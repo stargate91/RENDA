@@ -20,14 +20,40 @@ class ImageWorker:
         self._ensure_folders()
 
     def _ensure_folders(self):
-        """Creates the necessary subdirectories for different image types."""
-        for folder in ["posters", "backdrops", "persons", "stills"]:
+        """Creates the necessary subdirectories for different image types and thumbnails."""
+        for folder in ["posters", "backdrops", "persons", "stills", "thumbnails"]:
             (self.storage_path / folder).mkdir(parents=True, exist_ok=True)
+
+    def _generate_thumbnail(self, source_path: str) -> Optional[str]:
+        """Generates a small WebP thumbnail for fast UI preview."""
+        try:
+            from PIL import Image
+            src = Path(source_path)
+            if not src.exists():
+                return None
+            
+            thumb_filename = src.stem + "_thumb.webp"
+            thumb_path = self.storage_path / "thumbnails" / thumb_filename
+            
+            if thumb_path.exists():
+                return str(thumb_path)
+            
+            with Image.open(src) as img:
+                # Maintain aspect ratio, max width 300px
+                width = 300
+                w_percent = (width / float(img.size[0]))
+                h_size = int((float(img.size[1]) * float(w_percent)))
+                img = img.resize((width, h_size), Image.Resampling.LANCZOS)
+                img.save(thumb_path, "WEBP", quality=80)
+            
+            return str(thumb_path)
+        except Exception as e:
+            logger.error(f"Thumbnail generation failed ({source_path}): {e}")
+            return None
 
     def download_image(self, tmdb_path: str, subfolder: str, size: str = "original") -> Optional[str]:
         """
         Downloads an image from TMDB and returns the local relative path.
-        Includes basic caching by checking for existing files.
         """
         if not tmdb_path:
             return None
@@ -41,37 +67,34 @@ class ImageWorker:
         url = f"{self.BASE_URL}{size}{tmdb_path}"
         
         try:
-            response = requests.get(url, stream=True, timeout=10)
+            response = requests.get(url, stream=True, timeout=15)
             if response.status_code == 200:
                 with open(local_file_path, 'wb') as f:
                     for chunk in response.iter_content(1024):
                         f.write(chunk)
                 return str(local_file_path)
         except Exception as e:
-            print(f"Hiba a kép letöltésekor ({url}): {e}")
+            logger.error(f"Image download failed ({url}): {e}")
         
         return None
 
     def process_all(self, max_workers: int = 5):
-        """
-        Végrehajtja az összes letöltést párhuzamosan.
-        """
+        """Executes all pending downloads and processing in parallel."""
         from concurrent.futures import ThreadPoolExecutor
         
-        logger.info(f"ImageWorker: Letöltési folyamat indítása ({max_workers} szálon)...")
+        logger.info(f"ImageWorker: Starting download process ({max_workers} threads)...")
         
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # 1. Média képek (Posters, Stills)
+            # 1. Media assets (Posters, Stills)
             self.process_pending_media(executor)
             
-            # 2. Személyek profilképei
+            # 2. People profiles
             self.process_pending_persons(executor)
         
-        logger.info("ImageWorker: Minden várakozó feladat feldolgozva.")
+        logger.info("ImageWorker: All pending tasks completed.")
 
     def process_pending_media(self, executor):
-        """Feldolgozza a várakozó film/sorozat képeket batch-ekben."""
-        # Memória-barát: egyszerre csak 50 elemet töltünk be
+        """Processes pending movie/series images in batches."""
         while True:
             matches = self.db.query(MediaMatch).filter(
                 MediaMatch.image_status == ImageStatus.PENDING
@@ -80,7 +103,6 @@ class ImageWorker:
             if not matches:
                 break
 
-            # Letöltési feladatok beküldése a pool-ba
             futures = []
             for match in matches:
                 match.image_status = ImageStatus.DOWNLOADING
@@ -88,26 +110,29 @@ class ImageWorker:
             
             self.db.commit()
             
-            # Megvárjuk az aktuális batch végét
             for future in futures:
                 future.result()
 
     def _download_match_images(self, match: MediaMatch):
-        """Egyetlen médiaelem összes képének letöltése (szálon fut)."""
+        """Downloads all images for a single media match (threaded)."""
         success = False
         try:
             for loc in match.localizations:
-                # A. POSZTEREK
+                # A. POSTERS & THUMBNAILS
                 if loc.poster_path and not loc.local_poster_path:
                     local_p = self.download_image(loc.poster_path, "posters", size="w500")
                     if local_p:
                         loc.local_poster_path = local_p
+                        # Generate thumbnail immediately
+                        loc.local_thumb_path = self._generate_thumbnail(local_p)
                         success = True
                 
                 if loc.series_poster_path and not loc.local_series_poster_path:
                     local_sp = self.download_image(loc.series_poster_path, "posters", size="w500")
                     if local_sp:
                         loc.local_series_poster_path = local_sp
+                        if not loc.local_thumb_path: # Prefer movie poster for thumb, but use series if only one exists
+                            loc.local_thumb_path = self._generate_thumbnail(local_sp)
                         success = True
 
                 # B. STILLS
@@ -120,11 +145,11 @@ class ImageWorker:
             match.image_status = ImageStatus.COMPLETED if success else ImageStatus.FAILED
             self.db.commit()
         except Exception as e:
-            logger.error(f"Hiba a match képeinek letöltésekor (ID: {match.id}): {e}")
+            logger.error(f"Error downloading images for match ID {match.id}: {e}")
             self.db.rollback()
 
     def process_pending_persons(self, executor):
-        """Feldolgozza a várakozó személyek képeit batch-ekben."""
+        """Processes pending person profiles in batches."""
         while True:
             persons = self.db.query(Person).filter(
                 Person.image_status == ImageStatus.PENDING
@@ -144,7 +169,7 @@ class ImageWorker:
                 future.result()
 
     def _download_person_image(self, person: Person):
-        """Egyetlen személy képének letöltése (szálon fut)."""
+        """Downloads a single person's profile image (threaded)."""
         try:
             if person.profile_path and not person.local_profile_path:
                 local_path = self.download_image(person.profile_path, "persons", size="h632")
@@ -154,9 +179,9 @@ class ImageWorker:
                 else:
                     person.image_status = ImageStatus.FAILED
             else:
-                person.image_status = ImageStatus.COMPLETED # Ha nincs kép, késznek jelöljük
+                person.image_status = ImageStatus.COMPLETED
             
             self.db.commit()
         except Exception as e:
-            logger.error(f"Hiba a személy kép letöltésekor (ID: {person.id}): {e}")
+            logger.error(f"Error downloading person image (ID: {person.id}): {e}")
             self.db.rollback()

@@ -1,8 +1,17 @@
+import os
+from pathlib import Path
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import DeclarativeBase, sessionmaker, scoped_session
 
+# Ensure data directory exists
+DATA_DIR = Path("data")
+if not DATA_DIR.is_dir():
+    if DATA_DIR.exists(): # It's a file with the same name
+        os.remove(DATA_DIR)
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+
 # Database file location
-DATABASE_URL = "sqlite:///renda.db"
+DATABASE_URL = f"sqlite:///{DATA_DIR / 'renda.db'}"
 
 class Base(DeclarativeBase):
     """Base class for all SQLAlchemy models in the application."""

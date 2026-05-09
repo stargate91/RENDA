@@ -1,5 +1,6 @@
 from pathlib import Path
-from typing import List
+from concurrent.futures import ThreadPoolExecutor
+from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 
 from .collector import Collector
@@ -159,15 +160,18 @@ class ScannerManager:
                     logger.error(f"FFprobe hiba: {path} -> {e}")
                     probe_results[path] = None
 
-        # 2. Eredmények feldolgozása és logikai elemzés (Guessit)
-        for item in items:
+        # 2. Metaadatok lekérése (TMDB/Guessit) - Most már párhuzamosan (I/O bound)
+        
+        logger.info(f"Metadata enrichment starting for {len(items)} items (Parallel API)...")
+        
+        def process_item_metadata(item: MediaItem):
             try:
                 p = Path(item.original_path)
                 
                 # NFO (IMDb ID)
                 item.nfo_imdb_id = self.nfo_parser.get_imdb_id(p)
                 
-                # Technikai adatok a pool-ból
+                # Technical data from the probe pool
                 probe_data = probe_results.get(item.original_path)
                 if probe_data:
                     tech_info = self.prober.extract_info(probe_data)
@@ -178,94 +182,78 @@ class ScannerManager:
                     item.audio_streams = tech_info["audio_streams"]
                     item.internal_title = tech_info["internal_title"]
                 
-                # Guessit elemzés
+                # Guessit analysis
                 if not item.nfo_imdb_id:
                     triple = self.analyzer.get_triple_data(
                         item.internal_title, item.filename, item.folder_name
                     )
                     
-                    # --- Filename adatok (FN) ---
+                    # --- Filename data (FN) ---
                     fn = triple["fn"]
                     item.fn_title = self._reconstruct_movie_title(fn, item.filename)
                     item.fn_year = fn.get('year')
                     item.fn_season = fn.get('season')
                     item.fn_episode = str(fn.get('episode')) if fn.get('episode') else None
                     
-                    # Típus korrekció: ha magányos epizód -> movie
+                    # Type correction: standalone episodes treated as movies for better matching
                     fn_type = fn.get('type')
                     if fn_type == 'episode' and not fn.get('season'):
                         fn_type = 'movie'
                     item.fn_item_type = fn_type
                     
-                    # --- Intelligens Part detektálás ---
-                    # Csak akkor kezeljük Part-ként, ha NEM része a címnek
+                    # --- Intelligent Part Detection ---
                     raw_part = fn.get('part') or fn.get('cd') or fn.get('disc') or fn.get('volume')
                     if raw_part:
                         title_lower = (item.fn_title or "").lower()
-                        # Ha a 'part' szó benne van a címben, az valószínűleg a film címe (Harry Potter Part 1)
                         is_part_of_title = "part" in title_lower or "episode" in title_lower
-                        
-                        # Ha van epizód szám, akkor a 'part' valószínűleg az epizód címe (The End Part 1)
                         has_episode_num = fn.get('episode') is not None
                         
                         if not is_part_of_title and not has_episode_num:
                             from ..db.models import PartType
                             item.fn_part = raw_part
                             item.part = raw_part
-                            
-                            # Típus meghatározása prioritás szerint
-                            if 'cd' in fn:
-                                item.part_type = PartType.CD
-                            elif 'disc' in fn:
-                                item.part_type = PartType.DISC
-                            elif 'volume' in fn:
-                                item.part_type = PartType.VOLUME
-                            else:
-                                item.part_type = PartType.PART
-                        else:
-                            item.fn_part = None
+                            if 'cd' in fn: item.part_type = PartType.CD
+                            elif 'disc' in fn: item.part_type = PartType.DISC
+                            elif 'volume' in fn: item.part_type = PartType.VOLUME
+                            else: item.part_type = PartType.PART
                     
-                    # --- Group Hash generálás (Összetartozó fájlokhoz) ---
-                    # Cím + Év + (Szezon + Epizód ha van) + Mappa
-                    # Így a CD1 és CD2 ugyanazt a hash-t kapja
+                    # --- Group Hash (For split files like CD1/CD2) ---
                     hash_base = f"{item.fn_title or ''}{item.fn_year or ''}{item.fn_season or ''}{item.fn_episode or ''}{item.folder_name or ''}".lower().replace(" ", "")
                     if hash_base:
                         import hashlib
                         item.group_hash = hashlib.md5(hash_base.encode()).hexdigest()
                     
-                    # --- Folder adatok (FD) ---
+                    # --- Folder data (FD) ---
                     fd = triple["fd"]
                     item.fd_title = self._reconstruct_movie_title(fd, item.folder_name)
                     item.fd_year = fd.get('year')
                     item.fd_season = fd.get('season')
                     item.fd_episode = str(fd.get('episode')) if fd.get('episode') else None
+                    item.fd_item_type = fd.get('type')
                     
-                    fd_type = fd.get('type')
-                    if fd_type == 'episode' and not fd.get('season'):
-                        fd_type = 'movie'
-                    item.fd_item_type = fd_type
-                    
-                    item.fd_part = fd.get('part')
-                    
-                    # --- Internal title adatok (IT) ---
+                    # --- Internal title data (IT) ---
                     it = triple["it"]
-                    item.it_title = self._reconstruct_movie_title(it, item.internal_title)
-                    item.it_year = it.get('year')
-                    item.it_season = it.get('season')
-                    item.it_episode = str(it.get('episode')) if it.get('episode') else None
-                    
-                    it_type = it.get('type')
-                    if it_type == 'episode' and not it.get('season'):
-                        it_type = 'movie'
-                    item.it_item_type = it_type
+                    if it:
+                        item.it_title = self._reconstruct_movie_title(it, item.internal_title)
+                        item.it_year = it.get('year')
+                        item.it_season = it.get('season')
+                        item.it_episode = str(it.get('episode')) if it.get('episode') else None
+                        item.it_item_type = it.get('type')
                 
-                # Extrák nyelvének frissítése (Ez mindig kell a feliratokhoz/hangokhoz)
+                # Update language for extras (subtitles/audio)
                 for extra in item.extras:
                     if extra.category in [ExtraCategory.SUBTITLE, ExtraCategory.AUDIO]:
                         extra.language = self.analyzer.extract_language(extra.original_path)
+                
+                item.status = ItemStatus.MATCHED
+                return True
             except Exception as e:
-                print(f"Hiba a(z) {item.filename} gazdagítása közben: {e}")
+                logger.error(f"Error enriching {item.filename}: {e}")
                 item.status = ItemStatus.ERROR
+                return False
+
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            list(executor.map(process_item_metadata, items))
 
         self.db.commit()
-        print("Gazdagítás kész.")
+        logger.info("Enrichment complete.")

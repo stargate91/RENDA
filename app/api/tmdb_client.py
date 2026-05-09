@@ -19,38 +19,89 @@ class TMDBClient:
         setting = self.db.query(UserSetting).filter(UserSetting.key == "tmdb_api_key").first()
         return setting.value if setting else ""
 
-    def _get_cache(self, query: str, item_type: ItemType, language: str) -> Optional[Dict[str, Any]]:
-        """Megnézi, van-e már ilyen keresés a cache-ben."""
-        # Megjegyzés: A tmdb_cache táblában a tmdb_id-t használjuk, de keresésnél 
-        # a query-t is tárolhatnánk. Egyelőre a raw_data-ban tároljuk a keresési eredményeket is.
-        # Egyszerűség kedvéért a kereséseket egy speciális 'search' típusú cache-ként kezeljük.
-        pass # Később implementáljuk a finomhangolt cache-t
+    def _generate_cache_key(self, endpoint: str, params: Dict[str, Any]) -> str:
+        """Generates a unique key for the request based on endpoint and parameters."""
+        # Remove api_key from params to keep cache clean and portable
+        p = params.copy()
+        p.pop('api_key', None)
+        sorted_params = sorted(p.items())
+        param_str = "&".join(f"{k}={v}" for k, v in sorted_params)
+        return f"{endpoint}?{param_str}"
+
+    def _get_cache(self, cache_key: str) -> Optional[Dict[str, Any]]:
+        """Retrieves non-expired cache from the database."""
+        from datetime import datetime, timedelta
+        
+        # Check cache (expire after 30 days)
+        cache_item = self.db.query(TMDBCache).filter(TMDBCache.cache_key == cache_key).first()
+        if cache_item:
+            if datetime.utcnow() - cache_item.updated_at < timedelta(days=30):
+                return cache_item.raw_data
+        return None
+
+    def _set_cache(self, cache_key: str, data: Dict[str, Any]):
+        """Stores API response in the persistent cache."""
+        try:
+            # Use SQLite upsert logic (manual check for simplicity with Session)
+            cache_item = self.db.query(TMDBCache).filter(TMDBCache.cache_key == cache_key).first()
+            if not cache_item:
+                cache_item = TMDBCache(cache_key=cache_key)
+                self.db.add(cache_item)
+            
+            cache_item.raw_data = data
+            cache_item.tmdb_id = data.get('id') if isinstance(data, dict) else None
+            cache_item.target_language = data.get('language', 'en') if isinstance(data, dict) else 'en'
+            cache_item.updated_at = datetime.utcnow()
+            self.db.commit()
+        except Exception as e:
+            self.db.rollback()
+            # We don't want cache failures to break the app
+            pass
 
     def _call_api(self, endpoint: str, params: Dict[str, Any], max_retries: int = 3) -> Dict[str, Any]:
-        """Központi API hívó metódus Retry-After kezeléssel."""
+        """
+        Central API caller with Caching and Rate Limit (429) handling.
+        """
         import time
+        import logging
+        logger = logging.getLogger("renda")
         
+        # Ensure API key
+        if 'api_key' not in params:
+            params['api_key'] = self._api_key
+
+        # 1. Check Cache
+        cache_key = self._generate_cache_key(endpoint, params)
+        cached_data = self._get_cache(cache_key)
+        if cached_data:
+            return cached_data
+
+        # 2. Network Request
         url = self.BASE_URL + endpoint
-        
         for attempt in range(max_retries):
             try:
                 response = requests.get(url, params=params, timeout=15)
                 
+                if response.status_code == 200:
+                    data = response.json()
+                    self._set_cache(cache_key, data)
+                    return data
+                
                 if response.status_code == 429:
-                    # Rate limit elérve
                     retry_after = int(response.headers.get("Retry-After", 1))
-                    logger.warning(f"TMDB Rate Limit (429). Várakozás {retry_after} mp-et...")
+                    logger.warning(f"TMDB Rate Limit (429). Waiting {retry_after}s...")
                     time.sleep(retry_after)
                     continue
                 
                 response.raise_for_status()
-                return response.json()
                 
             except Exception as e:
                 if attempt == max_retries - 1:
-                    logger.error(f"TMDB API hiba ({endpoint}): {e}")
+                    logger.error(f"TMDB API Error ({endpoint}): {e}")
                     return {}
-                time.sleep(1 * (attempt + 1)) # Exponenciális várakozás
+                time.sleep(2 ** attempt)
+        
+        return {}
         
         return {}
 

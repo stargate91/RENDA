@@ -16,6 +16,8 @@ class TechnicalProber:
             'ffprobe', 
             '-v', 'quiet', 
             '-print_format', 'json', 
+            '-probesize', '5000000', # Limit probing to first 5MB
+            '-analyzeduration', '5000000', # Limit analysis to 5 seconds
             '-show_format', 
             '-show_streams', 
             file_path

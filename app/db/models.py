@@ -65,15 +65,16 @@ class ExtraSubtype(enum.Enum):
 # --- Models ---
 
 class MediaItem(Base):
-    """1. SZINT: A lemezen lévő fizikai fájl."""
+    """Level 1: The physical file on the disk."""
     __tablename__ = "media_items"
     id: Mapped[int] = mapped_column(primary_key=True); item_type: Mapped[ItemType] = mapped_column(SQLEnum(ItemType))
-    original_path: Mapped[str] = mapped_column(String, nullable=False); current_path: Mapped[str] = mapped_column(String, nullable=False)
-    filename: Mapped[str] = mapped_column(String); extension: Mapped[str] = mapped_column(String); size: Mapped[int] = mapped_column(BigInteger, default=0)
-    mtime: Mapped[Optional[float]] = mapped_column(Float) # Utolsó módosítás ideje (fájlrendszer)
-    folder_name: Mapped[Optional[str]] = mapped_column(String) # A közvetlen mappa neve
+    original_path: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    current_path: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    filename: Mapped[str] = mapped_column(String, index=True); extension: Mapped[str] = mapped_column(String); size: Mapped[int] = mapped_column(BigInteger, default=0, index=True)
+    mtime: Mapped[Optional[float]] = mapped_column(Float, index=True) # Last modified time (filesystem)
+    folder_name: Mapped[Optional[str]] = mapped_column(String) # Immediate parent directory name
     file_hash: Mapped[Optional[str]] = mapped_column(String, index=True)
-    group_hash: Mapped[Optional[str]] = mapped_column(String, index=True) # Darabolt fájlok összekötéséhez
+    group_hash: Mapped[Optional[str]] = mapped_column(String, index=True) # For linking split files (CD1/CD2)
     nfo_imdb_id: Mapped[Optional[str]] = mapped_column(String); internal_title: Mapped[Optional[str]] = mapped_column(String)
     duration: Mapped[Optional[float]] = mapped_column(Float); resolution: Mapped[Optional[str]] = mapped_column(String)
     video_codec: Mapped[Optional[str]] = mapped_column(String); video_bitrate: Mapped[Optional[int]] = mapped_column(Integer)
@@ -106,7 +107,7 @@ class MediaItem(Base):
 
 
 class MediaMatch(Base):
-    """2. SZINT: Globális TMDB találat."""
+    """Level 2: Global metadata match (e.g., TMDB result)."""
     __tablename__ = "media_matches"
     id: Mapped[int] = mapped_column(primary_key=True); media_item_id: Mapped[Optional[int]] = mapped_column(ForeignKey("media_items.id"), index=True)
     parent_id: Mapped[Optional[int]] = mapped_column(ForeignKey("media_matches.id"), index=True); tmdb_id: Mapped[int] = mapped_column(Integer, index=True)
@@ -136,7 +137,7 @@ class MediaMatch(Base):
 
 
 class MetadataLocalization(Base):
-    """3. SZINT: Nyelvi adatok."""
+    """Level 3: Language-specific metadata (localized titles, overviews)."""
     __tablename__ = "metadata_localizations"
     id: Mapped[int] = mapped_column(primary_key=True); match_id: Mapped[int] = mapped_column(ForeignKey("media_matches.id"))
     target_language: Mapped[str] = mapped_column(String, default="en", index=True); is_primary: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -156,12 +157,13 @@ class MetadataLocalization(Base):
     local_backdrop_path: Mapped[Optional[str]] = mapped_column(String)
     still_path: Mapped[Optional[str]] = mapped_column(String)
     local_still_path: Mapped[Optional[str]] = mapped_column(String)
+    local_thumb_path: Mapped[Optional[str]] = mapped_column(String) # For fast UI previews
     last_updated: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     match: Mapped["MediaMatch"] = relationship(back_populates="localizations")
 
 
 class Person(Base):
-    """Személyek - Globális adatok."""
+    """Cast and crew - Global information."""
     __tablename__ = "persons"
     id: Mapped[int] = mapped_column(primary_key=True); birthday: Mapped[Optional[str]] = mapped_column(String)
     deathday: Mapped[Optional[str]] = mapped_column(String); place_of_birth: Mapped[Optional[str]] = mapped_column(String)
@@ -176,7 +178,7 @@ class Person(Base):
 
 
 class PersonLocalization(Base):
-    """Személyek - Nyelvi adatok."""
+    """Cast and crew - Language-specific information."""
     __tablename__ = "person_localizations"
     id: Mapped[int] = mapped_column(primary_key=True); person_id: Mapped[int] = mapped_column(ForeignKey("persons.id"))
     language: Mapped[str] = mapped_column(String, default="en", index=True); name: Mapped[str] = mapped_column(String, nullable=False)
@@ -184,7 +186,7 @@ class PersonLocalization(Base):
 
 
 class MediaPersonLink(Base):
-    """Kapcsolótábla."""
+    """Link table between media matches and people (cast/crew)."""
     __tablename__ = "media_person_links"
     id: Mapped[int] = mapped_column(primary_key=True); media_match_id: Mapped[int] = mapped_column(ForeignKey("media_matches.id"), index=True)
     person_id: Mapped[int] = mapped_column(ForeignKey("persons.id"), index=True); job: Mapped[str] = mapped_column(String, index=True)
@@ -193,21 +195,24 @@ class MediaPersonLink(Base):
 
 
 class TMDBCache(Base):
-    """Nyers API cache."""
+    """Persistent storage for raw TMDB API responses."""
     __tablename__ = "tmdb_cache"
-    id: Mapped[int] = mapped_column(primary_key=True); tmdb_id: Mapped[int] = mapped_column(Integer, index=True)
-    item_type: Mapped[ItemType] = mapped_column(SQLEnum(ItemType)); target_language: Mapped[str] = mapped_column(String, index=True)
-    raw_data: Mapped[dict[str, Any]] = mapped_column(JSON); updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    __table_args__ = (UniqueConstraint('tmdb_id', 'item_type', 'target_language', name='_tmdb_cache_uc'),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    cache_key: Mapped[str] = mapped_column(String, unique=True, index=True) # Unique key for query/params
+    tmdb_id: Mapped[Optional[int]] = mapped_column(Integer, index=True)
+    item_type: Mapped[Optional[ItemType]] = mapped_column(SQLEnum(ItemType))
+    target_language: Mapped[str] = mapped_column(String, index=True)
+    raw_data: Mapped[dict[str, Any]] = mapped_column(JSON)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class ExtraFile(Base):
-    """Extra fájlok."""
+    """Associated files like subtitles, images, and trailers."""
     __tablename__ = "extra_files"
     id: Mapped[int] = mapped_column(primary_key=True); parent_item_id: Mapped[int] = mapped_column(ForeignKey("media_items.id"), index=True)
     category: Mapped[ExtraCategory] = mapped_column(SQLEnum(ExtraCategory), nullable=False)
     subtype: Mapped[ExtraSubtype] = mapped_column(SQLEnum(ExtraSubtype), default=ExtraSubtype.OTHER)
-    original_path: Mapped[str] = mapped_column(String, nullable=False); current_path: Mapped[str] = mapped_column(String, nullable=False)
+    original_path: Mapped[str] = mapped_column(String, nullable=False, index=True); current_path: Mapped[str] = mapped_column(String, nullable=False, index=True)
     extension: Mapped[str] = mapped_column(String)
     language: Mapped[Optional[str]] = mapped_column(String)
     parent_item: Mapped["MediaItem"] = relationship(back_populates="extras")
@@ -215,7 +220,7 @@ class ExtraFile(Base):
 
 
 class ActionBatch(Base):
-    """Csoportos műveletek."""
+    """Represents a group of operations performed together (for Undo)."""
     __tablename__ = "action_batches"
     id: Mapped[int] = mapped_column(primary_key=True); name: Mapped[Optional[str]] = mapped_column(String)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -223,7 +228,7 @@ class ActionBatch(Base):
 
 
 class ActionLog(Base):
-    """Műveleti napló."""
+    """Audit log for individual file operations."""
     __tablename__ = "action_logs"
     id: Mapped[int] = mapped_column(primary_key=True); batch_id: Mapped[int] = mapped_column(ForeignKey("action_batches.id"), index=True)
     media_item_id: Mapped[Optional[int]] = mapped_column(ForeignKey("media_items.id"), index=True)
@@ -239,7 +244,7 @@ class ActionLog(Base):
 
 
 class UserSetting(Base):
-    """Alkalmazás beállítások."""
+    """Application-wide user configurations."""
     __tablename__ = "user_settings"
     key: Mapped[str] = mapped_column(String, primary_key=True); value: Mapped[Any] = mapped_column(JSON)
     description: Mapped[Optional[str]] = mapped_column(String); updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
