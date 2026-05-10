@@ -1,0 +1,77 @@
+from datetime import datetime
+from typing import List, Optional, Any
+from sqlalchemy import String, Integer, Float, DateTime, Enum as SQLEnum, JSON, Boolean, BigInteger, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship, backref
+from app.db.base import Base
+from .enums import ItemType, ImageStatus
+
+class MediaMatch(Base):
+    """Level 2: Global metadata match (e.g., TMDB result)."""
+    __tablename__ = "media_matches"
+    id: Mapped[int] = mapped_column(primary_key=True); media_item_id: Mapped[Optional[int]] = mapped_column(ForeignKey("media_items.id"), index=True)
+    parent_id: Mapped[Optional[int]] = mapped_column(ForeignKey("media_matches.id"), index=True); tmdb_id: Mapped[int] = mapped_column(Integer, index=True)
+    imdb_id: Mapped[Optional[str]] = mapped_column(String, index=True); series_tmdb_id: Mapped[Optional[int]] = mapped_column(Integer)
+    season_tmdb_id: Mapped[Optional[int]] = mapped_column(Integer); item_type: Mapped[ItemType] = mapped_column(SQLEnum(ItemType))
+    season_number: Mapped[Optional[int]] = mapped_column(Integer); episode_number: Mapped[Optional[int]] = mapped_column(Integer)
+    episode_count: Mapped[Optional[int]] = mapped_column(Integer); rating_tmdb: Mapped[Optional[float]] = mapped_column(Float)
+    rating_imdb: Mapped[Optional[float]] = mapped_column(Float); rating_rotten: Mapped[Optional[str]] = mapped_column(String)
+    rating_meta: Mapped[Optional[int]] = mapped_column(Integer); vote_count_tmdb: Mapped[Optional[int]] = mapped_column(Integer)
+    vote_count_imdb: Mapped[Optional[int]] = mapped_column(Integer); budget: Mapped[Optional[int]] = mapped_column(BigInteger)
+    revenue: Mapped[Optional[int]] = mapped_column(BigInteger); runtime: Mapped[Optional[int]] = mapped_column(Integer)
+    popularity: Mapped[Optional[float]] = mapped_column(Float); release_status: Mapped[Optional[str]] = mapped_column(String)
+    series_type: Mapped[Optional[str]] = mapped_column(String)  # Scripted, Documentary, Miniseries, Reality
+    cast: Mapped[Optional[List[dict]]] = mapped_column(JSON); director: Mapped[Optional[str]] = mapped_column(String)
+    networks: Mapped[Optional[List[str]]] = mapped_column(JSON); collection: Mapped[Optional[str]] = mapped_column(String)
+    release_date: Mapped[Optional[datetime]] = mapped_column(DateTime); first_air_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    last_air_date: Mapped[Optional[datetime]] = mapped_column(DateTime); episode_air_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    season_air_date: Mapped[Optional[datetime]] = mapped_column(DateTime); number_of_seasons: Mapped[Optional[int]] = mapped_column(Integer)
+    number_of_episodes: Mapped[Optional[int]] = mapped_column(Integer)
+    fetched_languages: Mapped[Optional[str]] = mapped_column(String)
+    image_status: Mapped[ImageStatus] = mapped_column(SQLEnum(ImageStatus), default=ImageStatus.PENDING, index=True)
+    backdrop_status: Mapped[ImageStatus] = mapped_column(SQLEnum(ImageStatus), default=ImageStatus.PENDING, index=True)
+    confidence_score: Mapped[float] = mapped_column(Float, default=1.0)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    localizations: Mapped[List["MetadataLocalization"]] = relationship(back_populates="match", cascade="all, delete-orphan")
+    media_item: Mapped[Optional["MediaItem"]] = relationship(back_populates="matches")
+    children: Mapped[List["MediaMatch"]] = relationship("MediaMatch", backref=backref("parent", remote_side=[id]))
+    people: Mapped[List["MediaPersonLink"]] = relationship(back_populates="media_match", cascade="all, delete-orphan")
+
+
+class MetadataLocalization(Base):
+    """Level 3: Language-specific metadata (localized titles, overviews)."""
+    __tablename__ = "metadata_localizations"
+    id: Mapped[int] = mapped_column(primary_key=True); match_id: Mapped[int] = mapped_column(ForeignKey("media_matches.id"))
+    target_language: Mapped[str] = mapped_column(String, default="en", index=True); is_primary: Mapped[bool] = mapped_column(Boolean, default=True)
+    title: Mapped[str] = mapped_column(String); original_title: Mapped[Optional[str]] = mapped_column(String)
+    series_title: Mapped[Optional[str]] = mapped_column(String); original_series_title: Mapped[Optional[str]] = mapped_column(String)
+    season_title: Mapped[Optional[str]] = mapped_column(String)
+    episode_title: Mapped[Optional[str]] = mapped_column(String); tagline: Mapped[Optional[str]] = mapped_column(String)
+    overview: Mapped[Optional[str]] = mapped_column(String); genres: Mapped[Optional[List[str]]] = mapped_column(JSON)
+    origin_country: Mapped[Optional[List[str]]] = mapped_column(JSON)
+    original_language: Mapped[Optional[str]] = mapped_column(String)
+    spoken_languages: Mapped[Optional[List[str]]] = mapped_column(JSON)
+    poster_path: Mapped[Optional[str]] = mapped_column(String)
+    local_poster_path: Mapped[Optional[str]] = mapped_column(String)
+    series_poster_path: Mapped[Optional[str]] = mapped_column(String)
+    local_series_poster_path: Mapped[Optional[str]] = mapped_column(String)
+    backdrop_path: Mapped[Optional[str]] = mapped_column(String)
+    local_backdrop_path: Mapped[Optional[str]] = mapped_column(String)
+    still_path: Mapped[Optional[str]] = mapped_column(String)
+    local_still_path: Mapped[Optional[str]] = mapped_column(String)
+    all_stills: Mapped[Optional[List[str]]] = mapped_column(JSON) # JSON list of paths
+    local_all_stills: Mapped[Optional[List[str]]] = mapped_column(JSON)
+    local_thumb_path: Mapped[Optional[str]] = mapped_column(String) # For fast UI previews
+    last_updated: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    match: Mapped["MediaMatch"] = relationship(back_populates="localizations")
+
+
+class TMDBCache(Base):
+    """Persistent storage for raw TMDB API responses."""
+    __tablename__ = "tmdb_cache"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    cache_key: Mapped[str] = mapped_column(String, unique=True, index=True) # Unique key for query/params
+    tmdb_id: Mapped[Optional[int]] = mapped_column(Integer, index=True)
+    item_type: Mapped[Optional[ItemType]] = mapped_column(SQLEnum(ItemType))
+    target_language: Mapped[str] = mapped_column(String, index=True)
+    raw_data: Mapped[dict[str, Any]] = mapped_column(JSON)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
