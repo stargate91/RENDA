@@ -102,6 +102,64 @@ def get_image_status():
     finally:
         db.close()
 
+@app.get("/stats")
+def get_stats():
+    """Returns library statistics for the dashboard."""
+    db = Session()
+    try:
+        from sqlalchemy import func
+
+        # Movies: renamed/organized with type MOVIE
+        total_movies = db.query(func.count(MediaItem.id)).filter(
+            MediaItem.status.in_([ItemStatus.RENAMED, ItemStatus.ORGANIZED]),
+            MediaItem.item_type == ItemType.MOVIE
+        ).scalar() or 0
+
+        # Series: count distinct series titles (renamed/organized, type EPISODE or SERIES)
+        # Use fn_title or fd_title as the series identifier
+        total_series = db.query(
+            func.count(func.distinct(func.coalesce(MediaItem.fd_title, MediaItem.fn_title)))
+        ).filter(
+            MediaItem.status.in_([ItemStatus.RENAMED, ItemStatus.ORGANIZED]),
+            MediaItem.item_type.in_([ItemType.SERIES, ItemType.EPISODE])
+        ).scalar() or 0
+
+        # Episodes: total episode count (renamed/organized)
+        total_episodes = db.query(func.count(MediaItem.id)).filter(
+            MediaItem.status.in_([ItemStatus.RENAMED, ItemStatus.ORGANIZED]),
+            MediaItem.item_type.in_([ItemType.SERIES, ItemType.EPISODE])
+        ).scalar() or 0
+
+        # Storage: ALL media items (ExtraFile has no size column yet)
+        total_bytes = db.query(func.coalesce(func.sum(MediaItem.size), 0)).scalar()
+
+        # Format storage
+        if total_bytes >= 1024 ** 4:
+            storage_str = f"{total_bytes / (1024 ** 4):.1f} TB"
+        elif total_bytes >= 1024 ** 3:
+            storage_str = f"{total_bytes / (1024 ** 3):.1f} GB"
+        else:
+            storage_str = f"{total_bytes / (1024 ** 2):.0f} MB"
+
+        # Unmatched: items pending in discovery
+        unmatched = db.query(func.count(MediaItem.id)).filter(
+            MediaItem.status.in_([
+                ItemStatus.NEW, ItemStatus.MATCHED,
+                ItemStatus.UNCERTAIN, ItemStatus.NO_MATCH,
+                ItemStatus.MULTIPLE, ItemStatus.ERROR
+            ])
+        ).scalar() or 0
+
+        return {
+            "total_movies": total_movies,
+            "total_series": total_series,
+            "total_episodes": total_episodes,
+            "storage": storage_str,
+            "unmatched": unmatched
+        }
+    finally:
+        db.close()
+
 @app.get("/discovery")
 def get_discovery_items():
     """Returns grouped discovery items for the UI."""
@@ -206,13 +264,55 @@ def get_discovery_items():
                 else:
                     groups["movies"].append(data) # Fallback
 
+        from ..formatter.formatter import Formatter
+        formatter = Formatter()
+
+        # PASS 1: Kiszámoljuk az összes tervezett útvonalat
+        extra_paths = []
+        path_counts = {}
+
         for ex, p_status, p_planned, p_filename in extras:
             # Ha matched, akkor a tervezett nevet használjuk, különben az eredetit
             raw_parent_name = p_planned if (p_status == ItemStatus.MATCHED and p_planned) else p_filename
-            
-            # SOHA ne küldjük át a kiterjesztést a szülő nevében az extrákhoz, mert megtévesztő az UI-on
             parent_name = os.path.splitext(raw_parent_name)[0]
+            
+            if p_status == ItemStatus.MATCHED and p_planned:
+                parent_dir = os.path.dirname(p_planned)
+            else:
+                parent_dir = ""
                 
+            parent_name_no_ext = os.path.basename(parent_name)
+            
+            extra_ctx = formatter.build_extra_context(ex, parent_name_no_ext)
+            extra_name = formatter.format_extra_filename(extra_ctx)
+            extra_sub = formatter.get_extra_subpath(ex)
+            
+            import pathlib
+            base_path = str(pathlib.Path(parent_dir) / extra_sub / extra_name).replace("\\", "/")
+            raw_planned_path = base_path
+            
+            path_key = raw_planned_path.lower()
+            path_counts[path_key] = path_counts.get(path_key, 0) + 1
+                
+            extra_paths.append((ex, raw_planned_path, parent_name))
+
+        # PASS 2: Collision handling és JSON összeállítás
+        current_counts = {}
+        for ex, raw_planned_path, parent_name in extra_paths:
+            planned_path = raw_planned_path
+            
+            if planned_path != "-":
+                path_key = raw_planned_path.lower()
+                if path_counts[path_key] > 1:
+                    current_counts[path_key] = current_counts.get(path_key, 0) + 1
+                    idx = current_counts[path_key]
+                    
+                    if ex.extension:
+                        base = raw_planned_path[:-len(ex.extension)]
+                        planned_path = f"{base} {idx}{ex.extension}"
+                    else:
+                        planned_path = f"{raw_planned_path} {idx}"
+            
             groups["extras"].append({
                 "id": ex.id,
                 "parent_id": ex.parent_item_id,
@@ -222,7 +322,8 @@ def get_discovery_items():
                 "category": ex.category.value,
                 "subtype": ex.subtype.value if ex.subtype else "other",
                 "language": ex.language,
-                "path": ex.original_path
+                "path": ex.original_path,
+                "planned_path": planned_path
             })
             
         from fastapi.responses import JSONResponse

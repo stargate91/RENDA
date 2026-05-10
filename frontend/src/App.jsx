@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Search, X } from 'lucide-react';
 import './index.css';
 import en from './locales/en';
 
@@ -40,12 +41,19 @@ function App() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [imageIndex, setImageIndex] = useState(0);
   const [extraSubTab, setExtraSubTab] = useState('video');
+  const [stats, setStats] = useState({ total_movies: 0, total_series: 0, total_episodes: 0, storage: '0 MB', unmatched: 0 });
+  const [sortKey, setSortKey] = useState(null);
+  const [sortDir, setSortDir] = useState('asc'); // 'asc' | 'desc'
+  const [searchQuery, setSearchQuery] = useState('');
   const wasActiveRef = useRef(false);
 
   useEffect(() => {
     if (activeTab === 'extras') {
       setExtraSubTab('video');
     }
+    setSortKey(null);
+    setSortDir('asc');
+    setSearchQuery('');
   }, [activeTab]);
 
   useEffect(() => {
@@ -54,6 +62,7 @@ function App() {
 
   useEffect(() => {
     fetchSettings();
+    fetchStats();
   }, []);
 
   useEffect(() => {
@@ -92,6 +101,8 @@ function App() {
       fetchDiscovery();
     } else if (view === 'settings') {
       fetchSettings();
+    } else if (view === 'dashboard') {
+      fetchStats();
     }
   }, [view]);
 
@@ -102,6 +113,16 @@ function App() {
       setSettings(prev => ({ ...prev, ...data }));
     } catch (error) {
       console.error("Failed to fetch settings:", error);
+    }
+  };
+
+  const fetchStats = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/stats`);
+      const data = await response.json();
+      setStats(data);
+    } catch (error) {
+      console.error("Failed to fetch stats:", error);
     }
   };
 
@@ -248,22 +269,22 @@ function App() {
             <div className="stats-grid">
               <div className="stat-card">
                 <div className="stat-label">{T('dashboard.stats.total_movies')}</div>
-                <div className="stat-value">1,248</div>
+                <div className="stat-value">{(stats.total_movies || 0).toLocaleString()}</div>
                 <div className="stat-sub">{T('dashboard.stats.movies_sub')}</div>
               </div>
               <div className="stat-card">
                 <div className="stat-label">{T('dashboard.stats.tv_series')}</div>
-                <div className="stat-value">342</div>
-                <div className="stat-sub">{T('dashboard.stats.episodes_sub')}</div>
+                <div className="stat-value">{(stats.total_series || 0).toLocaleString()}</div>
+                <div className="stat-sub">{(stats.total_episodes || 0).toLocaleString()} {T('dashboard.stats.episodes_sub')}</div>
               </div>
               <div className="stat-card">
                 <div className="stat-label">{T('dashboard.stats.storage_used')}</div>
-                <div className="stat-value">42.8 TB</div>
+                <div className="stat-value">{stats.storage || '0 MB'}</div>
                 <div className="stat-sub">{T('dashboard.stats.storage_sub')}</div>
               </div>
               <div className="stat-card">
                 <div className="stat-label">{T('dashboard.stats.unmatched')}</div>
-                <div className="stat-value">{(items?.manual?.length || 0) + (items?.movies?.length || 0) + (items?.series?.length || 0)}</div>
+                <div className="stat-value">{(stats.unmatched || 0).toLocaleString()}</div>
                 <div className="stat-sub">{T('dashboard.stats.unmatched_sub')}</div>
               </div>
             </div>
@@ -327,24 +348,86 @@ function App() {
               </div>
             )}
 
+            <div className="search-bar">
+              <span className="search-icon"><Search size={16} /></span>
+              <input
+                type="text"
+                className="search-input"
+                placeholder={T('discovery.search_placeholder')}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              {searchQuery && (
+                <button className="search-clear" onClick={() => setSearchQuery('')}>
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+
             <div className="data-table-container">
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>{T('discovery.table.name_mapping')}</th>
-                    <th>{T('discovery.table.planned_name')}</th>
-                    {activeTab === 'manual' && <th className="cell-center">{T('discovery.table.type')}</th>}
-                    {activeTab === 'extras' && (
-                      <th className="cell-center">{T('discovery.table.subcategory')}</th>
+                    <th className="sortable-th" onClick={() => { setSortKey(sortKey === 'filename' && sortDir === 'asc' ? 'filename' : 'filename'); setSortDir(sortKey === 'filename' && sortDir === 'asc' ? 'desc' : 'asc'); }}>
+                      {T('discovery.table.name_mapping')} {sortKey === 'filename' && (sortDir === 'asc' ? '▲' : '▼')}
+                    </th>
+                    <th className="sortable-th" onClick={() => { setSortKey(sortKey === 'planned_path' && sortDir === 'asc' ? 'planned_path' : 'planned_path'); setSortDir(sortKey === 'planned_path' && sortDir === 'asc' ? 'desc' : 'asc'); }}>
+                      {T('discovery.table.planned_name')} {sortKey === 'planned_path' && (sortDir === 'asc' ? '▲' : '▼')}
+                    </th>
+                    {activeTab === 'manual' && (
+                      <th className="cell-center sortable-th" onClick={() => { setSortDir(sortKey === 'type' && sortDir === 'asc' ? 'desc' : 'asc'); setSortKey('type'); }}>
+                        {T('discovery.table.type')} {sortKey === 'type' && (sortDir === 'asc' ? '▲' : '▼')}
+                      </th>
                     )}
-                    {activeTab !== 'extras' && <th className="cell-center">{T('discovery.table.status')}</th>}
+                    {activeTab === 'extras' && (extraSubTab === 'subtitle' || extraSubTab === 'audio') && (
+                      <th className="cell-center sortable-th" onClick={() => { setSortDir(sortKey === 'language' && sortDir === 'asc' ? 'desc' : 'asc'); setSortKey('language'); }}>
+                        {T('discovery.table.language')} {sortKey === 'language' && (sortDir === 'asc' ? '▲' : '▼')}
+                      </th>
+                    )}
+                    {activeTab === 'extras' && extraSubTab !== 'metadata' && (
+                      <th className="cell-center sortable-th" onClick={() => { setSortDir(sortKey === 'subtype' && sortDir === 'asc' ? 'desc' : 'asc'); setSortKey('subtype'); }}>
+                        {T('discovery.table.subcategory')} {sortKey === 'subtype' && (sortDir === 'asc' ? '▲' : '▼')}
+                      </th>
+                    )}
+                    {activeTab !== 'extras' && (
+                      <th className="cell-center sortable-th" onClick={() => { setSortDir(sortKey === 'status' && sortDir === 'asc' ? 'desc' : 'asc'); setSortKey('status'); }}>
+                        {T('discovery.table.status')} {sortKey === 'status' && (sortDir === 'asc' ? '▲' : '▼')}
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
-                  {(activeTab === 'extras'
-                    ? (items.extras || []).filter(ex => ex.category === extraSubTab)
-                    : (items[activeTab] || [])
-                  ).map(item => (
+                  {(() => {
+                    let rows = activeTab === 'extras'
+                      ? (items.extras || []).filter(ex => ex.category === extraSubTab)
+                      : (items[activeTab] || []);
+                    
+                    // Search filter
+                    if (searchQuery) {
+                      const q = searchQuery.toLowerCase();
+                      rows = rows.filter(item => {
+                        const fn = (item.filename || '').toLowerCase();
+                        const pn = (activeTab === 'extras' ? (item.parent_name || '') : (item.planned_path || '')).toLowerCase();
+                        return fn.includes(q) || pn.includes(q);
+                      });
+                    }
+                    
+                    // Sort
+                    if (sortKey) {
+                      rows = [...rows].sort((a, b) => {
+                        let valA = (a[sortKey] || '').toString().toLowerCase();
+                        let valB = (b[sortKey] || '').toString().toLowerCase();
+                        if (sortKey === 'planned_path' && activeTab === 'extras') {
+                          valA = (a.parent_name || '').toLowerCase();
+                          valB = (b.parent_name || '').toLowerCase();
+                        }
+                        if (valA < valB) return sortDir === 'asc' ? -1 : 1;
+                        if (valA > valB) return sortDir === 'asc' ? 1 : -1;
+                        return 0;
+                      });
+                    }
+                    
+                    return rows.map(item => (
                     <tr
                       key={item.id}
                       className={selectedItem?.id === item.id ? 'selected' : ''}
@@ -357,17 +440,15 @@ function App() {
                         <div className="planned-name" title={item.planned_path}>
                           <span className="arrow">➔</span>
                           <span className="planned-name-text">
-                            {activeTab === 'extras' ? (
-                              <>
-                                {item.parent_name}{item.category !== 'metadata' && (
-                                  <>{(item.category === 'audio' || item.category === 'subtitle') && item.language ? ` [${item.language.toUpperCase()}]` : ''}
-                                    {item.subtype && item.subtype.toLowerCase() !== 'other'
-                                      ? ` ${item.subtype.charAt(0).toUpperCase() + item.subtype.slice(1).replace(/_/g, ' ')}`
-                                      : ''}</>
-                                )}{item.extension && <span className="extension-text">{item.extension.toLowerCase()}</span>}
-                              </>
-                            ) : item.planned_path ? (
-                              item.planned_path
+                            {item.planned_path ? (
+                              activeTab === 'extras' ? (
+                                <>
+                                  {item.planned_path.split('/').pop().replace(new RegExp((item.extension || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i'), '')}
+                                  {item.extension && <span className="extension-text">{item.extension.toLowerCase()}</span>}
+                                </>
+                              ) : (
+                                item.planned_path
+                              )
                             ) : '-'}
                           </span>
                         </div>
@@ -377,7 +458,14 @@ function App() {
                           <span className={`badge badge-type`}>{item.type}</span>
                         </td>
                       )}
-                      {activeTab === 'extras' && (
+                      {activeTab === 'extras' && (extraSubTab === 'subtitle' || extraSubTab === 'audio') && (
+                        <td className="cell-center">
+                          <span className="language-text">
+                            {item.language ? item.language.toUpperCase() : '-'}
+                          </span>
+                        </td>
+                      )}
+                      {activeTab === 'extras' && extraSubTab !== 'metadata' && (
                         <td className="cell-center">
                           <span className="subcategory-text">
                             {item.subtype && item.subtype.toLowerCase() !== 'other'
@@ -394,7 +482,8 @@ function App() {
                         </td>
                       )}
                     </tr>
-                  ))}
+                  ));
+                  })()}
                   {(!items[activeTab] || items[activeTab].length === 0) && !loading && (
                     <tr>
                       <td colSpan="6" style={{ textAlign: 'center', padding: '100px', color: '#666' }}>
@@ -522,7 +611,7 @@ function App() {
                 <h2 style={{ margin: 0, fontSize: '20px' }}>{T('inspector.details')}</h2>
               </div>
 
-              {selectedItem.images && selectedItem.images.length > 0 && (
+              {selectedItem.images && selectedItem.images.length > 0 && selectedItem.status?.toLowerCase() !== 'multiple' && selectedItem.status?.toLowerCase() !== 'no_match' && (
                 <div className="inspector-carousel">
                   <div className="carousel-container" onClick={() => setImageIndex((imageIndex + 1) % selectedItem.images.length)}>
                     <img
@@ -549,16 +638,17 @@ function App() {
               <div className="inspector-card">
                 <div className="inspector-item">
                   <div className="inspector-label">{T('inspector.path')}</div>
-                  <div className="inspector-value code">{selectedItem.folder}/{selectedItem.filename}</div>
+                  <div className="inspector-value code" style={{ color: '#ffffff' }}>
+                    {selectedItem.path || `${selectedItem.folder}/${selectedItem.filename}`}
+                  </div>
                 </div>
                 <div className="inspector-item">
                   <div className="inspector-label">{T('inspector.planned')}</div>
-                  <div className="inspector-value" style={{ color: 'var(--accent-blue)' }}>{selectedItem.planned_path || '-'}</div>
+                  <div className="inspector-value" style={{ color: '#00ff64' }}>{selectedItem.planned_path || '-'}</div>
                 </div>
               </div>
 
-              <div className="inspector-section">
-                <div className="inspector-section-title">{T('inspector.technical')}</div>
+              {activeTab !== 'extras' && (
                 <div className="inspector-card">
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                     <div className="inspector-item">
@@ -580,14 +670,10 @@ function App() {
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
 
-              <div className="inspector-section">
-                <div className="inspector-section-title">{T('inspector.actions')}</div>
-                <div className="inspector-actions">
-                  <button className="btn-secondary">{T('inspector.edit')}</button>
-                  <button className="btn-secondary">{T('inspector.force_refresh')}</button>
-                </div>
+              <div className="inspector-actions">
+                <button className="btn-secondary">{T('inspector.check_metadata')}</button>
               </div>
             </>
           ) : (

@@ -83,6 +83,10 @@ class Categorizer:
                 subtype = value
                 break
 
+        # Guard: DUBBED is audio-only, never applies to subtitles
+        if category == ExtraCategory.SUBTITLE and subtype == ExtraSubtype.DUBBED:
+            subtype = None
+
         # Special case for Metadata files - they should prioritize their specific type
         if ext == '.nfo': subtype = ExtraSubtype.NFO
         elif ext == '.xml': subtype = ExtraSubtype.XML

@@ -74,11 +74,13 @@ class FormatterConfig:
     series_category_name: str = "Series"
 
     # Extra rendszerezés
-    extra_org: ExtraOrg = ExtraOrg.SAME_FOLDER
+    extra_org: ExtraOrg = ExtraOrg.SUBFOLDER
     extras_subfolder_name: str = "Extras" # Csak SUBFOLDER módnál
 
-    # Alapértelmezett extra template
-    extra_file: str = "{parent_name}-{sub_category}"
+    # Alapértelmezett extra templatek
+    extra_video_image: str = "{parent_name} {sub_category}"
+    extra_audio_sub: str = "{parent_name} {language} {sub_category}"
+    extra_metadata: str = "{parent_name}"
 
     # Alapértelmezett film templatek
     movie_folder: str = "{title} ({year})"
@@ -299,7 +301,20 @@ class Formatter:
         return self._render(self.config.episode_file, context)
 
     def format_extra_filename(self, context: Dict[str, Any]) -> str:
-        return self._render(self.config.extra_file, context)
+        cat = context.get("category", "")
+        if cat in ["video", "image"]:
+            tmpl = self.config.extra_video_image
+        elif cat in ["audio", "subtitle"]:
+            tmpl = self.config.extra_audio_sub
+        elif cat == "metadata":
+            tmpl = self.config.extra_metadata
+        else:
+            tmpl = "{parent_name} {sub_category}"
+            
+        name = self._render(tmpl, context)
+        # Eltávolítjuk a felesleges szóközöket, amik az üres változókból adódnak
+        name = " ".join(name.split())
+        return name
 
     def get_extra_subpath(self, extra) -> str:
         """Visszaadja az extra fájl alkönyvtárát a stratégia alapján."""
@@ -321,7 +336,7 @@ class Formatter:
         parent_formatted_name: A szülő fájl neve kiterjesztés NÉLKÜL.
         """
         # subtype finomítás
-        sub_cat = extra.subtype.value if extra.subtype else ""
+        sub_cat = extra.subtype.value.replace("_", " ").title() if extra.subtype else ""
         # Ha Metadata és a sub_cat megegyezik a kiterjesztéssel, akkor üres legyen
         if extra.category == "Metadata" and sub_cat.lower() == (extra.extension or "").lower().strip("."):
             sub_cat = ""
@@ -330,7 +345,7 @@ class Formatter:
             "parent_name": parent_formatted_name,
             "category": extra.category.value if extra.category else "",
             "sub_category": sub_cat,
-            "language": extra.language or "",
+            "language": extra.language.upper() if extra.language else "",
             "ext": extra.extension or "",
             "custom": self.config.custom_text
         }
@@ -510,7 +525,7 @@ class Formatter:
         result = self.sanitize(result)
 
         # 3. Casing és Separator alkalmazása (csak a névre, a kiterjesztésre nem!)
-        result = self.apply_casing(result)
+        result = self.apply_casing(result, context)
         result = self.apply_separator(result)
 
         # 4. Automatikus kiterjesztés hozzáadása, ha fájlról van szó
@@ -522,11 +537,21 @@ class Formatter:
 
         return result.strip()
 
-    def apply_casing(self, text: str) -> str:
+    def apply_casing(self, text: str, context: Optional[Dict[str, Any]] = None) -> str:
         if not text: return ""
         if self.config.casing == Casing.LOWER: return text.lower()
         if self.config.casing == Casing.UPPER: return text.upper()
-        if self.config.casing == Casing.TITLE: return text.title()
+        if self.config.casing == Casing.TITLE:
+            title_text = text.title()
+            if context:
+                # Különleges, önállóan nagybetűs elemek védelme a Title Case-től (pl. HU, CD, III)
+                for key in ["language", "part_type", "part"]:
+                    val = context.get(key)
+                    if isinstance(val, str) and val:
+                        val_title = val.title()
+                        if val != val_title:
+                            title_text = re.sub(fr'\b{re.escape(val_title)}\b', val, title_text)
+            return title_text
         return text
 
     def apply_separator(self, text: str) -> str:

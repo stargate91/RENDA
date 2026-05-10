@@ -291,8 +291,24 @@ class ScannerManager:
                         item.fn_season = None
                         item.fn_episode = None
                     
+                    # 1. Erős sorozat indikátorok
+                    raw_fn_lower = (item.filename or "").lower()
+                    raw_fd_lower = (item.folder_name or "").lower()
+                    
+                    is_forced_series = False
+                    # Ha a Guessit ténylegesen talált szezont vagy epizódot (és nem a 1080p csapda):
+                    if item.fn_season or item.fn_episode or item.fd_season or item.fd_episode:
+                        is_forced_series = True
+                        
+                    # Kulcsszavak, amiket a Guessit lehet hogy 'movie'-ként értékel, de egyértelműen sorozat:
+                    series_kw = ['mini-series', 'miniseries', 'complete series', 'complete.series']
+                    if any(kw in raw_fn_lower or kw in raw_fd_lower for kw in series_kw):
+                        is_forced_series = True
+                    
                     # 2. Folder metadata is usually more reliable for scene releases
-                    if fd_type == 'movie' and fd.get('year'):
+                    if is_forced_series:
+                        final_type = 'episode'
+                    elif fd_type == 'movie' and fd.get('year'):
                         # Ha a mappában van évszám és filmnek tűnik, az nagyon erős jel
                         final_type = 'movie'
                     elif fn_type == 'episode' and not fd.get('year'):

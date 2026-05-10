@@ -106,12 +106,12 @@ class Resolver:
         # 2. Forrás: Triple Guessit Search (ha még nincs 100%-os találatunk)
         if not candidates:
             search_tasks = [
-                (item.it_title, item.it_year, item.it_item_type),
-                (item.fn_title, item.fn_year, item.fn_item_type),
-                (item.fd_title, item.fd_year, item.fd_item_type)
+                (item.it_title, item.it_year),
+                (item.fn_title, item.fn_year),
+                (item.fd_title, item.fd_year)
             ]
             
-            for title, year, itype in search_tasks:
+            for title, year in search_tasks:
                 if not title: continue
                 
                 # Ha filmnek tűnik, de Guessit epizódot/részt talált, 
@@ -123,7 +123,7 @@ class Resolver:
                 clean_title = self._sanitize_query(title)
                 if not clean_title: continue
 
-                tmdb_type = "tv" if itype == "episode" or itype == "series" else "movie"
+                tmdb_type = "tv" if item.item_type in (ItemType.SERIES, ItemType.EPISODE) else "movie"
                 results = self.api.search(clean_title, item_type=tmdb_type, year=year, language=language)
                 
                 # FALLBACK: Ha évszámmal nem volt találat, próbáljuk meg anélkül
@@ -195,21 +195,26 @@ class Resolver:
                 target_year = item.fn_year or item.fd_year or item.it_year
                 match_year = release_date.year if release_date else None
                 
-                is_episode = bool(item.fn_season or item.fn_episode or item.fd_season or item.fd_episode)
+                has_season = bool(item.fn_season or item.fd_season or item.it_season)
+                has_episode_num = bool(item.fn_episode or item.fd_episode or item.it_episode)
                 
-                # 1. Van évszámunk, és az első találat évszáma is megegyezik (+- 1 év)
-                if target_year and match_year and abs(target_year - match_year) <= 1:
+                # 1. Kritérium: Ha sorozat, de hiányzik a szezon VAGY epizód szám -> UNCERTAIN
+                if item.item_type in (ItemType.SERIES, ItemType.EPISODE) and (not has_season or not has_episode_num):
+                    item.status = ItemStatus.UNCERTAIN
+                    
+                # 2. Van évszámunk, és az első találat évszáma is megegyezik (+- 1 év)
+                elif target_year and match_year and abs(target_year - match_year) <= 1:
                     item.status = ItemStatus.MATCHED
                 
-                # 2. Van évszámunk, de az első találat évszáma eltér
+                # 3. Van évszámunk, de az első találat évszáma eltér
                 elif target_year and match_year and abs(target_year - match_year) > 1:
                     item.status = ItemStatus.UNCERTAIN
                     
-                # 3. Nincs évszámunk, de a TMDB több találatot is adott (pl. Jumanji, vagy több azonos című sorozat)
+                # 4. Nincs évszámunk, de a TMDB több találatot is adott
                 elif not target_year and match_count > 1:
                     item.status = ItemStatus.MULTIPLE
                     
-                # 4. Nincs évszám, de csak 1 találat jött vissza (pl. egyértelmű sorozatcím)
+                # 5. Nincs évszám, de csak 1 találat jött vissza (egyértelmű match)
                 else:
                     item.status = ItemStatus.MATCHED
             

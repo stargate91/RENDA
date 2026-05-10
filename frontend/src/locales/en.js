@@ -18,9 +18,9 @@ const en = {
     "subtitle": "Your library is optimized and up to date.",
     "stats": {
       "total_movies": "Total Movies",
-      "movies_sub": "+12 this week",
+      "movies_sub": "In Library",
       "tv_series": "TV Series",
-      "episodes_sub": "14,204 Episodes",
+      "episodes_sub": "Episodes",
       "storage_used": "Storage Used",
       "storage_sub": "across 4 drives",
       "unmatched": "Unmatched",
@@ -32,13 +32,15 @@ const en = {
     "found_items": "Found {{count}} new items.",
     "scan_now": "Scan Now",
     "processing": "Processing...",
+    "search_placeholder": "Search in this view...",
     "table": {
       "name_mapping": "Original Filename",
       "planned_name": "Planned Name",
       "type": "Type",
       "status": "Status",
       "subcategory": "Category",
-      "subtype": "Extension"
+      "subtype": "Extension",
+      "language": "Language"
     },
     "tabs": {
       "manual": "Manual Review",
@@ -66,15 +68,12 @@ const en = {
   "inspector": {
     "select_item": "Select an item to see details",
     "details": "Details",
-    "technical": "Technical Info",
     "path": "Original Path",
     "planned": "Planned Path",
     "resolution": "Resolution",
     "duration": "Duration",
     "codecs": "Codecs",
-    "actions": "Actions",
-    "edit": "Edit Metadata",
-    "force_refresh": "Force Refresh"
+    "check_metadata": "Check Full Metadata"
   }
 };
 
