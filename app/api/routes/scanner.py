@@ -50,11 +50,36 @@ def get_image_status():
 @router.post("/scan")
 def start_scan(request: ScanRequest, background_tasks: BackgroundTasks):
     """Triggers a library scan in the background."""
+    from app.utils.logger import logger
+    logger.info(f"Received scan request for paths: {request.paths}")
+    
+    import time
+    scan_status.update({
+        "active": True,
+        "phase": "collecting",
+        "current": 0,
+        "total": 0,
+        "start_time": time.time()
+    })
+    
     def run_scan():
+        logger.info("Background scan task starting...")
         db = Session()
         try:
-            scanner = ScannerManager(db)
+            from app.db.models import UserSetting
+            min_size = 500
+            try:
+                setting = db.query(UserSetting).filter(UserSetting.key == "min_video_size_mb").first()
+                if setting and setting.value: min_size = int(setting.value)
+            except: pass
+            
+            scanner = ScannerManager(db, min_video_size_mb=min_size)
             scanner.scan_and_save(request.paths)
+            logger.info("Background scan task completed successfully.")
+        except Exception as e:
+            import traceback
+            logger.error(f"Background scan task failed: {e}")
+            logger.error(traceback.format_exc())
         finally:
             db.close()
     

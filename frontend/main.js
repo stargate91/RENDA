@@ -7,9 +7,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Handler for folder selection dialog
-ipcMain.handle('select-folder', async () => {
+ipcMain.handle('select-folder', async (event, defaultPath) => {
   const result = await dialog.showOpenDialog({
-    properties: ['openDirectory']
+    properties: ['openDirectory'],
+    defaultPath: defaultPath || app.getPath('home')
   });
   if (result.canceled) {
     return null;

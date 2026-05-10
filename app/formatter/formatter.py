@@ -68,29 +68,139 @@ class FormatterConfig:
     zero_pad: bool = True  # S01E03 vs S1E3
     custom_text: str = ""  # {custom} változó értéke (Settingsből)
 
-    # Kategória mappák (Filmek/Sorozatok külön)
-    use_categories: bool = False
-    movies_category_name: str = "Movies"
-    series_category_name: str = "Series"
-
-    # Extra rendszerezés
-    extra_org: ExtraOrg = ExtraOrg.SUBFOLDER
-    extras_subfolder_name: str = "Extras" # Csak SUBFOLDER módnál
-
-    # Alapértelmezett extra templatek
-    extra_video_image: str = "{parent_name} {sub_category}"
-    extra_audio_sub: str = "{parent_name} {language} {sub_category}"
-    extra_metadata: str = "{parent_name}"
-
-    # Alapértelmezett film templatek
-    movie_folder: str = "{title} ({year})"
+    # Naming Templates (from Settings)
     movie_file: str = "{title} ({year})"
-    collection_folder: str = "{collection}"
-
-    # Alapértelmezett TV templatek
-    series_folder: str = "{series_title} ({first_air_year})"
-    season_folder: str = "Season {season}"
     episode_file: str = "{series_title} - S{season}E{episode} - {episode_title}"
+    
+    # Part Formatting
+    part_keyword: str = "Part"
+    part_numbering: str = "numeric" # numeric, roman, alpha
+    part_separator: Separator = Separator.SPACE
+
+    # Folder Organization
+    org_enabled: bool = True
+    move_to_library: bool = True
+    library_path: str = ""
+    sort_by_type: bool = True
+    movies_dir_name: str = "Movies"
+    series_dir_name: str = "TV Shows"
+    
+    # Folder Templates
+    create_movie_subdir: bool = True
+    movie_folder: str = "{title} ({year}) - {resolution}"
+    create_collection_dir: bool = True
+    collection_folder: str = "{collection}"
+    create_series_dir: bool = True
+    series_folder: str = "{series_title} ({year})"
+    create_season_dir: bool = True
+    season_folder: str = "Season {season}"
+    create_episode_dir: bool = False
+    episode_folder: str = "{series_title} - {season}{episode}"
+    
+    remove_empty: bool = True
+    
+    # Extras Handling
+    extras_enabled: bool = True
+    # Actions: 'rename', 'delete', 'ignore'
+    extra_video_action: str = "delete"
+    extra_sub_action: str = "rename"
+    extra_audio_action: str = "rename"
+    extra_img_action: str = "rename"
+    extra_meta_action: str = "rename"
+    
+    # Extras Templates
+    extra_video_template: str = "{parent_name} - {sub_category}"
+    extra_sub_template: str = "{parent_name} ({language}) {sub_category}"
+    extra_audio_template: str = "{parent_name} ({language}) {sub_category}"
+    extra_img_template: str = "{sub_category}"
+    extra_meta_template: str = "{parent_name}"
+    
+    # Extras Folder Placement
+    # modes: 'subfolder' (into 'Extras'), 'flat' (next to media)
+    extras_folder_mode: str = "subfolder"
+    extras_subfolder_name: str = "Extras"
+
+    @staticmethod
+    def from_db(db_session) -> 'FormatterConfig':
+        from ..db.models import UserSetting
+        config = FormatterConfig()
+        try:
+            settings = {s.key: s.value for s in db_session.query(UserSetting).all()}
+            
+            # Casing
+            c_val = settings.get("naming_filename_casing", "title")
+            if c_val == "lower": config.casing = Casing.LOWER
+            elif c_val == "upper": config.casing = Casing.UPPER
+            elif c_val == "title": config.casing = Casing.TITLE
+            else: config.casing = Casing.DEFAULT
+            
+            # Separator
+            s_val = settings.get("naming_word_separator", "space")
+            if s_val == "dot": config.separator = Separator.DOT
+            elif s_val == "dash": config.separator = Separator.DASH
+            elif s_val == "underscore": config.separator = Separator.UNDERSCORE
+            else: config.separator = Separator.SPACE
+
+            # Templates (Files)
+            config.movie_file = settings.get("naming_movie_template", config.movie_file).replace("{{", "{").replace("}}", "}")
+            config.episode_file = settings.get("naming_episode_template", config.episode_file).replace("{{", "{").replace("}}", "}")
+            
+            # Templates (Folders)
+            config.movie_folder = settings.get("folder_movie_template", config.movie_folder).replace("{{", "{").replace("}}", "}")
+            config.collection_folder = settings.get("folder_collection_template", config.collection_folder).replace("{{", "{").replace("}}", "}")
+            config.series_folder = settings.get("folder_show_template", config.series_folder).replace("{{", "{").replace("}}", "}")
+            config.season_folder = settings.get("folder_season_template", config.season_folder).replace("{{", "{").replace("}}", "}")
+            config.episode_folder = settings.get("folder_episode_template", config.episode_folder).replace("{{", "{").replace("}}", "}")
+
+            # Templates (Extras)
+            config.extra_video_template = settings.get("extras_video_template", config.extra_video_template).replace("{{", "{").replace("}}", "}")
+            config.extra_sub_template = settings.get("extras_sub_template", config.extra_sub_template).replace("{{", "{").replace("}}", "}")
+            config.extra_audio_template = settings.get("extras_audio_template", config.extra_audio_template).replace("{{", "{").replace("}}", "}")
+            config.extra_img_template = settings.get("extras_img_template", config.extra_img_template).replace("{{", "{").replace("}}", "}")
+            config.extra_meta_template = settings.get("extras_meta_template", config.extra_meta_template).replace("{{", "{").replace("}}", "}")
+
+            # Folder Switches
+            config.org_enabled = settings.get("folder_organization_enabled", True)
+            config.move_to_library = settings.get("folder_move_to_library", True)
+            config.library_path = settings.get("folder_library_path", "")
+            config.sort_by_type = settings.get("folder_sort_by_type", True)
+            config.movies_dir_name = settings.get("folder_movies_name", "Movies")
+            config.series_dir_name = settings.get("folder_series_name", "TV Shows")
+            
+            config.create_movie_subdir = settings.get("folder_create_movie_subdir", True)
+            config.create_collection_dir = settings.get("folder_create_collection_dir", True)
+            config.create_series_dir = settings.get("folder_create_show_dir", True)
+            config.create_season_dir = settings.get("folder_create_season_dir", True)
+            config.create_episode_dir = settings.get("folder_create_episode_dir", False)
+            config.remove_empty = settings.get("folder_remove_empty", True)
+
+            # Extras Switches & Actions
+            config.extras_enabled = settings.get("extras_enabled", True)
+            config.extra_video_action = settings.get("extras_video_action", "delete")
+            config.extra_sub_action = settings.get("extras_sub_action", "rename")
+            config.extra_audio_action = settings.get("extras_audio_action", "rename")
+            config.extra_img_action = settings.get("extras_img_action", "rename")
+            config.extra_meta_action = settings.get("extras_meta_action", "rename")
+            config.extras_folder_mode = settings.get("extras_folder_mode", "subfolder")
+
+            # Parts
+            config.part_keyword = settings.get("naming_part_keyword", "Part")
+            num_style = settings.get("naming_numbering_style", "1, 2, 3..")
+            if "I, II" in num_style: config.part_numbering = "roman"
+            elif "A, B" in num_style: config.part_numbering = "alpha"
+            else: config.part_numbering = "numeric"
+            
+            ps_val = settings.get("naming_inner_separator", "space")
+            if ps_val == "dot": config.part_separator = Separator.DOT
+            elif ps_val == "dash": config.part_separator = Separator.DASH
+            elif ps_val == "underscore": config.part_separator = Separator.UNDERSCORE
+            else: config.part_separator = Separator.SPACE
+            
+            config.custom_text = settings.get("naming_custom_tag", "default")
+            
+        except Exception as e:
+            print(f"Error loading FormatterConfig from DB: {e}")
+        return config
 
 
 @dataclass
@@ -137,6 +247,18 @@ class Formatter:
         Generates a preview for a single item using official metadata.
         Used for updating planned_path after enrichment.
         """
+        if not self.config.org_enabled:
+             # Just rename in place (keep same folder)
+             target_name = self.format_movie_filename(self.build_movie_context(item, match, loc)) if match.item_type == ItemType.MOVIE else self.format_episode_filename(self.build_tv_context(item, match, loc))
+             return RenamePreview(
+                item_id=item.id,
+                original_path=item.current_path,
+                target_name=target_name,
+                target_subpath="",
+                item_type=match.item_type.value,
+                destination_root=os.path.dirname(item.current_path)
+             )
+
         if match.item_type == ItemType.MOVIE:
             context = self.build_movie_context(item, match, loc)
             target_name = self.format_movie_filename(context)
@@ -151,12 +273,15 @@ class Formatter:
             season_folder = self.format_season_foldername(context)
             target_subpath = str(Path(cat_folder) / series_folder / season_folder)
 
+        dest_root = self.config.library_path if self.config.move_to_library and self.config.library_path else os.path.dirname(item.current_path)
+
         return RenamePreview(
             item_id=item.id,
             original_path=item.current_path,
             target_name=target_name,
             target_subpath=target_subpath,
-            item_type=match.item_type.value
+            item_type=match.item_type.value,
+            destination_root=dest_root
         )
 
     def plan_rename(self, match: MediaMatch, destination_root: str) -> RenamePreview:
@@ -167,23 +292,37 @@ class Formatter:
         item = match.media_item
         loc = next((l for l in match.localizations if l.is_primary), match.localizations[0])
         
-        # 1. Context építés
-        if match.item_type == ItemType.MOVIE:
-            context = self.build_movie_context(item, match, loc)
-            target_name = self.format_movie_filename(context)
-            # Mappa struktúra (pl. Movies/Matrix (1999))
-            cat_folder = self.get_category_folder("movie")
-            folder_name = self.format_movie_foldername(context)
-            target_subpath = str(Path(cat_folder) / folder_name)
+        # 1. Context építés & Útvonal generálás
+        if not self.config.org_enabled:
+             # Nincs mappaszerkezet, csak fájlnév változás (helyben)
+             if match.item_type == ItemType.MOVIE:
+                 context = self.build_movie_context(item, match, loc)
+                 target_name = self.format_movie_filename(context)
+             else:
+                 context = self.build_tv_context(item, match, loc)
+                 target_name = self.format_episode_filename(context)
+             target_subpath = ""
         else:
-            # Sorozat/Epizód (egyelőre epizód fókuszú)
-            context = self.build_tv_context(item, match, loc)
-            target_name = self.format_episode_filename(context)
-            # Mappa: Series/The Last of Us (2023)/Season 01
-            cat_folder = self.get_category_folder("series")
-            series_folder = self.format_series_foldername(context)
-            season_folder = self.format_season_foldername(context)
-            target_subpath = str(Path(cat_folder) / series_folder / season_folder)
+            if match.item_type == ItemType.MOVIE:
+                context = self.build_movie_context(item, match, loc)
+                target_name = self.format_movie_filename(context)
+                cat_folder = self.get_category_folder("movie")
+                folder_name = self.format_movie_foldername(context)
+                target_subpath = str(Path(cat_folder) / folder_name)
+            else:
+                context = self.build_tv_context(item, match, loc)
+                target_name = self.format_episode_filename(context)
+                cat_folder = self.get_category_folder("series")
+                series_folder = self.format_series_foldername(context)
+                season_folder = self.format_season_foldername(context)
+                target_subpath = str(Path(cat_folder) / series_folder / season_folder)
+
+        # Célmappa meghatározása (Global Library vs In-place)
+        effective_root = destination_root
+        if self.config.move_to_library and self.config.library_path:
+            effective_root = self.config.library_path
+        elif not destination_root:
+            effective_root = os.path.dirname(item.current_path)
 
         # 2. Fő preview létrehozása
         main_preview = RenamePreview(
@@ -192,28 +331,50 @@ class Formatter:
             target_name=target_name,
             target_subpath=target_subpath,
             item_type=match.item_type.value,
-            destination_root=destination_root
+            destination_root=effective_root
         )
 
         # 3. Extrák tervezése
-        parent_name_no_ext = target_name.rsplit(".", 1)[0]
-        for extra in item.extras:
-            extra_ctx = self.build_extra_context(extra, parent_name_no_ext)
-            extra_name = self.format_extra_filename(extra_ctx)
-            extra_sub = self.get_extra_subpath(extra)
-            
-            # Az extrák a szülő mappájába kerülnek (target_subpath) + opcionális extra_sub
-            final_extra_sub = str(Path(target_subpath) / extra_sub)
-            
-            main_preview.extra_previews.append(RenamePreview(
-                item_id=extra.id,
-                original_path=extra.current_path,
-                target_name=extra_name,
-                target_subpath=final_extra_sub,
-                item_type="extra",
-                destination_root=destination_root,
-                extra_id=extra.id
-            ))
+        if self.config.extras_enabled:
+            parent_name_no_ext = target_name.rsplit(".", 1)[0]
+            for extra in item.extras:
+                # Meghatározzuk az akciót a típus alapján
+                cat = extra.category.value if hasattr(extra.category, 'value') else str(extra.category)
+                action = getattr(self.config, f"extra_{cat}_action", "rename")
+                
+                if action == "ignore":
+                    continue
+                
+                if action == "delete":
+                    # Különleges preview, ami jelzi a törlést
+                    main_preview.extra_previews.append(RenamePreview(
+                        item_id=extra.id,
+                        original_path=extra.current_path,
+                        target_name="", # Üres név jelzi a törlést
+                        target_subpath="",
+                        item_type="extra",
+                        destination_root="",
+                        extra_id=extra.id,
+                        warnings=["File will be deleted according to extras settings."]
+                    ))
+                    continue
+
+                extra_ctx = self.build_extra_context(extra, parent_name_no_ext)
+                extra_name = self.format_extra_filename(extra_ctx)
+                extra_sub = self.get_extra_subpath(extra)
+                
+                # Az extrák a szülő mappájába kerülnek (target_subpath) + opcionális extra_sub
+                final_extra_sub = str(Path(target_subpath) / extra_sub)
+                
+                main_preview.extra_previews.append(RenamePreview(
+                    item_id=extra.id,
+                    original_path=extra.current_path,
+                    target_name=extra_name,
+                    target_subpath=final_extra_sub,
+                    item_type="extra",
+                    destination_root=effective_root,
+                    extra_id=extra.id
+                ))
 
         # 4. Ütközések feloldása
         self.resolve_collisions([main_preview])
@@ -282,6 +443,15 @@ class Formatter:
         return self._render(self.config.movie_file, context)
 
     def format_movie_foldername(self, context: Dict[str, Any]) -> str:
+        if not self.config.create_movie_subdir:
+            return ""
+            
+        # Ha van gyűjtemény, és be van kapcsolva a gyűjtemény mappa
+        if self.config.create_collection_dir and context.get("collection"):
+            coll_name = self.format_collection_foldername(context)
+            movie_name = self._render(self.config.movie_folder, context)
+            return str(Path(coll_name) / movie_name)
+            
         return self._render(self.config.movie_folder, context)
 
     def format_collection_foldername(self, context: Dict[str, Any]) -> str:
@@ -292,9 +462,13 @@ class Formatter:
     # =========================================================================
 
     def format_series_foldername(self, context: Dict[str, Any]) -> str:
+        if not self.config.create_series_dir:
+            return ""
         return self._render(self.config.series_folder, context)
 
     def format_season_foldername(self, context: Dict[str, Any]) -> str:
+        if not self.config.create_season_dir:
+            return ""
         return self._render(self.config.season_folder, context)
 
     def format_episode_filename(self, context: Dict[str, Any]) -> str:
@@ -302,12 +476,16 @@ class Formatter:
 
     def format_extra_filename(self, context: Dict[str, Any]) -> str:
         cat = context.get("category", "")
-        if cat in ["video", "image"]:
-            tmpl = self.config.extra_video_image
-        elif cat in ["audio", "subtitle"]:
-            tmpl = self.config.extra_audio_sub
+        if cat == "video":
+            tmpl = self.config.extra_video_template
+        elif cat == "subtitle":
+            tmpl = self.config.extra_sub_template
+        elif cat == "audio":
+            tmpl = self.config.extra_audio_template
+        elif cat == "image":
+            tmpl = self.config.extra_img_template
         elif cat == "metadata":
-            tmpl = self.config.extra_metadata
+            tmpl = self.config.extra_meta_template
         else:
             tmpl = "{parent_name} {sub_category}"
             
@@ -318,17 +496,10 @@ class Formatter:
 
     def get_extra_subpath(self, extra) -> str:
         """Visszaadja az extra fájl alkönyvtárát a stratégia alapján."""
-        if self.config.extra_org == ExtraOrg.SAME_FOLDER:
+        if self.config.extras_folder_mode == "flat":
             return ""
         
-        if self.config.extra_org == ExtraOrg.SUBFOLDER:
-            return self.config.extras_subfolder_name
-        
-        if self.config.extra_org == ExtraOrg.CATEGORY_FOLDERS:
-            # Pl. 'Images', 'Subtitles'
-            return extra.category or "Other"
-        
-        return ""
+        return self.config.extras_subfolder_name
 
     def build_extra_context(self, extra, parent_formatted_name: str) -> Dict[str, Any]:
         """
@@ -352,13 +523,13 @@ class Formatter:
 
     def get_category_folder(self, item_type_value: str) -> str:
         """Visszaadja a kategória-mappa nevét (Movies/Series), ha be van kapcsolva."""
-        if not self.config.use_categories:
+        if not self.config.sort_by_type:
             return ""
         
         if item_type_value == "movie":
-            return self.config.movies_category_name
+            return self.config.movies_dir_name
         if item_type_value in ["series", "episode"]:
-            return self.config.series_category_name
+            return self.config.series_dir_name
         return ""
 
     # =========================================================================
@@ -389,9 +560,10 @@ class Formatter:
         })
 
         # Part kezelés
-        part_label, part_val = self._build_part_info(item)
+        part_label, part_val, part_sep = self._build_part_info(item)
         ctx["part_type"] = part_label
         ctx["part"] = part_val
+        ctx["part_sep"] = part_sep
 
         return ctx
 
@@ -457,9 +629,10 @@ class Formatter:
 
 
         # Part kezelés (ritka de lehet epizódban is)
-        part_label, part_val = self._build_part_info(item)
+        part_label, part_val, part_sep = self._build_part_info(item)
         ctx["part_type"] = part_label
         ctx["part"] = part_val
+        ctx["part_sep"] = part_sep
 
         return ctx
 
@@ -477,20 +650,31 @@ class Formatter:
             "hdr": item.hdr_type or "",
         }
 
-    def _build_part_info(self, item) -> (str, str):
+    def _build_part_info(self, item) -> (str, str, str):
         from ..db.models import PartType, PartStyle
-        label = ""
+        label = self.config.part_keyword
         val = ""
+        sep = self.config.part_separator.value
+        
         if item.part is not None:
+            # Item specific override for keyword
             if item.part_type and item.part_type != PartType.NONE:
                 label = item.part_type.value
-            if item.part_style == PartStyle.ROMAN:
-                val = to_roman(item.part)
-            elif item.part_style == PartStyle.ALPHA:
-                val = to_alpha(item.part)
+            
+            # Numbering logic
+            style = item.part_style
+            if not style or style == PartStyle.NONE:
+                # Use global default
+                if self.config.part_numbering == "roman": val = to_roman(item.part)
+                elif self.config.part_numbering == "alpha": val = to_alpha(item.part)
+                else: val = str(item.part)
             else:
-                val = str(item.part)
-        return label, val
+                # Use item specific style
+                if style == PartStyle.ROMAN: val = to_roman(item.part)
+                elif style == PartStyle.ALPHA: val = to_alpha(item.part)
+                else: val = str(item.part)
+                
+        return label, val, sep
 
     def _format_enum_val(self, enum_obj) -> str:
         if not enum_obj or enum_obj.value == "none": return ""

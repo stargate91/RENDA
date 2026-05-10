@@ -109,7 +109,7 @@ class ScannerManager:
                     scan_status["current"] += 1
                     continue
 
-                res = self.categorizer.categorize(p)
+                res = self.categorizer.categorize(p, self.db)
                 if res[0] is None:
                     scan_status["current"] += 1
                     continue
@@ -439,7 +439,17 @@ class ScannerManager:
         logger.info(f"Phase 4: API Metadata Resolution for {len(items)} items...")
         scan_status.update({"phase": "resolving", "total": len(items), "current": 0})
 
-        item_ids = [item.id for item in items]
+        # Deduplicate items by group_hash to avoid race conditions in propagate_match
+        unique_items = []
+        seen_hashes = set()
+        for item in items:
+            if not item.group_hash:
+                unique_items.append(item)
+            elif item.group_hash not in seen_hashes:
+                unique_items.append(item)
+                seen_hashes.add(item.group_hash)
+        
+        item_ids = [item.id for item in unique_items]
 
         def resolve_task(item_id: int):
             local_db = DbSession()
@@ -456,8 +466,20 @@ class ScannerManager:
                 # Ha sikeres a találat (automatikus egyezés), rögtön töltsük le a mély metaadatokat
                 if item.status == ItemStatus.MATCHED:
                     from .metadata_enricher import MetadataEnricher
+                    from ..db.models import UserSetting
+                    
+                    # Load language preferences from settings
+                    primary_lang = "en"
+                    fallback_lang = None
+                    try:
+                        pl = local_db.query(UserSetting).filter(UserSetting.key == "primary_metadata_language").first()
+                        fl = local_db.query(UserSetting).filter(UserSetting.key == "fallback_metadata_language").first()
+                        if pl and pl.value: primary_lang = pl.value
+                        if fl and fl.value and fl.value != "none": fallback_lang = fl.value
+                    except: pass
+                    
                     enricher = MetadataEnricher(local_db)
-                    enricher.enrich_matched_item(item)
+                    enricher.enrich_matched_item(item, language=primary_lang, fallback_language=fallback_lang)
 
                 
             except Exception as e:

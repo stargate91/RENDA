@@ -125,7 +125,7 @@ const DiscoveryTable = ({ items, activeTab, extraSubTab, searchQuery, sortKey, s
           {(!items[activeTab] || items[activeTab].length === 0) && !loading && (
             <tr>
               <td colSpan="6" style={{ textAlign: 'center', padding: '100px', color: '#666' }}>
-                No items in this category.
+                {T('discovery.no_items')}
               </td>
             </tr>
           )}

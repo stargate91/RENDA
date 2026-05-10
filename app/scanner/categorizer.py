@@ -54,35 +54,54 @@ class Categorizer:
         'score': ExtraSubtype.ISOLATED_SCORE,
     }
 
-    def categorize(self, file_path: Path) -> Tuple[ExtraCategory, ExtraSubtype]:
+    def categorize(self, file_path: Path, db=None) -> Tuple[ExtraCategory, ExtraSubtype]:
         """
         Determines the category and subtype of a file.
         Uses extensions for primary categorization and keywords for subtype refinement.
         """
         ext = file_path.suffix.lower()
-        name = file_path.stem.lower()
+        filename = file_path.stem.lower()
         
-        # 1. Determine base category by extension
-        category = None
-        if ext in {'.mkv', '.mp4', '.avi', '.mov', '.wmv'}: category = ExtraCategory.VIDEO
-        elif ext in {'.srt', '.sub', '.ass', '.idx'}: category = ExtraCategory.SUBTITLE
-        elif ext in {'.jpg', '.jpeg', '.png', '.webp'}: category = ExtraCategory.IMAGE
-        elif ext in {'.ac3', '.dts', '.flac', '.mp3'}: category = ExtraCategory.AUDIO
-        elif ext in {'.nfo', '.xml', '.txt', '.json'}: category = ExtraCategory.METADATA
+        # Load user-defined extensions if db is provided
+        sub_exts = ['.srt', '.sub', '.ass', '.ssa', '.vtt']
+        audio_exts = ['.mka', '.ac3', '.dts', '.mp3', '.flac', '.wav', '.m4a']
+        img_exts = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']
+        meta_exts = ['.nfo', '.xml', '.txt']
+        
+        if db:
+            try:
+                from app.db.models import UserSetting
+                settings = {s.key: s.value for s in db.query(UserSetting).all()}
+                if "extras_sub_exts" in settings: sub_exts = [e.strip() for e in settings["extras_sub_exts"].split(",")]
+                if "extras_audio_exts" in settings: audio_exts = [e.strip() for e in settings["extras_audio_exts"].split(",")]
+                if "extras_img_exts" in settings: img_exts = [e.strip() for e in settings["extras_img_exts"].split(",")]
+                if "extras_meta_exts" in settings: meta_exts = [e.strip() for e in settings["extras_meta_exts"].split(",")]
+            except:
+                pass
 
-        # If no category was identified, it's 'trash' - return None
-        if category is None:
-            return None, None
-
-        # 2. Refine subtype using keywords in the filename
+        # Primary categorization based on extensions
+        category = ExtraCategory.OTHER
+        
+        if ext in sub_exts:
+            category = ExtraCategory.SUBTITLE
+        elif ext in audio_exts:
+            category = ExtraCategory.AUDIO
+        elif ext in img_exts:
+            category = ExtraCategory.IMAGE
+        elif ext in meta_exts:
+            category = ExtraCategory.METADATA
+        elif ext in ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.m4v']:
+             # Video files can be clips if they aren't the main movie
+             # This logic is usually handled by the Scanner (file size check)
+             category = ExtraCategory.VIDEO
+             
+        # Refine subtype based on keywords
         subtype = None
-        
-        # Search for known keywords in the filename
-        for key, value in self.SUBTYPE_MAP.items():
-            if key in name:
-                subtype = value
+        for keyword, mapped_subtype in self.SUBTYPE_MAP.items():
+            if keyword in filename:
+                subtype = mapped_subtype
                 break
-
+                
         # Guard: DUBBED is audio-only, never applies to subtitles
         if category == ExtraCategory.SUBTITLE and subtype == ExtraSubtype.DUBBED:
             subtype = None

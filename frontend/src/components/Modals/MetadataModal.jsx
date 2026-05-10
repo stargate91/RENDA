@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 
-const MetadataModal = ({ show, metadata, onClose }) => {
+const MetadataModal = ({ show, metadata, onClose, T }) => {
   const [activeTab, setActiveTab] = useState('technical');
 
   if (!show || !metadata) return null;
@@ -18,11 +18,11 @@ const MetadataModal = ({ show, metadata, onClose }) => {
 
         <div className="metadata-tabs">
           {[
-            { id: 'technical', label: 'Technical' },
-            { id: 'guessit', label: 'Guessit' },
-            { id: 'overrides', label: 'Overrides' },
-            { id: 'matches', label: `API Matches (${metadata.matches?.length || 0})` },
-            { id: 'api_raw', label: 'Raw JSON' }
+            { id: 'technical', label: T('modal.metadata.tabs.technical') },
+            { id: 'guessit', label: T('modal.metadata.tabs.guessit') },
+            { id: 'overrides', label: T('modal.metadata.tabs.overrides') },
+            { id: 'matches', label: T('modal.metadata.tabs.matches', { count: metadata.matches?.length || 0 }) },
+            { id: 'api_raw', label: T('modal.metadata.tabs.api_raw') }
           ].map(tab => (
             <button
               key={tab.id}
@@ -167,7 +167,7 @@ const MetadataModal = ({ show, metadata, onClose }) => {
                   </div>
                 ))
               ) : (
-                <p style={{ opacity: 0.5, textAlign: 'center', padding: '40px 0' }}>No matches found for this item.</p>
+                <p style={{ opacity: 0.5, textAlign: 'center', padding: '40px 0' }}>{T('modal.metadata.no_matches')}</p>
               )}
             </div>
           )}
@@ -186,7 +186,7 @@ const MetadataModal = ({ show, metadata, onClose }) => {
                   </div>
                 ))
               ) : (
-                <p style={{ opacity: 0.5, textAlign: 'center', padding: '40px 0' }}>No API data available.</p>
+                <p style={{ opacity: 0.5, textAlign: 'center', padding: '40px 0' }}>{T('modal.metadata.no_api')}</p>
               )}
             </div>
           )}

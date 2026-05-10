@@ -27,38 +27,41 @@ class Collector:
             "ignored": []
         }
 
+        def process_file(file_path: Path):
+            # Skip hidden files and directories
+            if any(part.startswith('.') for part in file_path.parts):
+                results["ignored"].append(file_path)
+                return
+
+            ext = file_path.suffix.lower()
+            
+            # Filter video files by size to distinguish primary media from extras
+            if ext in self.VIDEO_EXTS:
+                size = file_path.stat().st_size
+                if size >= self.min_video_size:
+                    results["potential_media"].append(file_path)
+                else:
+                    results["potential_extras"].append(file_path)
+            
+            elif ext in self.SUBTITLE_EXTS or \
+                 ext in self.IMAGE_EXTS or \
+                 ext in self.AUDIO_EXTS or \
+                 ext in self.META_EXTS:
+                results["potential_extras"].append(file_path)
+            
+            else:
+                results["ignored"].append(file_path)
+
         for root_path in paths:
             p = Path(root_path)
             if not p.exists():
                 continue
-
-            for file_path in p.rglob("*"): # Recursive traversal
-                if not file_path.is_file():
-                    continue
-
-                # Skip hidden files and directories (e.g., .recycle, .DS_Store)
-                if any(part.startswith('.') for part in file_path.parts):
-                    results["ignored"].append(file_path)
-                    continue
-
-                ext = file_path.suffix.lower()
-                
-                # Filter video files by size to distinguish primary media from extras
-                if ext in self.VIDEO_EXTS:
-                    size = file_path.stat().st_size
-                    if size >= self.min_video_size:
-                        results["potential_media"].append(file_path)
-                    else:
-                        results["potential_extras"].append(file_path)
-                
-                # Other recognized formats are automatically considered potential extras
-                elif ext in self.SUBTITLE_EXTS or \
-                     ext in self.IMAGE_EXTS or \
-                     ext in self.AUDIO_EXTS or \
-                     ext in self.META_EXTS:
-                    results["potential_extras"].append(file_path)
-                
-                else:
-                    results["ignored"].append(file_path)
+            
+            if p.is_file():
+                process_file(p)
+            else:
+                for file_path in p.rglob("*"): # Recursive traversal
+                    if file_path.is_file():
+                        process_file(file_path)
 
         return results

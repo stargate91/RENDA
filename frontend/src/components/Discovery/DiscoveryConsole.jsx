@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, X } from 'lucide-react';
+import { Upload, X, Search } from 'lucide-react';
 import DiscoveryTable from './DiscoveryTable';
 import en from '../../locales/en';
 
@@ -20,7 +20,18 @@ const T = (key, params = {}) => {
   return value;
 };
 
-const DiscoveryConsole = ({ items, loading, handleScan, fetchFullMetadata, selectedItem, setSelectedItem }) => {
+const DiscoveryConsole = ({ 
+  items = {}, 
+  loading, 
+  handleScan, 
+  handleDropScan, 
+  loadSession, 
+  fetchFullMetadata, 
+  selectedItem, 
+  setSelectedItem,
+  stats,
+  isDragging
+}) => {
   const [activeTab, setActiveTab] = useState('manual');
   const [extraSubTab, setExtraSubTab] = useState('video');
   const [sortKey, setSortKey] = useState(null);
@@ -33,7 +44,7 @@ const DiscoveryConsole = ({ items, loading, handleScan, fetchFullMetadata, selec
       if (items.movies && items.movies.length > 0) setActiveTab('movies');
       else if (items.series && items.series.length > 0) setActiveTab('series');
     }
-  }, [items]);
+  }, [items, activeTab]);
 
   useEffect(() => {
     if (activeTab === 'extras') {
@@ -44,34 +55,65 @@ const DiscoveryConsole = ({ items, loading, handleScan, fetchFullMetadata, selec
     setSearchQuery('');
   }, [activeTab]);
 
+  const totalPending = (items?.manual?.length || 0) + (items?.movies?.length || 0) + (items?.series?.length || 0) + (items?.extras?.length || 0) + (items?.collisions?.length || 0);
+
+  if (!loading && totalPending === 0 && searchQuery === '') {
+    return (
+      <div className={`discovery-view empty-workspace ${isDragging ? 'dragging' : ''}`}>
+        <div className="empty-state-content">
+          <div className="empty-state-icon">
+             <Upload size={48} color="var(--accent-blue)" />
+          </div>
+          <h2>{isDragging ? T('discovery.empty.drop_title') : T('discovery.empty.title')}</h2>
+          <p>
+            {isDragging 
+              ? T('discovery.empty.drop_subtitle')
+              : T('discovery.empty.subtitle')}
+          </p>
+          <div className="empty-state-actions">
+            <button className="btn-primary" onClick={handleScan}>
+              {T('discovery.empty.action_scan')}
+            </button>
+            <button className="btn-secondary" onClick={loadSession}>
+              {T('discovery.empty.action_resume', { count: stats?.unmatched || 0 })}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="discovery-view">
       <div className="discovery-header">
         <div className="header-text">
           <h1>{T('discovery.title')}</h1>
-          <p>{T('discovery.found_items', { count: (items.manual?.length || 0) + (items.movies?.length || 0) + (items.series?.length || 0) + (items.extras?.length || 0) })}</p>
+          <p>{T('discovery.found_items', { count: totalPending })}</p>
         </div>
         <div className="discovery-actions">
+          <button className="btn-secondary" onClick={loadSession} style={{ marginRight: '10px' }}>
+            {T('discovery.refresh')}
+          </button>
           <button className="btn-primary" onClick={handleScan} disabled={loading}>
-            {loading ? 'Processing...' : 'Scan Now'}
+            {loading ? T('discovery.processing') : T('discovery.scan_now')}
           </button>
         </div>
       </div>
 
       <div className="tabs">
         <button className={`tab-btn ${activeTab === 'manual' ? 'active' : ''}`} onClick={() => setActiveTab('manual')}>
-          {T('discovery.tabs.manual')} <span className="tab-count">{items.manual?.length || 0}</span>
+          {T('discovery.tabs.manual')} <span className="tab-count">{items?.manual?.length || 0}</span>
         </button>
         <button className={`tab-btn ${activeTab === 'movies' ? 'active' : ''}`} onClick={() => setActiveTab('movies')}>
-          {T('discovery.tabs.movies')} <span className="tab-count">{items.movies?.length || 0}</span>
+          {T('discovery.tabs.movies')} <span className="tab-count">{items?.movies?.length || 0}</span>
         </button>
         <button className={`tab-btn ${activeTab === 'series' ? 'active' : ''}`} onClick={() => setActiveTab('series')}>
-          {T('discovery.tabs.series')} <span className="tab-count">{items.series?.length || 0}</span>
+          {T('discovery.tabs.series')} <span className="tab-count">{items?.series?.length || 0}</span>
         </button>
         <button className={`tab-btn ${activeTab === 'extras' ? 'active' : ''}`} onClick={() => setActiveTab('extras')}>
-          {T('discovery.tabs.extras')} <span className="tab-count">{items.extras?.length || 0}</span>
+          {T('discovery.tabs.extras')} <span className="tab-count">{items?.extras?.length || 0}</span>
         </button>
-        {items.collisions?.length > 0 && (
+        {items?.collisions?.length > 0 && (
           <button className={`tab-btn ${activeTab === 'collisions' ? 'active' : ''} collision-tab`} onClick={() => setActiveTab('collisions')}>
             {T('discovery.tabs.collisions')} <span className="tab-count">{items.collisions.length}</span>
           </button>
@@ -81,13 +123,13 @@ const DiscoveryConsole = ({ items, loading, handleScan, fetchFullMetadata, selec
       {activeTab === 'extras' && (
         <div className="sub-tabs">
           {[
-            { id: 'video', label: 'Bonus Video' },
-            { id: 'subtitle', label: 'Subtitles' },
-            { id: 'audio', label: 'Audio Tracks' },
-            { id: 'image', label: 'Images' },
-            { id: 'metadata', label: 'Metadatas' }
+            { id: 'video', label: T('discovery.tabs.bonus_video') },
+            { id: 'subtitle', label: T('discovery.tabs.subtitles') },
+            { id: 'audio', label: T('discovery.tabs.audio_tracks') },
+            { id: 'image', label: T('discovery.tabs.images') },
+            { id: 'metadata', label: T('discovery.tabs.metadatas') }
           ].map(sub => {
-            const count = (items.extras || []).filter(ex => ex.category === sub.id).length;
+            const count = (items?.extras || []).filter(ex => ex.category === sub.id).length;
             return (
               <button
                 key={sub.id}

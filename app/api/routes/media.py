@@ -174,7 +174,7 @@ def get_discovery_items():
                 else:
                     groups["movies"].append(data) # Fallback
 
-        from ..formatter.formatter import Formatter
+        from app.formatter.formatter import Formatter
         formatter = Formatter()
 
         # PASS 1: Kiszámoljuk az összes tervezett útvonalat
@@ -236,7 +236,6 @@ def get_discovery_items():
                 "planned_path": planned_path
             })
             
-        from fastapi.responses import JSONResponse
         import json
         
         # Kényszerítjük az UTF-8 kódolást a JSON válaszhoz

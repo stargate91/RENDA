@@ -17,10 +17,11 @@ class MetadataEnricher:
         self.api = TMDBClient(db_session)
         self.omdb = OMDBClient(db_session)
 
-    def enrich_matched_item(self, item: MediaItem, language: str = "en"):
+    def enrich_matched_item(self, item: MediaItem, language: str = "en", fallback_language: str = None):
         """
         Végrehajtja a teljes metaadat-letöltést az aktív találathoz.
         Kényszeríti a helyes típust az API válasza alapján.
+        Ha fallback_language meg van adva és eltér a primarytől, abban is letölti a lokalizációt.
         """
         active_match = self.db.query(MediaMatch).filter(
             MediaMatch.media_item_id == item.id,
@@ -30,32 +31,39 @@ class MetadataEnricher:
         if not active_match: return
 
         # --- TÍPUS KÉNYSZERÍTÉS (API VÁLASZ ALAPJÁN) ---
-        # DEBUG: logger.info(f"DEBUG: active_match type: {type(active_match)}, attrs: {dir(active_match)}")
         imdb_id = getattr(active_match, 'imdb_id', None) or item.nfo_imdb_id
         if imdb_id and imdb_id.startswith("tt"):
             find_res = self.api.find_by_imdb(imdb_id, language=language)
             if find_res and "item_type" in find_res:
                 actual_type = ItemType.MOVIE if find_res["item_type"] == "movie" else ItemType.EPISODE
                 
-                # Ha eltér az eredeti tippünktől, kényszerítjük a helyeset
                 if active_match.item_type != actual_type:
                     logger.info(f"Correcting type for item {item.id} to {actual_type} based on API")
                     active_match.item_type = actual_type
                     item.item_type = actual_type
-                    # Ha sorozatról van szó, de nincs szezon/epizód infó, töltsük ki alapértelmezéssel
                     if actual_type == ItemType.EPISODE:
                         if active_match.season_number is None: active_match.season_number = 1
                         if active_match.episode_number is None: active_match.episode_number = 1
 
+        # Primary language enrichment
         if active_match.item_type == ItemType.MOVIE:
             self._enrich_movie(active_match, language)
         elif active_match.item_type == ItemType.SERIES or active_match.item_type == ItemType.EPISODE:
             self._enrich_tv(active_match, language)
 
+        # Fallback language enrichment (if set and different from primary)
+        if fallback_language and fallback_language != language:
+            logger.info(f"Enriching fallback language '{fallback_language}' for item {item.id}")
+            if active_match.item_type == ItemType.MOVIE:
+                self._enrich_movie(active_match, fallback_language)
+            elif active_match.item_type == ItemType.SERIES or active_match.item_type == ItemType.EPISODE:
+                self._enrich_tv(active_match, fallback_language)
+
         # --- TERVEZETT ÚTVONAL FRISSÍTÉSE (HIVATALOS ADATOKKAL) ---
         try:
-            from ..formatter.formatter import Formatter
-            formatter = Formatter()
+            from ..formatter.formatter import Formatter, FormatterConfig
+            config = FormatterConfig.from_db(self.db)
+            formatter = Formatter(config)
             loc = active_match.localizations[0] if active_match.localizations else None
             if loc:
                 preview = formatter.format_item(item, active_match, loc)

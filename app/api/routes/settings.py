@@ -28,6 +28,36 @@ def update_settings(settings: dict):
                 setting = UserSetting(key=key, value=value)
                 db.add(setting)
         db.commit()
+        
+        # If naming settings changed, we should ideally refresh planned paths.
+        # For simplicity, we'll check if any 'naming_' key was in the update.
+        if any(k.startswith("naming_") for k in settings.keys()):
+            try:
+                from app.formatter.formatter import Formatter, FormatterConfig
+                from app.db.models import MediaItem, ItemStatus
+                
+                config = FormatterConfig.from_db(db)
+                formatter = Formatter(config)
+                
+                # Get items in discovery
+                items = db.query(MediaItem).filter(MediaItem.status.in_([
+                    ItemStatus.NEW, ItemStatus.MATCHED, ItemStatus.UNCERTAIN,
+                    ItemStatus.NO_MATCH, ItemStatus.MULTIPLE, ItemStatus.ERROR
+                ])).all()
+                
+                for item in items:
+                    # Find active match to format against
+                    active_match = next((m for m in item.matches if m.is_active), None)
+                    if active_match:
+                        loc = next((l for l in active_match.localizations if l.is_primary), 
+                                  active_match.localizations[0] if active_match.localizations else None)
+                        if loc:
+                            preview = formatter.format_item(item, active_match, loc)
+                            item.planned_path = preview.target_path
+                db.commit()
+            except Exception as e:
+                print(f"Error refreshing planned paths: {e}")
+
         return {"status": "success"}
     finally:
         db.close()

@@ -96,6 +96,47 @@ body {
   flex: 1;
   padding: 60px;
   overflow-y: auto;
+  position: relative;
+}
+
+.global-drop-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 136, 255, 0.1);
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px dashed var(--accent-blue);
+  margin: 20px;
+  border-radius: 30px;
+  animation: overlayPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  pointer-events: none; /* Let the drop event pass through to the container */
+}
+
+@keyframes overlayPop {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.drop-content {
+  text-align: center;
+  color: var(--accent-blue);
+}
+
+.drop-content h2 {
+  font-size: 32px;
+  margin-top: 20px;
+  font-weight: 800;
+}
+
+.drop-content p {
+  font-size: 18px;
+  opacity: 0.8;
 }
 
 .header {
@@ -1327,4 +1368,459 @@ body {
   color: var(--accent-blue);
   margin-bottom: 8px;
   letter-spacing: 0.5px;
+}
+
+/* Floating Action Bar */
+.floating-action-bar {
+  position: fixed;
+  bottom: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(30, 30, 30, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 15px 25px;
+  border-radius: 100px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255,255,255,0.05);
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  z-index: 1000;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.floating-action-bar.active {
+  bottom: 40px;
+}
+
+.floating-action-content {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.floating-action-text {
+  color: white;
+  font-weight: 500;
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.floating-action-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+/* Split Layout for Settings */
+.settings-container {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.form-group.split {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 40px;
+  padding: 24px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  margin-bottom: 0;
+}
+
+.form-group.split:last-child {
+  border-bottom: none;
+}
+
+.form-group-info {
+  flex: 1;
+  max-width: 400px;
+}
+
+.form-group-info label {
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  display: block;
+}
+
+.form-group-info .input-hint {
+  margin-top: 0;
+  line-height: 1.5;
+}
+
+.form-group-input {
+  flex: 1;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group-input.flex-end {
+  align-items: flex-end;
+}
+
+.danger-zone {
+  border: 1px solid rgba(255, 60, 60, 0.2) !important;
+  padding: 24px !important;
+  border-radius: 12px;
+  background: rgba(255, 60, 60, 0.03);
+}
+
+.danger-btn {
+  background: #ff3c3c !important;
+  box-shadow: 0 4px 15px rgba(255, 60, 60, 0.2) !important;
+}
+
+.danger-btn:hover {
+  background: #ff5252 !important;
+}
+
+/* Danger Modal */
+.danger-modal {
+  border: 1px solid rgba(255, 60, 60, 0.3) !important;
+  box-shadow: 0 10px 40px rgba(255, 60, 60, 0.1) !important;
+}
+
+.danger-zone {
+  align-items: center !important;
+}
+
+/* Custom Select */
+.custom-select-container {
+  position: relative;
+  width: 100%;
+}
+
+.custom-select-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.custom-select-header.open {
+  border-color: #007bff; /* Primary outline color */
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
+}
+
+.custom-select-arrow {
+  font-size: 10px;
+  color: #888;
+}
+
+.custom-select-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 100%;
+  background: #1e1e1e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.custom-select-option {
+  padding: 10px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #eee;
+  font-size: 14px;
+}
+
+.custom-select-option:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.custom-select-option.selected {
+  background: rgba(0, 123, 255, 0.15);
+  color: #fff;
+  font-weight: 500;
+}
+
+/* Naming Settings Styles */
+.section-label {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--text-dim);
+    letter-spacing: 1.5px;
+    margin-bottom: 20px;
+    opacity: 0.6;
+}
+
+.template-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-card);
+    color: var(--accent-blue);
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.template-btn:hover {
+    background: var(--accent-blue);
+    color: white;
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 10px var(--accent-glow);
+}
+
+/* Variable Dropdown */
+.variable-dropdown {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 5px);
+    background: #1a1a1e;
+    border: 1px solid var(--border-card);
+    border-radius: 12px;
+    padding: 8px;
+    z-index: 100;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 4px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+    max-height: 250px;
+    overflow-y: auto;
+    width: 320px;
+}
+
+.var-item {
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid transparent;
+}
+
+.var-item:hover {
+    background: rgba(0, 136, 255, 0.1);
+    color: var(--accent-blue);
+    border-color: rgba(0, 136, 255, 0.3);
+}
+
+/* Switch Component */
+.switch-container {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    cursor: pointer;
+    user-select: none;
+    margin-bottom: 5px;
+}
+
+.switch-track {
+    width: 44px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid var(--border-card);
+}
+
+.switch-track.active {
+    background: var(--accent-blue);
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 15px var(--accent-glow);
+}
+
+.switch-thumb {
+    width: 18px;
+    height: 18px;
+    background: white;
+    border-radius: 50%;
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+}
+
+.switch-track.active .switch-thumb {
+    transform: translateX(20px);
+}
+
+.switch-labels {
+    display: flex;
+    flex-direction: column;
+}
+
+.switch-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.switch-sublabel {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 2px;
+}
+
+/* Folders Tab Adjustments */
+.variable-dropdown {
+    /* Ensure it works well in the folders tab too */
+    max-height: 200px;
+}
+
+/* Privacy Notice */
+.privacy-notice {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background: rgba(0, 136, 255, 0.05);
+    border: 1px solid rgba(0, 136, 255, 0.1);
+    padding: 16px 20px;
+    border-radius: 12px;
+    margin-bottom: 30px;
+}
+
+.privacy-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: rgba(0, 136, 255, 0.1);
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+.privacy-text {
+    flex: 1;
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.5;
+}
+
+.privacy-text strong {
+    color: var(--text-main);
+    margin-right: 5px;
+}
+
+/* Setup Guide */
+.setup-guide {
+    margin-top: 15px;
+    padding: 15px 20px;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+}
+
+.setup-guide h4 {
+    font-size: 13px;
+    margin-bottom: 10px;
+    color: var(--text-main);
+}
+
+.setup-guide ol {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.setup-guide li {
+    font-size: 12px;
+    color: #888;
+    margin-bottom: 5px;
+    line-height: 1.5;
+}
+
+.setup-guide a {
+    color: var(--accent-blue);
+    text-decoration: none;
+}
+
+.setup-guide a:hover {
+    text-decoration: underline;
+}
+
+/* Empty Workspace State */
+.empty-workspace {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 70vh;
+    text-align: center;
+}
+
+.empty-state-content {
+    max-width: 500px;
+}
+
+.empty-state-icon {
+    width: 100px;
+    height: 100px;
+    background: rgba(0, 136, 255, 0.05);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 30px;
+    border: 1px solid rgba(0, 136, 255, 0.1);
+}
+
+.empty-state-content h2 {
+    font-size: 28px;
+    margin-bottom: 15px;
+    color: var(--text-main);
+}
+
+.empty-state-content p {
+    font-size: 15px;
+    color: var(--text-dim);
+    line-height: 1.6;
+    margin-bottom: 40px;
+}
+
+.empty-state-actions {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+}
+
+.empty-state-actions .btn-primary,
+.empty-state-actions .btn-secondary {
+    padding: 12px 30px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+/* Drag and Drop Styling */
+.discovery-view.dragging {
+    background: rgba(0, 136, 255, 0.03);
+    outline: 2px dashed var(--accent-blue);
+    outline-offset: -10px;
+    border-radius: 20px;
+    transition: all 0.2s ease;
+}
+
+.discovery-view.dragging .empty-state-icon {
+    transform: scale(1.1);
+    background: rgba(0, 136, 255, 0.1);
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 20px var(--accent-glow);
+}
+
+.discovery-view.dragging .empty-state-content h2 {
+    color: var(--accent-blue);
 }

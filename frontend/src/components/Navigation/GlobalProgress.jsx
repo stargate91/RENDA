@@ -17,16 +17,18 @@ const GlobalProgress = ({ progress, T }) => {
   };
 
   const calculateETA = () => {
-    if (progress.current < 2) return "Estimating time...";
+    if (progress.current < 2) return T('progress.estimating');
     const elapsed = (Date.now() / 1000) - progress.start_time;
     const itemsPerSec = progress.current / elapsed;
     const remainingItems = progress.total - progress.current;
     const remainingSecs = remainingItems / itemsPerSec;
 
-    if (remainingSecs < 1) return "Finishing...";
+    if (remainingSecs < 1) return T('progress.finishing');
     const mins = Math.floor(remainingSecs / 60);
     const secs = Math.floor(remainingSecs % 60);
-    return mins > 0 ? `${mins}m ${secs}s left` : `${secs}s left`;
+    
+    const timeStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+    return T('progress.left', { time: timeStr });
   };
 
   const percent = getWeightedPercent();

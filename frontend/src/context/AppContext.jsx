@@ -1,18 +1,40 @@
 import React, { createContext, useState, useEffect, useRef, useContext } from 'react';
-import en from '../locales/en';
+const localeFiles = import.meta.glob('../locales/*.js', { eager: true });
+const locales = {};
+export const availableLocales = [];
+
+for (const path in localeFiles) {
+  const code = path.match(/\/([a-z]{2})\.js$/)[1];
+  const dict = localeFiles[path].default;
+  locales[code] = dict;
+  availableLocales.push({
+    value: code,
+    label: dict._lang_name || code.toUpperCase()
+  });
+}
 
 export const AppContext = createContext();
 
 const API_BASE = "http://localhost:8000";
 
 // Simple translation helper
-export const T = (key, params = {}) => {
+export const T = (key, params = {}, currentLang = 'en') => {
   const keys = key.split('.');
-  let value = en;
+  let value = locales[currentLang] || locales['en'];
+  
   for (const k of keys) {
     if (value && value[k]) value = value[k];
-    else return key;
+    else {
+      // Fallback to English if key missing
+      value = locales['en'];
+      for (const f of keys) {
+        if (value && value[f]) value = value[f];
+        else return key;
+      }
+      break;
+    }
   }
+  
   if (typeof value === 'string') {
     let result = value;
     for (const [p, val] of Object.entries(params)) {
@@ -23,21 +45,78 @@ export const T = (key, params = {}) => {
   return value;
 };
 
+const DEFAULT_SETTINGS = {
+  user_name: '', 
+  tmdb_api_key: '', tmdb_bearer_token: '', imdb_api_key: '',
+  ui_language: 'en',
+  default_scan_dir: '',
+  primary_metadata_language: 'en',
+  fallback_metadata_language: 'none',
+  min_video_size_mb: 500,
+  naming_filename_casing: 'title',
+  naming_word_separator: 'space',
+  naming_movie_template: '{{Title}} ({{Year}}) - {{Resolution}}',
+  naming_episode_template: '{{ShowTitle}} - S{{Season}}E{{Episode}} - {{EpisodeTitle}} - {{Resolution}}',
+  naming_part_keyword: 'Part',
+  naming_numbering_style: '1, 2, 3..',
+  naming_inner_separator: 'space',
+  naming_custom_tag: 'default',
+  folder_organization_enabled: true,
+  folder_move_to_library: true,
+  folder_library_path: '',
+  folder_sort_by_type: true,
+  folder_movies_name: 'Movies',
+  folder_series_name: 'TV Shows',
+  folder_create_movie_subdir: true,
+  folder_movie_template: '{{Title}} ({{Year}}) - {{Resolution}}',
+  folder_create_collection_dir: true,
+  folder_collection_template: '{{Collection}}',
+  folder_create_show_dir: true,
+  folder_show_template: '{{ShowTitle}} ({{YearRange}})',
+  folder_create_season_dir: true,
+  folder_season_template: 'Season {{Season}}',
+  folder_create_episode_dir: false,
+  folder_episode_template: '{{ShowTitle}} - {{Season}}{{Episode}}',
+  folder_remove_empty: true,
+  extras_enabled: true,
+  extras_sub_exts: '.srt, .sub, .ass, .ssa, .vtt',
+  extras_audio_exts: '.mka, .ac3, .dts, .mp3, .flac, .wav, .m4a',
+  extras_img_exts: '.jpg, .jpeg, .png, .gif, .bmp, .webp',
+  extras_meta_exts: '.nfo, .xml, .txt',
+  extras_video_action: 'delete',
+  extras_video_template: '{{ParentName}} - {{ExtraCategory}}',
+  extras_sub_action: 'rename',
+  extras_sub_template: '{{ParentName}} ({{Language}}) {{ExtraCategory}}',
+  extras_audio_action: 'rename',
+  extras_audio_template: '{{ParentName}} ({{Language}}) {{ExtraCategory}}',
+  extras_img_action: 'rename',
+  extras_img_template: '{{ExtraCategory}}',
+  extras_meta_action: 'rename',
+  extras_meta_template: '{{ParentName}}',
+  extras_folder_mode: 'subfolder',
+  ui_theme: 'dark_pro',
+};
+
 export const AppProvider = ({ children }) => {
   const [view, setView] = useState('dashboard');
   const [items, setItems] = useState({ manual: [], movies: [], series: [], extras: [], collisions: [] });
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(null);
-  const [settings, setSettings] = useState({ user_name: '', tmdb_api_key: '', tmdb_bearer_token: '', imdb_api_key: '' });
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [initialSettings, setInitialSettings] = useState(null);
+  const [isSettingsDirty, setIsSettingsDirty] = useState(false);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [settingsTab, setSettingsTab] = useState('api');
   const [saveStatus, setSaveStatus] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
   const [imageStatus, setImageStatus] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
   const [stats, setStats] = useState({ total_movies: 0, total_series: 0, total_episodes: 0, storage: '0 MB', unmatched: 0 });
   const [fullMetadata, setFullMetadata] = useState(null);
   const [showMetadataModal, setShowMetadataModal] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
   const wasActiveRef = useRef(false);
+  const scanTriggeredRef = useRef(false);
 
   useEffect(() => {
     fetchSettings();
@@ -74,22 +153,64 @@ export const AppProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    if (view === 'discovery') fetchDiscovery();
-    else if (view === 'settings') fetchSettings();
+    if (initialSettings && settings) {
+      const isDirty = JSON.stringify(settings) !== JSON.stringify(initialSettings);
+      
+      // Safety check: if they were JUST fetched, they shouldn't be dirty
+      if (isDirty) {
+        setIsSettingsDirty(true);
+      } else {
+        setIsSettingsDirty(false);
+      }
+    }
+  }, [settings, initialSettings]);
+
+  useEffect(() => {
+    // if (view === 'discovery') fetchDiscovery(); // Removed auto-fetch
+    if (view === 'settings') fetchSettings();
     else if (view === 'dashboard') fetchStats();
   }, [view]);
+
+  const loadSession = () => fetchDiscovery();
 
   const fetchSettings = async () => {
     try {
       const response = await fetch(`${API_BASE}/settings`);
       const data = await response.json();
-      setSettings(prev => ({ ...prev, ...data }));
+      
+      // Merge with defaults to ensure all keys exist and values are normalized
+      const normalizedData = { ...DEFAULT_SETTINGS };
+      for (const key in data) {
+        if (data[key] !== null && data[key] !== undefined) {
+          normalizedData[key] = data[key];
+        }
+      }
+
+      setSettings(normalizedData);
+      setInitialSettings(JSON.parse(JSON.stringify(normalizedData)));
+      setIsSettingsDirty(false);
     } catch (error) {
       console.error("Failed to fetch settings:", error);
     }
   };
 
-  const fetchStats = async () => {
+  const fetchDiscovery = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE}/discovery`);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      setItems(data);
+    } catch (error) {
+      console.error("Discovery fetch failed:", error);
+      // Optional: set some error state to show in UI
+    } finally {
+      setLoading(false);
+    }
+  }, [API_BASE]);
+
+  const fetchStats = React.useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE}/stats`);
       const data = await response.json();
@@ -97,7 +218,7 @@ export const AppProvider = ({ children }) => {
     } catch (error) {
       console.error("Failed to fetch stats:", error);
     }
-  };
+  }, [API_BASE]);
 
   const saveSettings = async () => {
     try {
@@ -108,6 +229,8 @@ export const AppProvider = ({ children }) => {
         body: JSON.stringify(settings)
       });
       setSaveStatus('Saved successfully!');
+      setInitialSettings(JSON.parse(JSON.stringify(settings)));
+      setIsSettingsDirty(false);
       setTimeout(() => setSaveStatus(''), 3000);
     } catch (error) {
       console.error("Failed to save settings:", error);
@@ -115,7 +238,13 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const fetchProgress = async () => {
+  const resetSettings = () => {
+    if (initialSettings) {
+      setSettings({ ...initialSettings });
+    }
+  };
+
+  const fetchProgress = React.useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE}/scan-status`);
       const data = await response.json();
@@ -124,45 +253,55 @@ export const AppProvider = ({ children }) => {
       if (data.active) {
         setLoading(true);
         wasActiveRef.current = true;
-      } else if (wasActiveRef.current) {
-        wasActiveRef.current = false;
+      } else {
+        // If it was active before, OR if we just triggered a scan, we should fetch the results.
+        if (wasActiveRef.current || scanTriggeredRef.current) {
+          await fetchDiscovery();
+          wasActiveRef.current = false;
+          scanTriggeredRef.current = false;
+          fetchStats(); // Update stats too
+        }
+        // If we were loading but nothing is active, stop loading
         setLoading(false);
-        fetchDiscovery();
       }
     } catch (error) {
       console.error("Progress fetch failed:", error);
     }
-  };
+  }, [API_BASE, fetchDiscovery, fetchStats]);
 
-  const fetchDiscovery = async () => {
-    setLoading(true);
+
+
+  const handleDropScan = React.useCallback(async (paths) => {
+    if (!paths || paths.length === 0) return;
     try {
-      const response = await fetch(`${API_BASE}/discovery`);
-      const data = await response.json();
-      setItems(data);
-    } catch (error) {
-      console.error("Failed to fetch discovery items:", error);
-    }
-    setLoading(false);
-  };
-
-  const handleScan = async () => {
-    try {
-      const { ipcRenderer } = window.require('electron');
-      const selectedPath = await ipcRenderer.invoke('select-folder');
-      if (!selectedPath) return;
-
       setLoading(true);
+      setView('discovery');
+      scanTriggeredRef.current = true;
       await fetch(`${API_BASE}/scan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paths: [selectedPath] })
+        body: JSON.stringify({ paths })
       });
+      setTimeout(() => {
+        fetchProgress();
+      }, 500); // Slightly longer wait to ensure backend has started
+    } catch (error) {
+      console.error("Drop scan failed:", error);
+      setLoading(false);
+      scanTriggeredRef.current = false;
+    }
+  }, [API_BASE, fetchProgress]);
+
+  const handleScan = React.useCallback(async () => {
+    try {
+      const { ipcRenderer } = window.require('electron');
+      const selectedPath = await ipcRenderer.invoke('select-folder', settings.default_scan_dir || null);
+      if (!selectedPath) return;
+      handleDropScan([selectedPath]);
     } catch (error) {
       console.error("Scan failed:", error);
-      setLoading(false);
     }
-  };
+  }, [settings.default_scan_dir, handleDropScan]);
 
   const fetchFullMetadata = async (itemId) => {
     try {
@@ -176,25 +315,33 @@ export const AppProvider = ({ children }) => {
       setShowMetadataModal(true);
     } catch (e) {
       console.error(e);
-      alert("Failed to fetch full metadata");
+      alert(T('alerts.metadata_failed'));
     }
   };
 
+  const confirmAction = (title, message, onConfirm) => {
+    setConfirmDialog({ isOpen: true, title, message, onConfirm });
+  };
+
   const wipeDatabase = async () => {
-    if (window.confirm('Are you absolutely sure you want to clear the entire database? This cannot be undone.')) {
-      setSaveStatus('Clearing database...');
-      try {
-        const res = await fetch(`${API_BASE}/database/clear`, { method: 'POST' });
-        if (res.ok) {
-          setSaveStatus('Database cleared successfully!');
-        } else {
-          setSaveStatus('Error clearing database');
+    confirmAction(
+      T('alerts.wipe_db_title'),
+      T('alerts.wipe_db_msg'),
+      async () => {
+        setSaveStatus(T('settings.status.saving'));
+        try {
+          const res = await fetch(`${API_BASE}/database/clear`, { method: 'POST' });
+          if (res.ok) {
+            setSaveStatus(T('settings.status.saved'));
+          } else {
+            setSaveStatus(T('settings.status.error'));
+          }
+        } catch (e) {
+          setSaveStatus(T('settings.status.error'));
         }
-        setTimeout(() => setSaveStatus(''), 4000);
-      } catch (e) {
-        setSaveStatus('Error clearing database');
+        setTimeout(() => setSaveStatus(''), 3000);
       }
-    }
+    );
   };
 
   return (
@@ -207,14 +354,19 @@ export const AppProvider = ({ children }) => {
       showWelcomeModal, setShowWelcomeModal,
       settingsTab, setSettingsTab,
       saveStatus, setSaveStatus,
+      isDragging, setIsDragging,
       imageStatus, setImageStatus,
       selectedItem, setSelectedItem,
       stats, setStats,
       fullMetadata, setFullMetadata,
       showMetadataModal, setShowMetadataModal,
+      confirmDialog, setConfirmDialog, confirmAction,
+      isSettingsDirty, resetSettings,
+      loadSession,
       fetchDiscovery, fetchStats, fetchSettings,
-      handleScan, fetchFullMetadata, saveSettings, wipeDatabase,
-      T, API_BASE
+      handleScan, handleDropScan, fetchFullMetadata, saveSettings, wipeDatabase,
+      T: (key, params) => T(key, params, settings.ui_language || 'en'),
+      availableLocales, API_BASE
     }}>
       {children}
     </AppContext.Provider>
