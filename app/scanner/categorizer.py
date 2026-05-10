@@ -63,24 +63,31 @@ class Categorizer:
         name = file_path.stem.lower()
         
         # 1. Determine base category by extension
-        category = ExtraCategory.OTHER
+        category = None
         if ext in {'.mkv', '.mp4', '.avi', '.mov', '.wmv'}: category = ExtraCategory.VIDEO
         elif ext in {'.srt', '.sub', '.ass', '.idx'}: category = ExtraCategory.SUBTITLE
-        elif ext in {'.jpg', '.jpeg', '.png', '.webp', '.png'}: category = ExtraCategory.IMAGE
+        elif ext in {'.jpg', '.jpeg', '.png', '.webp'}: category = ExtraCategory.IMAGE
         elif ext in {'.ac3', '.dts', '.flac', '.mp3'}: category = ExtraCategory.AUDIO
         elif ext in {'.nfo', '.xml', '.txt', '.json'}: category = ExtraCategory.METADATA
 
+        # If no category was identified, it's 'trash' - return None
+        if category is None:
+            return None, None
+
         # 2. Refine subtype using keywords in the filename
-        subtype = ExtraSubtype.OTHER
-        
-        # Special case for NFO files
-        if ext == '.nfo': subtype = ExtraSubtype.NFO
+        subtype = None
         
         # Search for known keywords in the filename
         for key, value in self.SUBTYPE_MAP.items():
             if key in name:
                 subtype = value
                 break
+
+        # Special case for Metadata files - they should prioritize their specific type
+        if ext == '.nfo': subtype = ExtraSubtype.NFO
+        elif ext == '.xml': subtype = ExtraSubtype.XML
+        elif ext == '.json': subtype = ExtraSubtype.JSON
+        elif ext == '.txt': subtype = ExtraSubtype.TXT
                 
         return category, subtype
 

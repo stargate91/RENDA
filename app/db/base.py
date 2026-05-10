@@ -20,7 +20,10 @@ class Base(DeclarativeBase):
 # Engine initialization
 engine = create_engine(
     DATABASE_URL, 
-    connect_args={"check_same_thread": False} # Required for multi-threaded SQLite usage
+    connect_args={
+        "check_same_thread": False,
+        "timeout": 30
+    } # Required for multi-threaded SQLite usage
 )
 
 # SQLite Optimization: Enable WAL (Write-Ahead Logging) mode

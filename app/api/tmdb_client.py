@@ -178,3 +178,11 @@ class TMDBClient:
             "append_to_response": "external_ids"
         }
         return self._call_api(endpoint, params)
+
+    def get_person_images(self, person_id: int) -> Dict[str, Any]:
+        """Lekéri egy színész/készítő összes elérhető profilképét."""
+        if not self._api_key: return {}
+        
+        endpoint = f"/person/{person_id}/images"
+        params = {"api_key": self._api_key}
+        return self._call_api(endpoint, params)

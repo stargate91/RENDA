@@ -98,6 +98,7 @@ class MediaItem(Base):
     part_type: Mapped[PartType] = mapped_column(SQLEnum(PartType), default=PartType.PART)
     part_style: Mapped[PartStyle] = mapped_column(SQLEnum(PartStyle), default=PartStyle.ARABIC)
     is_manual: Mapped[bool] = mapped_column(Boolean, default=False); status: Mapped[ItemStatus] = mapped_column(SQLEnum(ItemStatus), default=ItemStatus.NEW, index=True)
+    planned_path: Mapped[Optional[str]] = mapped_column(String) # The path proposed by the Formatter
     category: Mapped[str] = mapped_column(String, default="video", index=True); created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     matches: Mapped[List["MediaMatch"]] = relationship(back_populates="media_item", cascade="all, delete-orphan")
@@ -126,8 +127,10 @@ class MediaMatch(Base):
     release_date: Mapped[Optional[datetime]] = mapped_column(DateTime); first_air_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
     last_air_date: Mapped[Optional[datetime]] = mapped_column(DateTime); episode_air_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
     season_air_date: Mapped[Optional[datetime]] = mapped_column(DateTime); number_of_seasons: Mapped[Optional[int]] = mapped_column(Integer)
-    number_of_episodes: Mapped[Optional[int]] = mapped_column(Integer); fetched_languages: Mapped[Optional[str]] = mapped_column(String)
+    number_of_episodes: Mapped[Optional[int]] = mapped_column(Integer)
+    fetched_languages: Mapped[Optional[str]] = mapped_column(String)
     image_status: Mapped[ImageStatus] = mapped_column(SQLEnum(ImageStatus), default=ImageStatus.PENDING, index=True)
+    backdrop_status: Mapped[ImageStatus] = mapped_column(SQLEnum(ImageStatus), default=ImageStatus.PENDING, index=True)
     confidence_score: Mapped[float] = mapped_column(Float, default=1.0)
     is_active: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     localizations: Mapped[List["MetadataLocalization"]] = relationship(back_populates="match", cascade="all, delete-orphan")
@@ -157,6 +160,8 @@ class MetadataLocalization(Base):
     local_backdrop_path: Mapped[Optional[str]] = mapped_column(String)
     still_path: Mapped[Optional[str]] = mapped_column(String)
     local_still_path: Mapped[Optional[str]] = mapped_column(String)
+    all_stills: Mapped[Optional[List[str]]] = mapped_column(JSON) # JSON list of paths
+    local_all_stills: Mapped[Optional[List[str]]] = mapped_column(JSON)
     local_thumb_path: Mapped[Optional[str]] = mapped_column(String) # For fast UI previews
     last_updated: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     match: Mapped["MediaMatch"] = relationship(back_populates="localizations")
@@ -211,7 +216,7 @@ class ExtraFile(Base):
     __tablename__ = "extra_files"
     id: Mapped[int] = mapped_column(primary_key=True); parent_item_id: Mapped[int] = mapped_column(ForeignKey("media_items.id"), index=True)
     category: Mapped[ExtraCategory] = mapped_column(SQLEnum(ExtraCategory), nullable=False)
-    subtype: Mapped[ExtraSubtype] = mapped_column(SQLEnum(ExtraSubtype), default=ExtraSubtype.OTHER)
+    subtype: Mapped[Optional[ExtraSubtype]] = mapped_column(SQLEnum(ExtraSubtype), nullable=True)
     original_path: Mapped[str] = mapped_column(String, nullable=False, index=True); current_path: Mapped[str] = mapped_column(String, nullable=False, index=True)
     extension: Mapped[str] = mapped_column(String)
     language: Mapped[Optional[str]] = mapped_column(String)

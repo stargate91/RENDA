@@ -130,6 +130,33 @@ class Formatter:
     def __init__(self, config: Optional[FormatterConfig] = None):
         self.config = config or FormatterConfig()
 
+    def format_item(self, item: 'MediaItem', match: MediaMatch, loc: 'MetadataLocalization') -> RenamePreview:
+        """
+        Generates a preview for a single item using official metadata.
+        Used for updating planned_path after enrichment.
+        """
+        if match.item_type == ItemType.MOVIE:
+            context = self.build_movie_context(item, match, loc)
+            target_name = self.format_movie_filename(context)
+            cat_folder = self.get_category_folder("movie")
+            folder_name = self.format_movie_foldername(context)
+            target_subpath = str(Path(cat_folder) / folder_name)
+        else:
+            context = self.build_tv_context(item, match, loc)
+            target_name = self.format_episode_filename(context)
+            cat_folder = self.get_category_folder("series")
+            series_folder = self.format_series_foldername(context)
+            season_folder = self.format_season_foldername(context)
+            target_subpath = str(Path(cat_folder) / series_folder / season_folder)
+
+        return RenamePreview(
+            item_id=item.id,
+            original_path=item.current_path,
+            target_name=target_name,
+            target_subpath=target_subpath,
+            item_type=match.item_type.value
+        )
+
     def plan_rename(self, match: MediaMatch, destination_root: str) -> RenamePreview:
         """
         Generates a comprehensive renaming plan for a media item and all its extras.
@@ -488,8 +515,10 @@ class Formatter:
 
         # 4. Automatikus kiterjesztés hozzáadása, ha fájlról van szó
         ext = context.get("ext", "")
-        if ext and not result.lower().endswith(ext.lower()):
-            result = f"{result}{ext}"
+        if ext:
+            ext_lower = ext.lower()
+            if not result.lower().endswith(ext_lower):
+                result = f"{result}{ext_lower}"
 
         return result.strip()
 
@@ -507,8 +536,22 @@ class Formatter:
         return normalized.replace(" ", sep) if sep != " " else normalized
 
     def format_number(self, num, width: int = 2) -> str:
-        try: n = int(num)
-        except: return str(num) if num else ""
+        if isinstance(num, (list, tuple)):
+            return f"-E".join(str(n).zfill(width) for n in num)
+            
+        try: 
+            n = int(num)
+        except: 
+            # Ha string és JSON lista, próbáljuk meg parse-olni
+            if isinstance(num, str) and num.startswith("["):
+                 try:
+                     import ast
+                     parsed = ast.literal_eval(num)
+                     if isinstance(parsed, list):
+                         return self.format_number(parsed, width)
+                 except: pass
+            return str(num) if num else ""
+            
         return str(n).zfill(width) if self.config.zero_pad else str(n)
 
     def sanitize(self, text: str) -> str:

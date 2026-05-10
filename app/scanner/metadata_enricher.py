@@ -20,6 +20,7 @@ class MetadataEnricher:
     def enrich_matched_item(self, item: MediaItem, language: str = "en"):
         """
         Végrehajtja a teljes metaadat-letöltést az aktív találathoz.
+        Kényszeríti a helyes típust az API válasza alapján.
         """
         active_match = self.db.query(MediaMatch).filter(
             MediaMatch.media_item_id == item.id,
@@ -28,10 +29,39 @@ class MetadataEnricher:
 
         if not active_match: return
 
+        # --- TÍPUS KÉNYSZERÍTÉS (API VÁLASZ ALAPJÁN) ---
+        # DEBUG: logger.info(f"DEBUG: active_match type: {type(active_match)}, attrs: {dir(active_match)}")
+        imdb_id = getattr(active_match, 'imdb_id', None) or item.nfo_imdb_id
+        if imdb_id and imdb_id.startswith("tt"):
+            find_res = self.api.find_by_imdb(imdb_id, language=language)
+            if find_res and "item_type" in find_res:
+                actual_type = ItemType.MOVIE if find_res["item_type"] == "movie" else ItemType.EPISODE
+                
+                # Ha eltér az eredeti tippünktől, kényszerítjük a helyeset
+                if active_match.item_type != actual_type:
+                    logger.info(f"Correcting type for item {item.id} to {actual_type} based on API")
+                    active_match.item_type = actual_type
+                    item.item_type = actual_type
+                    # Ha sorozatról van szó, de nincs szezon/epizód infó, töltsük ki alapértelmezéssel
+                    if actual_type == ItemType.EPISODE:
+                        if active_match.season_number is None: active_match.season_number = 1
+                        if active_match.episode_number is None: active_match.episode_number = 1
+
         if active_match.item_type == ItemType.MOVIE:
             self._enrich_movie(active_match, language)
         elif active_match.item_type == ItemType.SERIES or active_match.item_type == ItemType.EPISODE:
             self._enrich_tv(active_match, language)
+
+        # --- TERVEZETT ÚTVONAL FRISSÍTÉSE (HIVATALOS ADATOKKAL) ---
+        try:
+            from ..formatter.formatter import Formatter
+            formatter = Formatter()
+            loc = active_match.localizations[0] if active_match.localizations else None
+            if loc:
+                preview = formatter.format_item(item, active_match, loc)
+                item.planned_path = preview.target_name
+        except Exception as e:
+            logger.error(f"Failed to update planned_path after enrichment: {e}")
 
         self.db.commit()
 
@@ -107,31 +137,83 @@ class MetadataEnricher:
 
         # C. EPIZÓD SZINT (Ha van epizód szám)
         if match.season_number is not None and match.episode_number is not None:
-            ep_details = self.api.get_episode_details(
-                match.tmdb_id, match.season_number, match.episode_number, language=language
-            )
-            if ep_details:
-                loc.episode_title = ep_details.get("name")
-                loc.overview = ep_details.get("overview") or loc.overview
-                match.rating_tmdb = ep_details.get("vote_average")
-                match.vote_count_tmdb = ep_details.get("vote_count")
-                match.runtime = ep_details.get("runtime") or match.runtime
-                # Epizód air date
-                ep_date = ep_details.get("air_date")
-                if ep_date:
+            # Kezeljük a több epizódból álló fájlokat (pl. S01E01-02)
+            ep_nums = []
+            raw_ep = match.episode_number
+            
+            if isinstance(raw_ep, list):
+                ep_nums = raw_ep
+            elif isinstance(raw_ep, str) and "[" in raw_ep:
+                # Guessit string reprezentáció kezelése: "[1, 2]" -> [1, 2]
+                try:
+                    import ast
+                    parsed = ast.literal_eval(raw_ep)
+                    if isinstance(parsed, list):
+                        ep_nums = parsed
+                    else:
+                        ep_nums = [parsed]
+                except:
+                    ep_nums = [raw_ep]
+            else:
+                ep_nums = [raw_ep]
+
+            titles = []
+            overviews = []
+            all_stills = []
+            first_still = None
+            first_air_date = None
+            
+            for ename in ep_nums:
+                try:
+                    ep_details = self.api.get_episode_details(
+                        match.tmdb_id, match.season_number, ename, language=language
+                    )
+                    if ep_details:
+                        titles.append(ep_details.get("name") or f"Episode {ename}")
+                        if ep_details.get("overview"):
+                            overviews.append(ep_details.get("overview"))
+                        
+                        s_path = ep_details.get("still_path")
+                        if s_path:
+                            all_stills.append(s_path)
+                            if not first_still:
+                                first_still = s_path
+                                
+                        if not first_air_date:
+                            first_air_date = ep_details.get("air_date")
+                            
+                        # Első epizód alapján állítsunk be alap adatokat
+                        if ename == ep_nums[0]:
+                            match.rating_tmdb = ep_details.get("vote_average")
+                            match.vote_count_tmdb = ep_details.get("vote_count")
+                            match.runtime = ep_details.get("runtime") or match.runtime
+                            
+                            # IMDb ID az elsőhöz
+                            ep_ext_ids = ep_details.get("external_ids", {})
+                            ep_imdb_id = ep_ext_ids.get("imdb_id")
+                            if ep_imdb_id:
+                                self._update_omdb_ratings(match, ep_imdb_id)
+                except Exception as e:
+                    logger.warning(f"Failed to fetch metadata for episode {ename}: {e}")
+
+            if titles:
+                loc.episode_title = " / ".join(titles)
+                loc.still_path = first_still
+                loc.all_stills = all_stills
+                if overviews:
+                    loc.overview = "\n\n".join(overviews)
+                
+                if first_still:
+                    loc.still_path = first_still
+                
+                if first_air_date:
                     try:
                         from datetime import datetime
-                        match.episode_air_date = datetime.strptime(ep_date, "%Y-%m-%d")
+                        match.episode_air_date = datetime.strptime(first_air_date, "%Y-%m-%d")
                     except: pass
-                # Epizód kép
-                if ep_details.get("still_path"):
-                    loc.backdrop_path = ep_details.get("still_path")
                 
-                # EPIZÓD SZINTŰ IMDb (OMDb hívás az epizód ID-jával)
-                ep_ext_ids = ep_details.get("external_ids", {})
-                ep_imdb_id = ep_ext_ids.get("imdb_id")
-                if ep_imdb_id:
-                    self._update_omdb_ratings(match, ep_imdb_id)
+                # Állítsuk be az epizódok számát
+                match.episode_count = len(ep_nums)
 
     def _update_match_common(self, match: MediaMatch, details: Dict[str, Any]):
         """Közös adatok frissítése (időtartam, értékelések, személyek)."""
@@ -185,25 +267,26 @@ class MetadataEnricher:
         from ..db.models import Person, MediaPersonLink
         
         credits = details.get("credits", {})
-        cast = credits.get("cast", [])[:20] # Top 20 színész
+        cast = credits.get("cast", [])[:10] # Top 10 színész
         crew = credits.get("crew", [])
         
         # 1. Rendezők / Készítők
         creators = []
         if match.item_type == ItemType.MOVIE:
-            creators = [p for p in crew if p["job"] == "Director"]
+            creators = [p for p in crew if p["job"] == "Director"][:2]
         else:
             # Sorozatoknál 'created_by'
             creators = details.get("created_by", [])
             # Ha nincs created_by, akkor a crew-ból a Producerek
             if not creators:
                 creators = [p for p in crew if p["job"] in ["Executive Producer", "Director"]]
+            creators = creators[:2]
 
         # Mentés és Linkelés
         processed_people = [] # ID-k a duplikáció elkerülésére egy elemen belül
         
         # A. Készítők feldolgozása
-        for i, p in enumerate(creators[:5]):
+        for i, p in enumerate(creators[:2]):
             person = self._get_or_create_person(p)
             self._link_person(match, person, job="Director" if match.item_type == ItemType.MOVIE else "Creator")
             processed_people.append(p["id"])
@@ -217,46 +300,65 @@ class MetadataEnricher:
             processed_people.append(p["id"])
 
     def _get_or_create_person(self, p_data: Dict[str, Any]) -> "Person":
-        from ..db.models import Person
+        from ..db.models import Person, PersonLocalization
+        from sqlalchemy.exc import IntegrityError
+        
         tmdb_id = p_data["id"]
         person = self.db.query(Person).filter(Person.id == tmdb_id).first()
-        if not person:
-            person = Person(
-                id=tmdb_id,
-                popularity=p_data.get("popularity"),
-                profile_path=p_data.get("profile_path")
-            )
-            self.db.add(person)
-            # Alap lokalizáció (név)
-            from ..db.models import PersonLocalization
-            loc = PersonLocalization(person_id=tmdb_id, language="en", name=p_data["name"])
-            self.db.add(loc)
-        return person
+        if person:
+            return person
+            
+        try:
+            # Use nested transaction (SAVEPOINT) to handle race conditions gracefully
+            with self.db.begin_nested():
+                person = Person(
+                    id=tmdb_id,
+                    popularity=p_data.get("popularity"),
+                    profile_path=p_data.get("profile_path")
+                )
+                self.db.add(person)
+                loc = PersonLocalization(person_id=tmdb_id, language="en", name=p_data.get("name", "Unknown"))
+                self.db.add(loc)
+                self.db.flush() # Trigger uniqueness check NOW
+            return person
+        except IntegrityError:
+            # Rollback happened automatically. Fetch existing.
+            self.db.rollback()
+            return self.db.query(Person).filter(Person.id == tmdb_id).first()
 
     def _link_person(self, match: MediaMatch, person: "Person", job: str, character: str = None, order: int = 0):
         from ..db.models import MediaPersonLink
+        from sqlalchemy.exc import IntegrityError
+        
         link = self.db.query(MediaPersonLink).filter(
             MediaPersonLink.media_match_id == match.id,
             MediaPersonLink.person_id == person.id,
             MediaPersonLink.job == job
         ).first()
+        
         if not link:
-            link = MediaPersonLink(
-                media_match_id=match.id,
-                person_id=person.id,
-                job=job,
-                character_name=character,
-                order=order
-            )
-            self.db.add(link)
+            try:
+                with self.db.begin_nested():
+                    link = MediaPersonLink(
+                        media_match_id=match.id,
+                        person_id=person.id,
+                        job=job,
+                        character_name=character,
+                        order=order
+                    )
+                    self.db.add(link)
+                    self.db.flush()
+            except IntegrityError:
+                self.db.rollback()
+                pass # Already linked by another thread/process
 
     def _get_or_create_loc(self, match: MediaMatch, language: str) -> MetadataLocalization:
         """Lokalizációs objektum kérése vagy létrehozása."""
         loc = self.db.query(MetadataLocalization).filter(
             MetadataLocalization.match_id == match.id,
-            MetadataLocalization.language == language
+            MetadataLocalization.target_language == language
         ).first()
         if not loc:
-            loc = MetadataLocalization(match_id=match.id, language=language)
+            loc = MetadataLocalization(match_id=match.id, target_language=language)
             self.db.add(loc)
         return loc

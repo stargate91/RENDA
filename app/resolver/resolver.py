@@ -57,7 +57,7 @@ class Resolver:
             for loc in active_match.localizations:
                 new_loc = MetadataLocalization(
                     match_id=new_match.id,
-                    language=loc.language,
+                    target_language=loc.target_language,
                     title=loc.title,
                     original_title=loc.original_title,
                     series_title=loc.series_title,
@@ -188,19 +188,30 @@ class Resolver:
                 vote_count_tmdb=data.get("vote_count")
             )
             
-            # Első találat (legnépszerűbb) lesz az aktív, ha csak egy van vagy automatikus módban vagyunk
+            # Első találat (legnépszerűbb) lesz az aktív
             if i == 0:
                 match.is_active = True
-                if match_count == 1:
-                    # Évszám ellenőrzés
-                    target_year = item.fn_year or item.fd_year or item.it_year
-                    match_year = release_date.year if release_date else None
-                    if target_year and match_year and abs(target_year - match_year) > 1:
-                        item.status = ItemStatus.UNCERTAIN
-                    else:
-                        item.status = ItemStatus.MATCHED
-                else:
+                
+                target_year = item.fn_year or item.fd_year or item.it_year
+                match_year = release_date.year if release_date else None
+                
+                is_episode = bool(item.fn_season or item.fn_episode or item.fd_season or item.fd_episode)
+                
+                # 1. Van évszámunk, és az első találat évszáma is megegyezik (+- 1 év)
+                if target_year and match_year and abs(target_year - match_year) <= 1:
+                    item.status = ItemStatus.MATCHED
+                
+                # 2. Van évszámunk, de az első találat évszáma eltér
+                elif target_year and match_year and abs(target_year - match_year) > 1:
+                    item.status = ItemStatus.UNCERTAIN
+                    
+                # 3. Nincs évszámunk, de a TMDB több találatot is adott (pl. Jumanji, vagy több azonos című sorozat)
+                elif not target_year and match_count > 1:
                     item.status = ItemStatus.MULTIPLE
+                    
+                # 4. Nincs évszám, de csak 1 találat jött vissza (pl. egyértelmű sorozatcím)
+                else:
+                    item.status = ItemStatus.MATCHED
             
             self.db.add(match)
             self.db.flush()
@@ -208,7 +219,7 @@ class Resolver:
             # Lokalizált adatok (alap keresési válaszból)
             loc = MetadataLocalization(
                 match_id=match.id,
-                language=language,
+                target_language=language,
                 title=data.get("title") or data.get("name"),
                 overview=data.get("overview"),
                 poster_path=data.get("poster_path"),
