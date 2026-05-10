@@ -104,6 +104,8 @@ class MetadataEnricher:
         match.networks = [n["name"] for n in series_details.get("networks", [])]
         
         loc = self._get_or_create_loc(match, language)
+        loc.title = series_details.get("name")
+        loc.original_title = series_details.get("original_name")
         loc.series_title = series_details.get("name")
         loc.original_series_title = series_details.get("original_name")
         loc.overview = series_details.get("overview")
@@ -112,6 +114,7 @@ class MetadataEnricher:
         loc.backdrop_path = series_details.get("backdrop_path")
         loc.genres = [g["name"] for g in series_details.get("genres", [])]
         loc.origin_country = series_details.get("origin_country")
+        loc.original_language = series_details.get("original_language")
 
         # B. SZEZON SZINT (Ha van szezon szám)
         if match.season_number is not None:

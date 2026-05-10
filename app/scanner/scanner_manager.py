@@ -243,9 +243,16 @@ class ScannerManager:
                 if probe_data:
                     tech_info = self.prober.extract_info(probe_data)
                     item.duration = tech_info["duration"]
+                    item.size = tech_info["size"] or item.size
                     item.resolution = tech_info["resolution"]
                     item.video_codec = tech_info["video_codec"]
+                    item.video_bitrate = tech_info["video_bitrate"]
                     item.audio_codec = tech_info["audio_codec"]
+                    item.audio_channels = tech_info["audio_channels"]
+                    item.audio_bitrate = tech_info["audio_bitrate"]
+                    item.framerate = tech_info["framerate"]
+                    item.bit_depth = tech_info["bit_depth"]
+                    item.hdr_type = tech_info["hdr_type"]
                     item.audio_streams = tech_info["audio_streams"]
                     item.internal_title = tech_info["internal_title"]
                 
