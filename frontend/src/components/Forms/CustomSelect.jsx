@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { ChevronDown } from 'lucide-react';
 
-const CustomSelect = ({ value, options, onChange }) => {
+const CustomSelect = ({ value, options, onChange, placeholder = 'Select...' }) => {
   const [isOpen, setIsOpen] = useState(false);
   const ref = useRef(null);
 
-  const selectedOption = options.find(opt => opt.value === value) || options[0];
+  const selectedOption = options.find(opt => opt.value === value);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -17,29 +18,33 @@ const CustomSelect = ({ value, options, onChange }) => {
   }, []);
 
   return (
-    <div className="custom-select-container" ref={ref}>
+    <div className={`custom-select-container ${isOpen ? 'is-open' : ''}`} ref={ref}>
       <div 
-        className={`form-input custom-select-header ${isOpen ? 'open' : ''}`} 
+        className="custom-select-header" 
         onClick={() => setIsOpen(!isOpen)}
       >
-        {selectedOption?.label}
-        <span className="custom-select-arrow">▼</span>
+        <span className="selected-label">
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <ChevronDown className={`select-arrow ${isOpen ? 'rotate' : ''}`} size={16} />
       </div>
       
       {isOpen && (
         <div className="custom-select-dropdown">
-          {options.map(opt => (
-            <div 
-              key={opt.value} 
-              className={`custom-select-option ${opt.value === value ? 'selected' : ''}`}
-              onClick={() => {
-                onChange(opt.value);
-                setIsOpen(false);
-              }}
-            >
-              {opt.label}
-            </div>
-          ))}
+          <div className="dropdown-scroll">
+            {options.map(opt => (
+              <div 
+                key={opt.value} 
+                className={`custom-select-option ${opt.value === value ? 'selected' : ''}`}
+                onClick={() => {
+                  onChange(opt.value);
+                  setIsOpen(false);
+                }}
+              >
+                {opt.label}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

@@ -22,7 +22,7 @@ const ConfirmModal = () => {
         <p style={{ marginBottom: '25px', lineHeight: '1.5', color: '#ccc' }}>{confirmDialog.message}</p>
         <div className="modal-actions" style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
           <button className="btn-secondary" onClick={handleCancel}>{T('modal.confirm.cancel')}</button>
-          <button className="btn-primary danger-btn" onClick={handleConfirm}>{T('modal.confirm.yes')}</button>
+          <button className="btn-danger" onClick={handleConfirm}>{T('modal.confirm.yes')}</button>
         </div>
       </div>
     </div>

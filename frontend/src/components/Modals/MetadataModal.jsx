@@ -47,7 +47,7 @@ const MetadataModal = ({ show, metadata, onClose, T }) => {
               </div>
               {metadata.technical.audio_streams && metadata.technical.audio_streams.length > 0 && (
                 <>
-                  <div className="metadata-match-subheader" style={{marginTop: '20px'}}>Audio Streams</div>
+                  <div className="metadata-match-subheader" style={{marginTop: '20px'}}>{T('modal.metadata.audio_streams')}</div>
                   <div className="metadata-code-block">
                     {JSON.stringify(metadata.technical.audio_streams, null, 2)}
                   </div>
@@ -88,9 +88,9 @@ const MetadataModal = ({ show, metadata, onClose, T }) => {
                 metadata.matches.map((m, idx) => (
                   <div key={m.id} className="metadata-match-card">
                     <div className="metadata-match-header">
-                      Match {idx + 1} — {m.type.toUpperCase()} — TMDB: {m.tmdb_id || 'N/A'}
+                      {T('modal.metadata.match')} {idx + 1} — {m.type.toUpperCase()} — TMDB: {m.tmdb_id || T('modal.metadata.na')}
                       {m.imdb_id ? ` — IMDb: ${m.imdb_id}` : ''}
-                      {m.is_active && <span className="metadata-active-badge">ACTIVE</span>}
+                      {m.is_active && <span className="metadata-active-badge">{T('modal.metadata.active')}</span>}
                     </div>
 
                     <div className="metadata-grid compact" style={{ marginBottom: '15px' }}>
@@ -111,8 +111,8 @@ const MetadataModal = ({ show, metadata, onClose, T }) => {
                       {m.popularity != null && <div className="metadata-grid-item"><span className="metadata-key">Popularity</span><span className="metadata-val">{m.popularity}</span></div>}
                       {m.release_status && <div className="metadata-grid-item"><span className="metadata-key">Release Status</span><span className="metadata-val">{m.release_status}</span></div>}
                       
-                      {m.rating_tmdb != null && <div className="metadata-grid-item"><span className="metadata-key">TMDB Rating</span><span className="metadata-val">{m.rating_tmdb} {m.vote_count_tmdb != null ? `(${m.vote_count_tmdb} votes)` : ''}</span></div>}
-                      {m.rating_imdb != null && <div className="metadata-grid-item"><span className="metadata-key">IMDB Rating</span><span className="metadata-val">{m.rating_imdb} {m.vote_count_imdb != null ? `(${m.vote_count_imdb} votes)` : ''}</span></div>}
+                      {m.rating_tmdb != null && <div className="metadata-grid-item"><span className="metadata-key">TMDB Rating</span><span className="metadata-val">{m.rating_tmdb} {m.vote_count_tmdb != null ? `(${m.vote_count_tmdb} ${T('modal.metadata.votes')})` : ''}</span></div>}
+                      {m.rating_imdb != null && <div className="metadata-grid-item"><span className="metadata-key">IMDB Rating</span><span className="metadata-val">{m.rating_imdb} {m.vote_count_imdb != null ? `(${m.vote_count_imdb} ${T('modal.metadata.votes')})` : ''}</span></div>}
                       {m.rating_rotten != null && <div className="metadata-grid-item"><span className="metadata-key">Rotten Tomatoes</span><span className="metadata-val">{m.rating_rotten}</span></div>}
                       {m.rating_meta != null && <div className="metadata-grid-item"><span className="metadata-key">Metascore</span><span className="metadata-val">{m.rating_meta}</span></div>}
                       
@@ -134,10 +134,10 @@ const MetadataModal = ({ show, metadata, onClose, T }) => {
 
                     {m.localizations && m.localizations.length > 0 && (
                       <>
-                        <div className="metadata-match-subheader">Localizations</div>
+                        <div className="metadata-match-subheader">{T('modal.metadata.localizations')}</div>
                         {m.localizations.map((loc, li) => (
                           <div key={li} className="metadata-loc-card">
-                            <div className="metadata-loc-lang">{(loc.language || '??').toUpperCase()}{loc.is_primary ? ' (Primary)' : ''}</div>
+                            <div className="metadata-loc-lang">{(loc.language || '??').toUpperCase()}{loc.is_primary ? ` (${T('modal.metadata.primary')})` : ''}</div>
                             <div className="metadata-grid compact">
                               <div className="metadata-grid-item"><span className="metadata-key">Title</span><span className="metadata-val">{loc.title || '—'}</span></div>
                               <div className="metadata-grid-item"><span className="metadata-key">Original Title</span><span className="metadata-val">{loc.original_title || '—'}</span></div>

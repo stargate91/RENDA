@@ -1,5 +1,17 @@
 const en = {
   "_lang_name": "English",
+  "common": {
+    "save": "Save Changes",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete"
+  },
+  "units": {
+    "m": "m",
+    "s": "s",
+    "min": "min",
+    "sec": "sec"
+  },
   "phases": {
     "collecting": "Analyzing files",
     "probing": "Technical probing",
@@ -23,7 +35,7 @@ const en = {
       "tv_series": "TV Series",
       "episodes_sub": "Episodes",
       "storage_used": "Storage Used",
-      "storage_sub": "across 4 drives",
+      "storage_sub": "across {{count}} drives",
       "unmatched": "Unmatched",
       "unmatched_sub": "Pending in Discovery"
     }
@@ -31,18 +43,25 @@ const en = {
   "discovery": {
     "title": "Discovery Console",
     "found_items": "Found {{count}} new items.",
-    "scan_now": "Scan Now",
+    "scan_now": "Browse & Scan",
+    "background_images": "Fetching Images",
     "refresh": "Refresh",
     "processing": "Processing...",
     "search_placeholder": "Search in this view...",
     "no_items": "No items in this category.",
+    "bulk": {
+      "selected": "{{count}} items selected",
+      "delete": "Delete Selected"
+    },
     "empty": {
       "title": "Ready for work?",
       "subtitle": "Your workspace is currently clear. Drag & drop folders here, start a new scan, or load all pending items from the database.",
       "drop_title": "Drop to Scan",
       "drop_subtitle": "Drop your folders or files here to start the discovery process.",
       "action_scan": "Scan New Files",
-      "action_resume": "Load All Pending Items ({{count}})"
+      "action_resume": "Load All Pending Items ({{count}})",
+      "drop_overlay_title": "Drop to Scan",
+      "drop_overlay_subtitle": "Release to start discovery"
     },
     "table": {
       "name_mapping": "Original Filename",
@@ -51,7 +70,8 @@ const en = {
       "status": "Status",
       "subcategory": "Category",
       "subtype": "Extension",
-      "language": "Language"
+      "language": "Language",
+      "unknown": "UNKNOWN"
     },
     "tabs": {
       "manual": "Manual Review",
@@ -59,11 +79,11 @@ const en = {
       "series": "Series",
       "extras": "Extras",
       "collisions": "Collisions",
-      "bonus_video": "Bonus Video",
-      "subtitles": "Subtitles",
-      "audio_tracks": "Audio Tracks",
-      "images": "Images",
-      "metadatas": "Metadatas"
+      "video": "Bonus Video",
+      "subtitle": "Subtitles",
+      "audio": "Audio Tracks",
+      "image": "Images",
+      "metadata": "Metadata"
     }
   },
   "progress": {
@@ -73,26 +93,53 @@ const en = {
   },
   "modal": {
     "confirm": {
-      "cancel": "Cancel",
-      "yes": "Yes, I'm sure"
+      "yes": "Yes, Delete",
+      "cancel": "Cancel"
+    },
+    "resolver": {
+      "title": "Manual Metadata Resolver",
+      "search_placeholder": "Search movie or series title...",
+      "year": "Year",
+      "assignment": "Assignment",
+      "season": "Season",
+      "episode": "Episode",
+      "confirm": "Resolve & Enrich",
+      "select_hint": "Select a result from the list to assign it to this file",
+      "action": "Fix Match"
+    },
+    "override": {
+      "title": "Manual Overrides",
+      "action": "Edit Details",
+      "media_info": "Media Properties",
+      "tv_params": "TV / Episode Parameters",
+      "extra_info": "Extra File Properties",
+      "localization": "Language & Region"
     },
     "metadata": {
       "tabs": {
         "technical": "Technical",
-        "guessit": "Guessit",
+        "guessit": "Guessit Analysis",
         "overrides": "Overrides",
-        "matches": "API Matches ({{count}})",
-        "api_raw": "Raw JSON"
+        "matches": "Matches ({{count}})",
+        "api_raw": "API Raw Data"
       },
-      "no_matches": "No matches found for this item.",
-      "no_api": "No API data available."
+      "audio_streams": "Audio Streams",
+      "match": "Match",
+      "active": "ACTIVE",
+      "na": "N/A",
+      "votes": "votes",
+      "localizations": "Localizations",
+      "primary": "Primary",
+      "no_matches": "No metadata matches found.",
+      "no_api": "No raw API data available."
     }
   },
   "floating": {
     "unsaved": "You have unsaved changes.",
     "reset": "Reset",
     "save": "Save Changes",
-    "saving": "Saving..."
+    "saving": "Saving...",
+    "saved": "Settings saved!"
   },
   "settings": {
     "title": "Settings",
@@ -172,7 +219,11 @@ const en = {
   "alerts": {
     "metadata_failed": "Failed to fetch full metadata",
     "wipe_db_title": "Factory Reset Database",
-    "wipe_db_msg": "Are you absolutely sure you want to clear the entire database? This cannot be undone."
+    "wipe_db_msg": "Are you absolutely sure you want to clear the entire database? This cannot be undone.",
+    "delete_title": "Delete Item",
+    "delete_msg": "Are you sure you want to delete this item from the database?",
+    "bulk_delete_title": "Bulk Delete",
+    "bulk_delete_msg": "Are you sure you want to delete {{count}} selected items from the database?"
   },
   "extras": {
     "categories": {
@@ -192,6 +243,7 @@ const en = {
   "inspector": {
     "select_item": "Select an item to see details",
     "details": "Details",
+    "media_alt": "Media Preview",
     "path": "Original Path",
     "planned": "Planned Path",
     "resolution": "Resolution",

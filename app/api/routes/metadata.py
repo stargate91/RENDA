@@ -7,7 +7,113 @@ router = APIRouter()
 from sqlalchemy.orm import joinedload
 from fastapi.responses import JSONResponse
 import logging
+import logging
 logger = logging.getLogger(__name__)
+
+from pydantic import BaseModel
+from typing import Optional, List
+
+class SearchRequest(BaseModel):
+    query: str
+    item_type: str = "movie"
+    year: Optional[int] = None
+    language: str = "en-US"
+
+class ResolveRequest(BaseModel):
+    item_id: int
+    tmdb_id: int
+    item_type: str
+    season: Optional[int] = None
+    episode: Optional[int] = None
+
+@router.get("/metadata/search")
+def search_metadata(query: str, item_type: str = "movie", year: Optional[int] = None, language: str = "en-US"):
+    """Performs a manual search on TMDB."""
+    db = Session()
+    try:
+        from app.api.tmdb_client import TMDBClient
+        client = TMDBClient(db)
+        results = client.search(query, item_type=item_type, year=year, language=language)
+        return results
+    finally:
+        db.close()
+
+@router.post("/metadata/resolve")
+def resolve_metadata(request: ResolveRequest):
+    """Manually assigns a TMDB match to a MediaItem."""
+    db = Session()
+    try:
+        from app.db.models import MediaItem, MediaMatch, ItemStatus, ItemType
+        from app.scanner.metadata_enricher import MetadataEnricher
+        
+        item = db.query(MediaItem).filter(MediaItem.id == request.item_id).first()
+        if not item:
+            return JSONResponse(status_code=404, content={"error": "Item not found"})
+            
+        # 1. Deactivate existing matches
+        db.query(MediaMatch).filter(MediaMatch.media_item_id == item.id).update({"is_active": False})
+        
+        # 2. Check for existing match with this TMDB ID
+        match = db.query(MediaMatch).filter(
+            MediaMatch.media_item_id == item.id,
+            MediaMatch.tmdb_id == request.tmdb_id,
+            MediaMatch.season_number == request.season,
+            MediaMatch.episode_number == request.episode
+        ).first()
+        
+        if not match:
+            # Create new match
+            match = MediaMatch(
+                media_item_id=item.id,
+                tmdb_id=request.tmdb_id,
+                item_type=ItemType.MOVIE if request.item_type == "movie" else ItemType.EPISODE,
+                season_number=request.season,
+                episode_number=request.episode,
+                is_active=True,
+                confidence_score=1.0
+            )
+            db.add(match)
+        else:
+            match.is_active = True
+            
+        # Update item status
+        item.status = ItemStatus.MATCHED
+        item.item_type = match.item_type
+        db.commit()
+        
+        # 3. Enrich
+        from app.db.models import UserSetting
+        lang = db.query(UserSetting).filter(UserSetting.key == "primary_metadata_language").first()
+        fallback = db.query(UserSetting).filter(UserSetting.key == "fallback_metadata_language").first()
+        
+        enricher = MetadataEnricher(db)
+        enricher.enrich_matched_item(
+            item, 
+            language=lang.value if lang else "en",
+            fallback_language=fallback.value if fallback and fallback.value != "none" else None
+        )
+        
+        # 4. Trigger image download
+        import threading
+        from app.scanner.image_worker import ImageWorker
+        def run_image_worker():
+            local_db = Session()
+            try:
+                iw = ImageWorker(local_db, "./data")
+                iw.process_all()
+            finally:
+                local_db.close()
+        threading.Thread(target=run_image_worker, daemon=True).start()
+        
+        return {"status": "success", "match_id": match.id}
+    except Exception as e:
+        db.rollback()
+        import traceback
+        logger.error(f"Error resolving metadata: {e}")
+        logger.error(traceback.format_exc())
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    finally:
+        db.close()
 
 @router.get("/item/{item_id}/full-metadata")
 def get_full_metadata(item_id: int):

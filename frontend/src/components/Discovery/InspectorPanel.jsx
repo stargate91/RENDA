@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from '../../services/api';
+import { Search, Settings } from 'lucide-react';
 
-const API_BASE = "http://localhost:8000";
-
-const InspectorPanel = ({ selectedItem, fetchFullMetadata, T }) => {
+const InspectorPanel = ({ selectedItem, fetchFullMetadata, openResolver, openOverride, T }) => {
   const [imageIndex, setImageIndex] = useState(0);
 
   useEffect(() => {
@@ -12,7 +12,11 @@ const InspectorPanel = ({ selectedItem, fetchFullMetadata, T }) => {
   if (!selectedItem) {
     return (
       <div className="inspector-empty">
-        <div style={{ fontSize: '48px', marginBottom: '20px', opacity: 0.2 }}>🔍</div>
+        <div className="empty-icon-wrapper">
+          <div className="empty-pulse"></div>
+          <div className="empty-icon-inner">🔍</div>
+        </div>
+        <h3>{T('inspector.details')}</h3>
         <p>{T('inspector.select_item')}</p>
       </div>
     );
@@ -32,7 +36,7 @@ const InspectorPanel = ({ selectedItem, fetchFullMetadata, T }) => {
             <img
               className="inspector-poster"
               src={`${API_BASE}${selectedItem.images[imageIndex].path}`}
-              alt="Media"
+              alt={T('inspector.media_alt')}
             />
             {selectedItem.images[imageIndex].type !== 'poster' && (
               <div className="carousel-type-badge">
@@ -73,7 +77,7 @@ const InspectorPanel = ({ selectedItem, fetchFullMetadata, T }) => {
             <div className="inspector-item">
               <div className="inspector-label">{T('inspector.duration')}</div>
               <div className="inspector-value">
-                {selectedItem.duration ? `${Math.floor(selectedItem.duration / 60)}m` : '-'}
+                {selectedItem.duration ? `${Math.floor(selectedItem.duration / 60)}${T('units.m')}` : '-'}
               </div>
             </div>
             <div className="inspector-item">
@@ -88,8 +92,11 @@ const InspectorPanel = ({ selectedItem, fetchFullMetadata, T }) => {
       )}
 
       <div className="inspector-actions">
-        <button className="btn-secondary" onClick={() => fetchFullMetadata(selectedItem.id)}>
+        <button className="btn-secondary" style={{ flex: 1 }} onClick={() => fetchFullMetadata(selectedItem.id)}>
           {T('inspector.check_metadata')}
+        </button>
+        <button className="btn-secondary" style={{ width: '45px', padding: '0', display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center' }} onClick={() => openOverride(selectedItem)} title={T('modal.override.action')}>
+          <Settings size={18} />
         </button>
       </div>
     </>

@@ -541,98 +541,82 @@ class Formatter:
         from ..db.models import PartType, PartStyle
         ctx = self._build_common_tech_context(item)
         
-        # Alap metaadatok
+        # Alap metaadatok (PascalCase a frontend sablonokhoz)
         ctx.update({
-            "title": loc.title or "",
-            "original_title": loc.original_title or "",
-            "year": str(match.release_date.year) if match.release_date else "",
-            "release_date": match.release_date.strftime("%Y-%m-%d") if match.release_date else "",
-            "director": match.director or "",
-            "imdb_id": match.imdb_id or "",
-            "tmdb_id": str(match.tmdb_id) if match.tmdb_id else "",
-            "rating_imdb": str(match.rating_imdb) if match.rating_imdb else "",
-            "collection": match.collection or "",
-            "edition": self._format_enum_val(item.edition),
-            "audio_type": self._format_enum_val(item.audio_type),
-            "source": self._format_source(item.source),
-            "custom": self.config.custom_text,
+            "Title": loc.title or "",
+            "OriginalTitle": loc.original_title or "",
+            "Year": str(match.release_date.year) if match.release_date else "",
+            "ReleaseDate": match.release_date.strftime("%Y-%m-%d") if match.release_date else "",
+            "Edition": self._format_enum_val(item.edition),
+            "Source": self._format_source(item.source),
+            "AudioType": self._format_enum_val(item.audio_type),
+            "Custom": self.config.custom_text,
+            "ImdbId": match.imdb_id or "",
+            "TmdbId": str(match.tmdb_id) if match.tmdb_id else "",
+            "RatingImdb": str(match.rating_imdb) if match.rating_imdb else "",
+            "Collection": match.collection or "", # Belső használatra
             "ext": item.extension or "",
         })
 
         # Part kezelés
         part_label, part_val, part_sep = self._build_part_info(item)
-        ctx["part_type"] = part_label
-        ctx["part"] = part_val
-        ctx["part_sep"] = part_sep
+        ctx["PartType"] = part_label
+        ctx["Part"] = part_val
+        ctx["PartSep"] = part_sep
 
         return ctx
 
     def build_tv_context(self, item, match, loc, children: List[Any] = None) -> Dict[str, Any]:
         """
         Összegyűjti a változókat sorozathoz / szezonhoz / epizódhoz.
-        children: a mappában lévő MediaItem-ek a technikai statisztikához (mixed felbontás).
         """
         ctx = self._build_common_tech_context(item)
         
-        # Ha mappáról van szó (series/season), felülbíráljuk a felbontást a mixed logikával
         if children:
-            ctx["resolution"] = self._calculate_mixed_resolution(children)
+            ctx["Resolution"] = self._calculate_mixed_resolution(children)
 
-        # Sorozat/Szezon/Epizód közös meta
+        # Sorozat/Szezon/Epizód meta (PascalCase)
         ctx.update({
-            # Series szint
-            "series_title": loc.series_title or "",
-            "series_original_title": loc.original_series_title or "",
-            "series_tmdb_id": str(match.series_tmdb_id or match.tmdb_id),
-            "series_imdb_id": match.imdb_id or "",
-            "series_imdb_rating": str(match.rating_imdb) if match.rating_imdb else "",
-            "number_of_seasons": str(match.number_of_seasons or ""),
-            "number_of_episodes": str(match.number_of_episodes or ""),
-            "first_air_date": match.first_air_date.strftime("%Y-%m-%d") if match.first_air_date else "",
-            "first_air_year": str(match.first_air_date.year) if match.first_air_date else "",
-            "year": str(match.first_air_date.year) if match.first_air_date else "", # Alias
-            "last_air_date": "",
-            "last_air_year": "",
-            "series_status": match.release_status or "",
-            "series_type": match.series_type or "",
-            "director": match.director or "",
-            "networks": ", ".join(match.networks) if match.networks else "",
+            "SeriesTitle": loc.series_title or "",
+            "SeriesOriginalTitle": loc.original_series_title or "",
+            "SeriesTmdbId": str(match.series_tmdb_id or match.tmdb_id or ""),
+            "SeriesImdbId": match.series_imdb_id or match.imdb_id or "",
+            "SeriesRatingImdb": str(match.series_rating_imdb or match.rating_imdb or ""),
+            "Networks": ", ".join(match.networks) if match.networks else "",
+            "FirstAirDate": match.first_air_date.strftime("%Y-%m-%d") if match.first_air_date else "",
+            "FirstAirYear": str(match.first_air_date.year) if match.first_air_date else "",
+            "LastAirDate": match.last_air_date.strftime("%Y-%m-%d") if match.last_air_date else "",
+            "LastAirYear": str(match.last_air_date.year) if match.last_air_date else "",
+            "SeriesSeasonCount": str(match.number_of_seasons or ""),
+            "SeriesEpisodeCount": str(match.number_of_episodes or ""),
+            "SeriesStatus": match.release_status or "",
+            "SeriesType": match.series_type or "",
+            "Director": match.director or "",
+            
+            "SeasonNumber": self.format_number(match.season_number),
+            "SeasonName": loc.season_title or "",
+            "SeasonTmdbId": str(match.season_tmdb_id or ""),
+            "SeasonEpisodeCount": str(match.episode_count or ""),
+            "SeasonAirDate": match.season_air_date.strftime("%Y-%m-%d") if match.season_air_date else "",
+            "SeasonAirYear": str(match.season_air_date.year) if match.season_air_date else "",
 
-            # Season szint
-            "season": self.format_number(match.season_number),
-            "season_title": loc.season_title or "",
-            "season_tmdb_id": str(match.season_tmdb_id or ""),
-            "episode_count": str(match.episode_count or ""),
-            "season_air_date": match.season_air_date.strftime("%Y-%m-%d") if match.season_air_date else "",
-            "season_air_year": str(match.season_air_date.year) if match.season_air_date else "",
+            "EpisodeNumber": self.format_number(match.episode_number),
+            "EpisodeTitle": loc.episode_title or "",
+            "EpisodeAirDate": match.episode_air_date.strftime("%Y-%m-%d") if match.episode_air_date else "",
+            "EpisodeAirYear": str(match.episode_air_date.year) if match.episode_air_date else "",
+            "EpisodeRatingImdb": str(match.rating_imdb) if match.item_type.value == "episode" else "",
+            "EpisodeTmdbId": str(match.tmdb_id) if match.item_type.value == "episode" else "",
+            "EpisodeImdbId": match.imdb_id if match.item_type.value == "episode" else "",
 
-            # Episode szint
-            "episode": self.format_number(match.episode_number),
-            "episode_title": loc.episode_title or "",
-            "episode_original_title": loc.original_title or "", # Episode original title
-            "episode_tmdb_id": str(match.tmdb_id) if match.item_type.value == "episode" else "",
-            "episode_imdb_id": match.imdb_id if match.item_type.value == "episode" else "",
-            "episode_air_date": match.episode_air_date.strftime("%Y-%m-%d") if match.episode_air_date else "",
-            "episode_air_year": str(match.episode_air_date.year) if match.episode_air_date else "",
-
-            "custom": self.config.custom_text,
+            "Custom": self.config.custom_text,
             "ext": item.extension or "",
         })
 
-        # Intelligens last_air dátum kezelés
-        if match.release_status in ["Ended", "Canceled"] and match.last_air_date:
-            l_year = str(match.last_air_date.year)
-            # Csak akkor rakjuk be, ha nem ugyanaz az év, mint a kezdés (pl. minisorozat)
-            if l_year != ctx.get("first_air_year"):
-                ctx["last_air_date"] = match.last_air_date.strftime("%Y-%m-%d")
-                ctx["last_air_year"] = l_year
-
-
-        # Part kezelés (ritka de lehet epizódban is)
+        # Part kezelés
         part_label, part_val, part_sep = self._build_part_info(item)
-        ctx["part_type"] = part_label
-        ctx["part"] = part_val
-        ctx["part_sep"] = part_sep
+        ctx["PartType"] = part_label
+        ctx["Part"] = part_val
+        ctx["PartSep"] = part_sep
 
         return ctx
 
@@ -642,12 +626,14 @@ class Formatter:
 
     def _build_common_tech_context(self, item) -> Dict[str, Any]:
         return {
-            "resolution": item.resolution or "",
-            "video_codec": item.video_codec or "",
-            "audio_codec": item.audio_codec or "",
-            "channels": item.audio_channels or "",
-            "bit_depth": f"{item.bit_depth}bit" if item.bit_depth else "",
-            "hdr": item.hdr_type or "",
+            "Resolution": item.resolution or "",
+            "VideoCodec": item.video_codec or "",
+            "AudioCodec": item.audio_codec or "",
+            "AudioChannels": item.audio_channels or "",
+            "BitDepth": f"{item.bit_depth}bit" if item.bit_depth else "",
+            "HDR": item.hdr_type or "",
+            "Framerate": str(item.framerate) if item.framerate else "",
+            "VideoBitrate": f"{round(item.video_bitrate / 1000)}kbps" if item.video_bitrate else "",
         }
 
     def _build_part_info(self, item) -> (str, str, str):
@@ -698,8 +684,10 @@ class Formatter:
 
     def _render(self, template: str, context: Dict[str, Any]) -> str:
         """Rendereli a template-et, és automatikusan hozzáadja a kiterjesztést, ha fájlról van szó."""
-        # 1. Behelyettesítés
-        result = self.TEMPLATE_VAR.sub(lambda m: context.get(m.group(1), ""), template)
+        # 1. Behelyettesítés (Case-insensitive lookup)
+        # Create a lowercase mapping for the context to handle case mismatches gracefully
+        lower_ctx = {k.lower(): v for k, v in context.items()}
+        result = self.TEMPLATE_VAR.sub(lambda m: str(lower_ctx.get(m.group(1).lower(), "")), template)
         
         # 2. Üres zárójelek/maradványok takarítása
         result = re.sub(r'\(\s*\)', '', result)

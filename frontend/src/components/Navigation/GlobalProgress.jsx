@@ -27,7 +27,7 @@ const GlobalProgress = ({ progress, T }) => {
     const mins = Math.floor(remainingSecs / 60);
     const secs = Math.floor(remainingSecs % 60);
     
-    const timeStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+    const timeStr = mins > 0 ? `${mins}${T('units.m')} ${secs}${T('units.s')}` : `${secs}${T('units.s')}`;
     return T('progress.left', { time: timeStr });
   };
 

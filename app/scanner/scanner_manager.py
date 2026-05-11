@@ -9,6 +9,7 @@ from .linker import Linker
 from .nfo_parser import NFOParser
 from .probe import TechnicalProber
 from .analyzer import Analyzer
+from .decision_engine import DecisionEngine
 from ..formatter.formatter import Formatter, FormatterConfig
 from ..db.models import MediaItem, ExtraFile, ItemType, ItemStatus, ExtraCategory, PartType
 from ..resolver.resolver import Resolver
@@ -40,6 +41,7 @@ class ScannerManager:
         self.linker = Linker()
         self.prober = TechnicalProber()
         self.analyzer = Analyzer()
+        self.decision_engine = DecisionEngine()
         self.nfo_parser = NFOParser()
         self.formatter = Formatter() # Default config for now
 
@@ -160,35 +162,6 @@ class ScannerManager:
             scan_status["active"] = False
             scan_status["phase"] = "idle"
 
-    def _reconstruct_movie_title(self, data: Dict[str, Any], original_text: str) -> str:
-        """
-        Reconstructs the movie title by putting back trimmed numbers to their original positions.
-        """
-        title = data.get('title')
-        is_movie = data.get('type') == 'movie'
-        is_lonely_episode = data.get('type') == 'episode' and not data.get('season')
-        
-        if not title or not (is_movie or is_lonely_episode):
-            return title
-            
-        episode = data.get('episode')
-        part = data.get('part')
-        result = str(title)
-        
-        if episode:
-            ep_str = str(episode)
-            title_pos = original_text.lower().find(title.lower())
-            ep_pos = original_text.lower().find(ep_str)
-            
-            if ep_pos < title_pos:
-                result = f"{ep_str} {result}"
-            else:
-                result = f"{result} {ep_str}"
-                
-        if part:
-            result = f"{result} {part}"
-            
-        return result
 
     def enrich_all(self, items: List[MediaItem]):
         """
@@ -263,83 +236,31 @@ class ScannerManager:
                 
                 # --- Filename data (FN) ---
                 fn = triple.get("fn", {})
-                item.fn_title = self._reconstruct_movie_title(fn, item.filename)
+                item.fn_title = self.analyzer.reconstruct_title(fn, item.filename)
                 item.fn_year = fn.get('year')
                 item.fn_season = fn.get('season')
                 item.fn_episode = str(fn.get('episode')) if fn.get('episode') else None
                 
                 # --- Folder data (FD) ---
                 fd = triple.get("fd", {})
-                item.fd_title = self._reconstruct_movie_title(fd, item.folder_name)
+                item.fd_title = self.analyzer.reconstruct_title(fd, item.folder_name)
                 item.fd_year = fd.get('year')
                 item.fd_season = fd.get('season')
                 item.fd_episode = str(fd.get('episode')) if fd.get('episode') else None
 
-                # --- Decision Logic: NFO is King ---
-                if item.nfo_imdb_id:
-                    # Ha van NFO-nk IMDb ID-val, az minden felett áll.
-                    # Nincs találgatás, nincs Guessit félreértés.
-                    item.item_type = ItemType.MOVIE
-                    item.fn_season = None
-                    item.fn_episode = None
-                    item.fd_season = None
-                    item.fd_episode = None
-                    item.fn_item_type = 'movie'
-                    item.fd_item_type = 'movie'
-                    final_type = 'movie'
-                else:
-                    # Ha nincs NFO, akkor jöhet a találgatás
-                    fn_type = fn.get('type')
-                    fd_type = fd.get('type')
-                    
-                    # Fix common 1080p -> S10E80 trap
-                    if fn.get('season') == 10 and fn.get('episode') == 80:
-                        fn_type = 'movie'
-                        item.fn_season = None
-                        item.fn_episode = None
-                    
-                    # 1. Erős sorozat indikátorok
-                    raw_fn_lower = (item.filename or "").lower()
-                    raw_fd_lower = (item.folder_name or "").lower()
-                    
-                    is_forced_series = False
-                    # Ha a Guessit ténylegesen talált szezont vagy epizódot (és nem a 1080p csapda):
-                    if item.fn_season or item.fn_episode or item.fd_season or item.fd_episode:
-                        is_forced_series = True
-                        
-                    # Kulcsszavak, amiket a Guessit lehet hogy 'movie'-ként értékel, de egyértelműen sorozat:
-                    series_kw = ['mini-series', 'miniseries', 'complete series', 'complete.series']
-                    if any(kw in raw_fn_lower or kw in raw_fd_lower for kw in series_kw):
-                        is_forced_series = True
-                    
-                    # 2. Folder metadata is usually more reliable for scene releases
-                    if is_forced_series:
-                        final_type = 'episode'
-                    elif fd_type == 'movie' and fd.get('year'):
-                        # Ha a mappában van évszám és filmnek tűnik, az nagyon erős jel
-                        final_type = 'movie'
-                    elif fn_type == 'episode' and not fd.get('year'):
-                        # Csak akkor hiszünk a fájlnév epizód-tippjének, ha a mappában nincs évszám
-                        final_type = 'episode'
-                    elif fd_type == 'episode':
-                        final_type = 'episode'
-                    elif fn_type == 'movie' or fd_type == 'movie':
-                        final_type = 'movie'
-                    
-                    # Final correction: If folder has a year and is a movie, clear filename's episode/season filth
-                    if final_type == 'movie' and fd.get('year'):
-                        item.fn_season = None
-                        item.fn_episode = None
-                    
-                    if final_type == 'movie':
-                        item.item_type = ItemType.MOVIE
-                    elif final_type == 'episode':
-                        item.item_type = ItemType.EPISODE
-                    else:
-                        item.item_type = ItemType.MOVIE # Default fallback
-                    
-                    item.fn_item_type = fn_type
-                    item.fd_item_type = fd_type
+                # --- Decision Logic & Metadata Cleanup ---
+                item.item_type = self.decision_engine.determine_item_type(
+                    triple, item.filename, item.folder_name, has_nfo=bool(item.nfo_imdb_id)
+                )
+                
+                # Apply type-based cleanup
+                cleanup = self.decision_engine.get_clean_metadata(item.item_type, triple)
+                if cleanup:
+                    if "season" in cleanup: item.fn_season = cleanup["season"]
+                    if "episode" in cleanup: item.fn_episode = cleanup["episode"]
+
+                item.fn_item_type = fn.get('type')
+                item.fd_item_type = fd.get('type')
                 
                 # --- Part Detection ---
                 raw_part = fn.get('part') or fn.get('cd') or fn.get('disc') or fn.get('volume')
@@ -361,36 +282,13 @@ class ScannerManager:
                         elif 'volume' in fn: item.part_type = PartType.VOLUME
                         else: item.part_type = PartType.PART
                 
-                # --- Group Hash (for Collision Detection) ---
-                title_for_hash = item.fn_title or item.fd_title or item.folder_name or ""
-                year_for_hash = item.fn_year or item.fd_year or ""
-                season_for_hash = item.fn_season or ""
-                
-                # Epizód hash kezelése (lista esetén is)
-                ep_val = fn.get('episode')
-                if isinstance(ep_val, list):
-                    ep_hash = "-".join(map(str, sorted(ep_val)))
-                else:
-                    ep_hash = str(ep_val) if ep_val is not None else ""
-
-                # Normalize title: lowercase, alphanumeric only
-                import re
-                clean_title = re.sub(r'[^a-z0-9]', '', title_for_hash.lower())
-                
-                # Konstruáljunk egy egyedi kulcsot szeparátorokkal
-                # Pl: stargatesg1|1997|1|1-2
-                hash_key = f"{clean_title}|{year_for_hash}|{season_for_hash}|{ep_hash}"
-                
-                if clean_title:
-                    item.group_hash = hashlib.md5(hash_key.encode()).hexdigest()
-                
-                # --- Folder data (FD) ---
-                fd = triple.get("fd", {})
-                item.fd_title = self._reconstruct_movie_title(fd, item.folder_name)
-                item.fd_year = fd.get('year')
-                item.fd_season = fd.get('season')
-                item.fd_episode = str(fd.get('episode')) if fd.get('episode') else None
-                item.fd_item_type = fd.get('type')
+                # --- Group Hash ---
+                item.group_hash = self.analyzer.generate_group_hash(
+                    title=item.fn_title or item.fd_title or item.folder_name,
+                    year=item.fn_year or item.fd_year,
+                    season=item.fn_season,
+                    episode=fn.get('episode')
+                )
                 
                 # C. Generate Planned Path (Lite)
                 lite_ctx = {
@@ -399,7 +297,7 @@ class ScannerManager:
                     "resolution": item.resolution or "",
                     "ext": item.extension or ""
                 }
-                if item.fn_season or item.fn_episode:
+                if item.item_type == ItemType.EPISODE:
                     lite_ctx["series_title"] = lite_ctx["title"]
                     lite_ctx["season"] = self.formatter.format_number(item.fn_season or "1")
                     lite_ctx["episode"] = self.formatter.format_number(item.fn_episode or "0")

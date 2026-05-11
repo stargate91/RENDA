@@ -1,0 +1,72 @@
+/* Global Drag and Drop Overlay */
+.global-drop-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 136, 255, 0.1);
+  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  pointer-events: none;
+  border: 3px dashed var(--accent-blue);
+  margin: 30px;
+  border-radius: var(--radius-2xl);
+  transition: all 0.3s ease;
+}
+
+.drop-content {
+  text-align: center;
+  color: var(--accent-blue);
+}
+
+.drop-content h2 {
+  font-size: 36px;
+  margin-top: 20px;
+  font-weight: 800;
+  letter-spacing: -1px;
+}
+
+.drop-content p {
+  font-size: 18px;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+/* Generic Header Layout */
+.header {
+  margin-bottom: 50px;
+}
+
+.header h1 {
+  font-size: 32px;
+  font-weight: 800;
+  margin-bottom: 12px;
+  letter-spacing: -0.5px;
+}
+
+.header p {
+  color: var(--text-dim);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+/* Informational Guides (Moved here if not in settings) */
+.privacy-notice {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: var(--bg-glass);
+  border: 1px solid var(--border-glass);
+  padding: 20px 24px;
+  border-radius: var(--radius-md);
+  margin-bottom: 35px;
+}
+
+.setup-guide {
+  margin-top: 20px;
+  padding: 20px;
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-card);
+}

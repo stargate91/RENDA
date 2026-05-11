@@ -35,13 +35,15 @@ def get_image_status():
         )
         
         active = total_tasks > completed_tasks
+        progress = (completed_tasks / total_tasks) * 100 if total_tasks > 0 else 0
         
         return {
             "active": active,
             "pending": total_tasks - completed_tasks,
             "downloading": 0,
             "total": total_tasks,
-            "completed": completed_tasks
+            "completed": completed_tasks,
+            "progress": progress
         }
     finally:
         db.close()

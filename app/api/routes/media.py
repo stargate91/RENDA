@@ -40,7 +40,24 @@ def get_stats():
         ).scalar() or 0
 
         # Storage: ALL media items (ExtraFile has no size column yet)
-        total_bytes = db.query(func.coalesce(func.sum(MediaItem.size), 0)).scalar()
+        # Storage: ALL media items
+        items = db.query(MediaItem.current_path, MediaItem.size).all()
+        total_bytes = sum(i.size for i in items if i.size)
+        
+        # Calculate dynamic drive count
+        drives = set()
+        for i in items:
+            if i.current_path:
+                if ":" in i.current_path:
+                    drives.add(i.current_path.split(":")[0].upper() + ":")
+                elif i.current_path.startswith("/"):
+                    parts = i.current_path.split("/")
+                    if len(parts) > 2 and parts[1] in ["mnt", "media", "Volumes"]:
+                        drives.add("/" + parts[1] + "/" + parts[2])
+                    else:
+                        drives.add("/")
+        
+        drive_count = len(drives) if drives else 0
 
         # Format storage
         if total_bytes >= 1024 ** 4:
@@ -64,6 +81,7 @@ def get_stats():
             "total_series": total_series,
             "total_episodes": total_episodes,
             "storage": storage_str,
+            "drive_count": drive_count,
             "unmatched": unmatched
         }
     finally:
@@ -138,6 +156,23 @@ def get_discovery_items():
                     if loc.series_poster_path and loc.series_poster_path != loc.poster_path:
                         all_images.append({"type": "series", "path": f"/media/images/posters{loc.series_poster_path}"})
 
+            # matches_info for manual resolver
+            matches_info = []
+            for m in item.matches:
+                loc = m.localizations[0] if m.localizations else None
+                matches_info.append({
+                    "id": m.id,
+                    "tmdb_id": m.tmdb_id,
+                    "type": m.item_type.value if m.item_type else "movie",
+                    "title": loc.title if loc else (loc.series_title if loc else ""),
+                    "year": m.release_date.year if m.release_date else (m.first_air_date.year if m.first_air_date else None),
+                    "poster_path": loc.poster_path if loc else None,
+                    "vote_average": m.rating_tmdb,
+                    "overview": loc.overview if loc else "",
+                    "is_active": m.is_active,
+                    "confidence": m.confidence_score
+                })
+
             data = {
                 "id": item.id,
                 "filename": item.filename,
@@ -150,6 +185,7 @@ def get_discovery_items():
                 "size_mb": round(item.size / (1024 * 1024), 2) if item.size else 0,
                 "group_hash": item.group_hash,
                 "images": all_images,
+                "matches": matches_info,
                 "resolution": item.resolution,
                 "duration": item.duration,
                 "video_codec": item.video_codec,
@@ -249,3 +285,94 @@ def get_discovery_items():
         db.close()
 
 
+@router.post("/discovery/delete")
+def delete_discovery_items(payload: dict):
+    """Deletes specified media items and extras from the database."""
+    item_ids = payload.get("item_ids", [])
+    extra_ids = payload.get("extra_ids", [])
+    
+    db = Session()
+    try:
+        if item_ids:
+            db.query(MediaItem).filter(MediaItem.id.in_(item_ids)).delete(synchronize_session=False)
+        if extra_ids:
+            db.query(ExtraFile).filter(ExtraFile.id.in_(extra_ids)).delete(synchronize_session=False)
+        db.commit()
+        return {"status": "success", "deleted_items": len(item_ids), "deleted_extras": len(extra_ids)}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting items: {e}")
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+    finally:
+        db.close()
+
+
+@router.post("/media/update")
+def update_media_item(payload: dict):
+    """Updates media item or extra file properties manually."""
+    db = Session()
+    try:
+        from app.db.models import MediaItem, ExtraFile, MediaMatch, ItemType
+        from app.formatter.formatter import Formatter
+        
+        item_id = payload.get("id")
+        item_type = payload.get("type", "media") # 'media' or 'extra'
+        updates = payload.get("updates", {})
+        
+        if item_type == "media":
+            item = db.query(MediaItem).filter(MediaItem.id == item_id).first()
+            if not item:
+                return JSONResponse(status_code=404, content={"error": "Media item not found"})
+            
+            # Update fields
+            if "target_language" in updates: item.target_language = updates["target_language"]
+            if "edition" in updates: item.edition = MovieEdition(updates["edition"])
+            if "source" in updates: item.source = MediaSource(updates["source"])
+            if "audio_type" in updates: item.audio_type = MediaAudioType(updates["audio_type"])
+            
+            # Special case: Season/Episode update (requires updating the active match)
+            if "season" in updates or "episode" in updates:
+                active_match = next((m for m in item.matches if m.is_active), None)
+                if active_match:
+                    if "season" in updates: active_match.season_number = updates["season"]
+                    if "episode" in updates: active_match.episode_number = updates["episode"]
+                    active_match.item_type = ItemType.EPISODE
+                    item.item_type = ItemType.EPISODE
+
+        else: # 'extra'
+            extra = db.query(ExtraFile).filter(ExtraFile.id == item_id).first()
+            if not extra:
+                return JSONResponse(status_code=404, content={"error": "Extra file not found"})
+            
+            if "subtype" in updates: extra.subtype = ExtraSubtype(updates["subtype"])
+            if "language" in updates: extra.language = updates["language"]
+            item = extra.parent_item
+
+        # Re-calculate planned path
+        formatter = Formatter.from_db(db)
+        active_match = next((m for m in item.matches if m.is_active), None)
+        if active_match:
+            # Use enrichment logic to refresh paths
+            from app.scanner.metadata_enricher import MetadataEnricher
+            enricher = MetadataEnricher(db)
+            # We don't need full enrichment, just a re-plan
+            preview = formatter.plan_rename(active_match, "")
+            item.planned_path = preview.target_subpath + "/" + preview.target_name
+            
+            # Also update extras' planned paths
+            for extra_prev in preview.extra_previews:
+                ex_item = db.query(ExtraFile).filter(ExtraFile.id == extra_prev.extra_id).first()
+                if ex_item:
+                    # Not stored in DB directly yet, but the discovery API re-calculates it anyway
+                    pass
+
+        db.commit()
+        return {"status": "success"}
+    except Exception as e:
+        db.rollback()
+        import traceback
+        logger.error(f"Error updating media: {e}")
+        logger.error(traceback.format_exc())
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    finally:
+        db.close()

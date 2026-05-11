@@ -1,0 +1,73 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap');
+
+:root {
+  /* Core Colors */
+  --bg-main: #0a0a0c;
+  --bg-sidebar: #111114;
+  --bg-card: rgba(255, 255, 255, 0.03);
+  --bg-glass: rgba(255, 255, 255, 0.05);
+  
+  --accent-blue: #0088ff;
+  --accent-glow: rgba(0, 136, 255, 0.25);
+  --accent-gradient: linear-gradient(180deg, #1a94ff 0%, #007cf0 100%);
+  
+  --text-main: #ffffff;
+  --text-dim: #88888b;
+  --text-muted: #555558;
+  
+  --border-card: rgba(255, 255, 255, 0.08);
+  --border-glass: rgba(255, 255, 255, 0.12);
+  
+  /* Semantic Colors */
+  --danger: #ff3c3c;
+  --danger-bg: rgba(255, 60, 60, 0.1);
+  --success: #00ff64;
+  --success-bg: rgba(0, 255, 100, 0.1);
+  --warning: #ffc832;
+  --warning-bg: rgba(255, 200, 50, 0.1);
+  --info: #0088ff;
+  
+  /* Layout & Spacing */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-2xl: 32px;
+  
+  --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.4);
+  --glass-blur: blur(12px);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Outfit', sans-serif;
+}
+
+body {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom Scrollbar - Consistent across all components */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  transition: all 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-glow);
+}

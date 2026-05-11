@@ -15,8 +15,6 @@ for (const path in localeFiles) {
 
 export const AppContext = createContext();
 
-const API_BASE = "http://localhost:8000";
-
 // Simple translation helper
 export const T = (key, params = {}, currentLang = 'en') => {
   const keys = key.split('.');
@@ -45,6 +43,8 @@ export const T = (key, params = {}, currentLang = 'en') => {
   return value;
 };
 
+import { api } from '../services/api';
+
 const DEFAULT_SETTINGS = {
   user_name: '', 
   tmdb_api_key: '', tmdb_bearer_token: '', imdb_api_key: '',
@@ -52,7 +52,7 @@ const DEFAULT_SETTINGS = {
   default_scan_dir: '',
   primary_metadata_language: 'en',
   fallback_metadata_language: 'none',
-  min_video_size_mb: 500,
+  min_video_size_mb: 300,
   naming_filename_casing: 'title',
   naming_word_separator: 'space',
   naming_movie_template: '{{Title}} ({{Year}}) - {{Resolution}}',
@@ -106,14 +106,17 @@ export const AppProvider = ({ children }) => {
   const [initialSettings, setInitialSettings] = useState(null);
   const [isSettingsDirty, setIsSettingsDirty] = useState(false);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
-  const [settingsTab, setSettingsTab] = useState('api');
+  const [settingsTab, setSettingsTab] = useState('general');
   const [saveStatus, setSaveStatus] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [imageStatus, setImageStatus] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]); // Array of IDs being selected for bulk actions
   const [stats, setStats] = useState({ total_movies: 0, total_series: 0, total_episodes: 0, storage: '0 MB', unmatched: 0 });
   const [fullMetadata, setFullMetadata] = useState(null);
   const [showMetadataModal, setShowMetadataModal] = useState(false);
+  const [showResolverModal, setShowResolverModal] = useState(false);
+  const [resolverItem, setResolverItem] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
   const wasActiveRef = useRef(false);
   const scanTriggeredRef = useRef(false);
@@ -127,8 +130,7 @@ export const AppProvider = ({ children }) => {
     if (settings.user_name === '' && !showWelcomeModal) {
       const checkName = async () => {
         try {
-          const res = await fetch(`${API_BASE}/settings`);
-          const data = await res.json();
+          const data = await api.getSettings();
           if (!data.user_name) setShowWelcomeModal(true);
         } catch (e) {}
       };
@@ -139,8 +141,7 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     const int = setInterval(async () => {
       try {
-        const res = await fetch(`${API_BASE}/image-status`);
-        const data = await res.json();
+        const data = await api.getImageStatus();
         setImageStatus(data);
       } catch (e) {}
     }, 2000);
@@ -156,7 +157,6 @@ export const AppProvider = ({ children }) => {
     if (initialSettings && settings) {
       const isDirty = JSON.stringify(settings) !== JSON.stringify(initialSettings);
       
-      // Safety check: if they were JUST fetched, they shouldn't be dirty
       if (isDirty) {
         setIsSettingsDirty(true);
       } else {
@@ -166,19 +166,18 @@ export const AppProvider = ({ children }) => {
   }, [settings, initialSettings]);
 
   useEffect(() => {
-    // if (view === 'discovery') fetchDiscovery(); // Removed auto-fetch
     if (view === 'settings') fetchSettings();
     else if (view === 'dashboard') fetchStats();
+    
+    if (view !== 'discovery') setSelectedItem(null);
   }, [view]);
 
   const loadSession = () => fetchDiscovery();
 
   const fetchSettings = async () => {
     try {
-      const response = await fetch(`${API_BASE}/settings`);
-      const data = await response.json();
+      const data = await api.getSettings();
       
-      // Merge with defaults to ensure all keys exist and values are normalized
       const normalizedData = { ...DEFAULT_SETTINGS };
       for (const key in data) {
         if (data[key] !== null && data[key] !== undefined) {
@@ -197,37 +196,29 @@ export const AppProvider = ({ children }) => {
   const fetchDiscovery = React.useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/discovery`);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const data = await response.json();
+      const data = await api.getDiscoveryItems();
       if (data.error) throw new Error(data.error);
       setItems(data);
     } catch (error) {
       console.error("Discovery fetch failed:", error);
-      // Optional: set some error state to show in UI
     } finally {
       setLoading(false);
     }
-  }, [API_BASE]);
+  }, []);
 
   const fetchStats = React.useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE}/stats`);
-      const data = await response.json();
+      const data = await api.getStats();
       setStats(data);
     } catch (error) {
       console.error("Failed to fetch stats:", error);
     }
-  }, [API_BASE]);
+  }, []);
 
   const saveSettings = async () => {
     try {
       setSaveStatus('Saving...');
-      await fetch(`${API_BASE}/settings`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings)
-      });
+      await api.updateSettings(settings);
       setSaveStatus('Saved successfully!');
       setInitialSettings(JSON.parse(JSON.stringify(settings)));
       setIsSettingsDirty(false);
@@ -246,30 +237,25 @@ export const AppProvider = ({ children }) => {
 
   const fetchProgress = React.useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE}/scan-status`);
-      const data = await response.json();
+      const data = await api.getScanStatus();
       setProgress(data);
 
       if (data.active) {
         setLoading(true);
         wasActiveRef.current = true;
       } else {
-        // If it was active before, OR if we just triggered a scan, we should fetch the results.
         if (wasActiveRef.current || scanTriggeredRef.current) {
           await fetchDiscovery();
           wasActiveRef.current = false;
           scanTriggeredRef.current = false;
-          fetchStats(); // Update stats too
+          fetchStats();
         }
-        // If we were loading but nothing is active, stop loading
         setLoading(false);
       }
     } catch (error) {
       console.error("Progress fetch failed:", error);
     }
-  }, [API_BASE, fetchDiscovery, fetchStats]);
-
-
+  }, [fetchDiscovery, fetchStats]);
 
   const handleDropScan = React.useCallback(async (paths) => {
     if (!paths || paths.length === 0) return;
@@ -277,20 +263,16 @@ export const AppProvider = ({ children }) => {
       setLoading(true);
       setView('discovery');
       scanTriggeredRef.current = true;
-      await fetch(`${API_BASE}/scan`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paths })
-      });
+      await api.triggerScan(paths);
       setTimeout(() => {
         fetchProgress();
-      }, 500); // Slightly longer wait to ensure backend has started
+      }, 500);
     } catch (error) {
       console.error("Drop scan failed:", error);
       setLoading(false);
       scanTriggeredRef.current = false;
     }
-  }, [API_BASE, fetchProgress]);
+  }, [fetchProgress]);
 
   const handleScan = React.useCallback(async () => {
     try {
@@ -305,8 +287,7 @@ export const AppProvider = ({ children }) => {
 
   const fetchFullMetadata = async (itemId) => {
     try {
-      const res = await fetch(`${API_BASE}/item/${itemId}/full-metadata`);
-      const data = await res.json();
+      const data = await api.getItemFullMetadata(itemId);
       if(data.error) {
         alert(data.error);
         return;
@@ -316,6 +297,26 @@ export const AppProvider = ({ children }) => {
     } catch (e) {
       console.error(e);
       alert(T('alerts.metadata_failed'));
+    }
+  };
+  
+  const openResolver = (item) => {
+    setResolverItem(item);
+    setShowResolverModal(true);
+  };
+  
+  const resolveItem = async (itemId, tmdbId, type, season, episode) => {
+    try {
+      setLoading(true);
+      await api.resolveMetadata(itemId, tmdbId, type, season, episode);
+      setShowResolverModal(false);
+      await fetchDiscovery();
+      fetchStats();
+    } catch (e) {
+      console.error(e);
+      alert(T('alerts.resolve_failed'));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -330,16 +331,40 @@ export const AppProvider = ({ children }) => {
       async () => {
         setSaveStatus(T('settings.status.saving'));
         try {
-          const res = await fetch(`${API_BASE}/database/clear`, { method: 'POST' });
-          if (res.ok) {
-            setSaveStatus(T('settings.status.saved'));
-          } else {
-            setSaveStatus(T('settings.status.error'));
-          }
+          await api.clearDatabase();
+          setItems({ manual: [], movies: [], series: [], extras: [], collisions: [] });
+          setStats({ total_movies: 0, total_series: 0, total_episodes: 0, storage: '0 MB', unmatched: 0 });
+          setSaveStatus(T('settings.status.saved'));
         } catch (e) {
           setSaveStatus(T('settings.status.error'));
         }
         setTimeout(() => setSaveStatus(''), 3000);
+      }
+    );
+  };
+
+  const deleteDiscoveryItems = async (ids, type = 'media') => {
+    const isBulk = Array.isArray(ids);
+    const idList = isBulk ? ids : [ids];
+    
+    confirmAction(
+      T(isBulk ? 'alerts.bulk_delete_title' : 'alerts.delete_title'),
+      T(isBulk ? 'alerts.bulk_delete_msg' : 'alerts.delete_msg', { count: idList.length }),
+      async () => {
+        try {
+          setLoading(true);
+          const itemIds = type !== 'extras' ? idList : [];
+          const extraIds = type === 'extras' ? idList : [];
+          await api.deleteItems(itemIds, extraIds);
+          setSelectedIds([]);
+          setSelectedItem(null);
+          await fetchDiscovery();
+          fetchStats();
+        } catch (e) {
+          console.error("Delete failed:", e);
+        } finally {
+          setLoading(false);
+        }
       }
     );
   };
@@ -357,16 +382,20 @@ export const AppProvider = ({ children }) => {
       isDragging, setIsDragging,
       imageStatus, setImageStatus,
       selectedItem, setSelectedItem,
+      selectedIds, setSelectedIds,
       stats, setStats,
       fullMetadata, setFullMetadata,
       showMetadataModal, setShowMetadataModal,
+      showResolverModal, setShowResolverModal,
+      resolverItem, setResolverItem,
       confirmDialog, setConfirmDialog, confirmAction,
       isSettingsDirty, resetSettings,
       loadSession,
       fetchDiscovery, fetchStats, fetchSettings,
-      handleScan, handleDropScan, fetchFullMetadata, saveSettings, wipeDatabase,
+      handleScan, handleDropScan, fetchFullMetadata, saveSettings, wipeDatabase, deleteDiscoveryItems,
+      openResolver, resolveItem,
       T: (key, params) => T(key, params, settings.ui_language || 'en'),
-      availableLocales, API_BASE
+      availableLocales
     }}>
       {children}
     </AppContext.Provider>
