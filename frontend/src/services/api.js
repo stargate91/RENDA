@@ -53,11 +53,23 @@ export const api = {
     body: JSON.stringify({ id, type, updates }),
   }),
 
-  searchMetadata: (query, type, year, language) => 
-    fetchJson(`/metadata/search?query=${encodeURIComponent(query)}&item_type=${type}&year=${year || ''}&language=${language || 'en-US'}`),
+  searchMetadata: (query, type, year, language) => {
+    const params = new URLSearchParams({
+      query: query,
+      item_type: type,
+      language: language || 'en-US'
+    });
+    if (year) params.append('year', year);
+    return fetchJson(`/metadata/search?${params.toString()}`);
+  },
 
   resolveMetadata: (itemId, tmdbId, type, season, episode) => fetchJson('/metadata/resolve', {
     method: 'POST',
     body: JSON.stringify({ item_id: itemId, tmdb_id: tmdbId, item_type: type, season, episode }),
+  }),
+  
+  revealInExplorer: (path) => fetchJson('/reveal', {
+    method: 'POST',
+    body: JSON.stringify({ path }),
   }),
 };

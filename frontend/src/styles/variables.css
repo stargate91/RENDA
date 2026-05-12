@@ -25,6 +25,8 @@
   --success-bg: rgba(0, 255, 100, 0.1);
   --warning: #ffc832;
   --warning-bg: rgba(255, 200, 50, 0.1);
+  --amber: #ff8c32;
+  --amber-bg: rgba(255, 140, 50, 0.1);
   --info: #0088ff;
   
   /* Layout & Spacing */

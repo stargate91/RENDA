@@ -107,10 +107,10 @@ const InspectorPanel = ({ selectedItem, fetchFullMetadata, openResolver, openOve
           <div className="inspector-value" style={{ 
             color: '#00ff64', 
             wordBreak: 'break-all',
-            opacity: (selectedItem.status === 'matched' || selectedItem.status === 'renamed' || selectedItem.status === 'organized') ? 1 : 0.5
+            opacity: (selectedItem.planned_path && selectedItem.planned_path !== selectedItem.filename) || (selectedItem.status === 'matched' || selectedItem.status === 'renamed' || selectedItem.status === 'organized') ? 1 : 0.5
           }}>
-            {(selectedItem.status === 'matched' || selectedItem.status === 'renamed' || selectedItem.status === 'organized') 
-              ? (selectedItem.planned_path || '-') 
+            {(selectedItem.planned_path && selectedItem.planned_path !== selectedItem.filename) 
+              ? selectedItem.planned_path 
               : selectedItem.filename}
           </div>
         </div>

@@ -70,7 +70,7 @@ class TechnicalProber:
                 w = stream.get('width')
                 h = stream.get('height')
                 if w and h:
-                    info["resolution"] = f"{w}x{h}"
+                    info["resolution"] = self._map_resolution(w, h)
 
                 # Video bitrate
                 vbr = stream.get('bit_rate')
@@ -164,3 +164,9 @@ class TechnicalProber:
             return "HDR"
         
         return None
+
+    def _map_resolution(self, w: int, h: int) -> str:
+        """Maps raw pixel dimensions to common labels (1080p, 4K, etc.)"""
+        from ..formatter.tech_mapping import map_resolution
+        return map_resolution(w, h)
+

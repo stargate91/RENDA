@@ -1,5 +1,6 @@
 import React from 'react';
-import { Trash2, Square, CheckSquare, Search, Settings, ArrowRight } from 'lucide-react';
+import { Trash2, Square, CheckSquare, Search, Settings, ArrowRight, Folder } from 'lucide-react';
+import { api } from '../../services/api';
 
 const DiscoveryTable = ({ 
   items, activeTab, extraSubTab, searchQuery, 
@@ -78,26 +79,19 @@ const DiscoveryTable = ({
             <th className="sortable-th" onClick={() => { setSortKey('planned_path'); setSortDir(sortKey === 'planned_path' && sortDir === 'asc' ? 'desc' : 'asc'); }}>
               {T('discovery.table.planned_name')} {sortKey === 'planned_path' && (sortDir === 'asc' ? '▲' : '▼')}
             </th>
-            {activeTab === 'manual' && (
-              <th className="cell-center sortable-th type-col" onClick={() => { setSortKey('type'); setSortDir(sortKey === 'type' && sortDir === 'asc' ? 'desc' : 'asc'); }}>
-                {T('discovery.table.type')} {sortKey === 'type' && (sortDir === 'asc' ? '▲' : '▼')}
-              </th>
-            )}
-            {activeTab === 'extras' && (extraSubTab === 'subtitle' || extraSubTab === 'audio') && (
-              <th className="cell-center sortable-th type-col" onClick={() => { setSortKey('language'); setSortDir(sortKey === 'language' && sortDir === 'asc' ? 'desc' : 'asc'); }}>
-                {T('discovery.table.language')} {sortKey === 'language' && (sortDir === 'asc' ? '▲' : '▼')}
-              </th>
-            )}
-            {activeTab === 'extras' && extraSubTab !== 'metadata' && (
-              <th className="cell-center sortable-th type-col" onClick={() => { setSortKey('subtype'); setSortDir(sortKey === 'subtype' && sortDir === 'asc' ? 'desc' : 'asc'); }}>
-                {T('discovery.table.subcategory')} {sortKey === 'subtype' && (sortDir === 'asc' ? '▲' : '▼')}
-              </th>
-            )}
-            {activeTab !== 'extras' && (
-              <th className="cell-center sortable-th status-col" onClick={() => { setSortKey('status'); setSortDir(sortKey === 'status' && sortDir === 'asc' ? 'desc' : 'asc'); }}>
-                {T('discovery.table.status')} {sortKey === 'status' && (sortDir === 'asc' ? '▲' : '▼')}
-              </th>
-            )}
+            <th className="cell-center sortable-th metadata-col">
+              {activeTab === 'extras' ? (
+                (extraSubTab === 'subtitle' || extraSubTab === 'audio') ? T('discovery.table.language') : T('discovery.table.subcategory')
+              ) : T('discovery.table.type')}
+            </th>
+            <th className="cell-center sortable-th status-col" onClick={() => { 
+              const key = activeTab === 'extras' ? 'extension' : 'status';
+              setSortKey(key); 
+              setSortDir(sortKey === key && sortDir === 'asc' ? 'desc' : 'asc'); 
+            }}>
+              {activeTab === 'extras' ? T('discovery.table.subtype') : T('discovery.table.status')} 
+              {(sortKey === 'status' || sortKey === 'extension') && (sortDir === 'asc' ? ' ▲' : ' ▼')}
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -120,7 +114,11 @@ const DiscoveryTable = ({
                   <span className="arrow">➔</span>
                   {item.planned_path && item.planned_path !== item.filename ? (
                     <span className="planned-name-text" title={item.planned_path}>
-                      {item.planned_path.split('/').pop()}
+                      {(() => {
+                        const fullPath = item.planned_path;
+                        const parts = fullPath.includes('\\') ? fullPath.split('\\') : fullPath.split('/');
+                        return parts.pop();
+                      })()}
                     </span>
                   ) : (
                     <button className="btn-link" onClick={(e) => { e.stopPropagation(); openResolver(item); }}>
@@ -129,35 +127,44 @@ const DiscoveryTable = ({
                   )}
                 </div>
               </td>
-              {activeTab === 'manual' && (
-                <td className="cell-center type-col">
+              <td className="cell-center metadata-col">
+                {activeTab === 'extras' ? (
+                  (extraSubTab === 'subtitle' || extraSubTab === 'audio') ? (
+                    <span className="language-badge hide-on-hover">
+                      {item.language ? item.language.toUpperCase() : '-'}
+                    </span>
+                  ) : (
+                    <span className="subtype-badge hide-on-hover">
+                      {item.subtype && item.subtype.toLowerCase() !== 'other'
+                        ? (item.subtype.charAt(0).toUpperCase() + item.subtype.slice(1).replace(/_/g, ' '))
+                        : (item.extension || '-')}
+                    </span>
+                  )
+                ) : (
                   <span className={`badge badge-type hide-on-hover`}>{item.type}</span>
-                </td>
-              )}
-              {activeTab === 'extras' && (extraSubTab === 'subtitle' || extraSubTab === 'audio') && (
-                <td className="cell-center type-col">
-                  <span className="language-text hide-on-hover">
-                    {item.language ? item.language.toUpperCase() : '-'}
-                  </span>
-                </td>
-              )}
-              {activeTab === 'extras' && extraSubTab !== 'metadata' && (
-                <td className="cell-center type-col">
-                  <span className="subcategory-text hide-on-hover">
-                    {item.subtype && item.subtype.toLowerCase() !== 'other'
-                      ? (item.subtype.charAt(0).toUpperCase() + item.subtype.slice(1).replace(/_/g, ' '))
-                      : '-'}
-                  </span>
-                </td>
-              )}
-              <td className="cell-center status-col" style={{ position: 'relative' }}>
-                {activeTab !== 'extras' && (
-                  <span className={`status-badge ${(item.status || '').toLowerCase()} hide-on-hover`}>
-                    {item.status || T('discovery.table.unknown')}
-                  </span>
                 )}
+              </td>
+              <td className="cell-center status-col" style={{ position: 'relative' }}>
+                <div className="status-container hide-on-hover">
+                  {activeTab !== 'extras' ? (
+                    <span className={`status-badge ${(item.status || '').toLowerCase()}`}>
+                      {item.status || T('discovery.table.unknown')}
+                    </span>
+                  ) : (
+                    <span className="status-badge extras">
+                      {item.extension ? item.extension.toUpperCase() : 'FILE'}
+                    </span>
+                  )}
+                </div>
                 
                 <div className="row-actions">
+                  <button 
+                    className="action-btn reveal" 
+                    onClick={(e) => { e.stopPropagation(); api.revealInExplorer(item.current_path); }}
+                    title={T('discovery.reveal_explorer') || 'Show in Folder'}
+                  >
+                    <Folder size={16} />
+                  </button>
                   <button 
                     className="action-btn edit" 
                     onClick={(e) => { e.stopPropagation(); openOverride(item); }}
@@ -187,7 +194,7 @@ const DiscoveryTable = ({
           ))}
           {rows.length === 0 && !loading && (
             <tr>
-              <td colSpan="6" style={{ textAlign: 'center', padding: '100px', color: '#666' }}>
+              <td colSpan="5" style={{ textAlign: 'center', padding: '100px', color: '#666' }}>
                 {T('discovery.no_items')}
               </td>
             </tr>

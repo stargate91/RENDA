@@ -207,6 +207,34 @@
   color: #fff;
 }
 
+.language-badge {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-card);
+  color: var(--text-dim);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.subtype-badge {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  color: var(--text-dim);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.status-badge.extras {
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-dim);
+  border: 1px solid transparent;
+  opacity: 0.6;
+}
+
 .sub-pill.active {
   background: rgba(0, 136, 255, 0.1);
   color: var(--accent-blue);
@@ -217,11 +245,11 @@
 /* Data Table - Hybrid Slab Design */
 /* Column widths for stability */
 .data-table th.checkbox-col, .data-table td.checkbox-col { width: 50px; text-align: center; padding: 15px 10px; }
-.data-table th:nth-child(2), .data-table td:nth-child(2) { width: 25%; }
-.data-table th:nth-child(3), .data-table td:nth-child(3) { width: 40%; }
+.data-table th:nth-child(2), .data-table td:nth-child(2) { width: 28%; }
+.data-table th:nth-child(3), .data-table td:nth-child(3) { width: 38%; }
 
-.type-col { width: 140px; }
-.status-col { width: 180px; }
+.metadata-col { width: 140px; }
+.status-col { width: 200px; }
 
 .cell-center {
   text-align: center !important;
@@ -254,36 +282,40 @@
   background: rgba(0, 136, 255, 0.04);
 }
 
-.hide-on-hover {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.data-table tbody tr:hover .hide-on-hover {
-  opacity: 0;
-  transform: translateX(-10px);
-  pointer-events: none;
-}
-
 /* Row Actions - Overlay Logic */
 .row-actions {
   position: absolute;
-  right: 0;
-  left: 0;
   top: 50%;
-  transform: translateY(-50%) scale(0.9);
+  right: 15px;
+  transform: translateY(-50%) scale(0.95);
   display: flex;
-  justify-content: center;
-  gap: 10px;
+  gap: 8px;
   opacity: 0;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  z-index: 10;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   pointer-events: none;
+  z-index: 10;
+  background: var(--bg-card);
+  padding: 4px;
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
 }
 
 .data-table tbody tr:hover .row-actions {
   opacity: 1;
   transform: translateY(-50%) scale(1);
   pointer-events: all;
+}
+
+.status-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: opacity 0.2s ease;
+}
+
+.data-table tbody tr:hover .hide-on-hover {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .action-btn {
@@ -298,6 +330,27 @@
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
+}
+
+.action-btn.edit:hover {
+  background: var(--bg-glass);
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+
+.action-btn.resolve:hover {
+  background: var(--bg-glass);
+  border-color: var(--success);
+  color: var(--success);
+  box-shadow: 0 0 10px var(--success-bg);
+}
+
+.action-btn.reveal:hover {
+  background: var(--bg-glass);
+  border-color: var(--info);
+  color: var(--info);
+  box-shadow: 0 0 10px rgba(0, 136, 255, 0.2);
 }
 
 .action-btn.delete:hover {
@@ -446,6 +499,20 @@
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.planned-name-text {
+  color: var(--color-success);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.path-prefix {
+  opacity: 0.5;
+  font-weight: 400;
+  font-size: 0.9em;
 }
 
 .planned-name .arrow {

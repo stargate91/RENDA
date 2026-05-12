@@ -290,11 +290,20 @@ class ScannerManager:
                     episode=fn.get('episode')
                 )
                 
-                # C. Generate Planned Path (Lite)
+                # D. Generate Planned Path (Lite)
+                res = item.resolution or ""
+                if res and "x" in res.lower() and "p" not in res.lower():
+                    try:
+                        from ..formatter.tech_mapping import map_resolution
+                        parts = res.lower().split("x")
+                        if len(parts) == 2:
+                            res = map_resolution(int(parts[0]), int(parts[1]))
+                    except: pass
+
                 lite_ctx = {
                     "title": item.fn_title or item.fd_title or item.filename,
                     "year": str(item.fn_year or item.fd_year or ""),
-                    "resolution": item.resolution or "",
+                    "resolution": res,
                     "ext": item.extension or ""
                 }
                 if item.item_type == ItemType.EPISODE:
@@ -305,7 +314,7 @@ class ScannerManager:
                 else:
                     item.planned_path = self.formatter.format_movie_filename(lite_ctx)
 
-                # D. Language for extras
+                # E. Language for extras
                 for extra in item.extras:
                     if extra.category in [ExtraCategory.SUBTITLE, ExtraCategory.AUDIO]:
                         extra.language = self.analyzer.extract_language(extra.original_path)

@@ -9,6 +9,8 @@ from sqlalchemy.orm import joinedload
 from fastapi.responses import JSONResponse
 import os
 import logging
+import platform
+import subprocess
 logger = logging.getLogger(__name__)
 
 @router.get("/stats")
@@ -39,7 +41,6 @@ def get_stats():
             MediaItem.item_type.in_([ItemType.SERIES, ItemType.EPISODE])
         ).scalar() or 0
 
-        # Storage: ALL media items (ExtraFile has no size column yet)
         # Storage: ALL media items
         items = db.query(MediaItem.current_path, MediaItem.size).all()
         total_bytes = sum(i.size for i in items if i.size)
@@ -93,7 +94,6 @@ def get_discovery_items():
     """Returns grouped discovery items for the UI."""
     db = Session()
     try:
-        # Lekérjük az összes releváns médiaelemet a kapcsolódó adatokkal együtt
         from sqlalchemy.orm import joinedload
         from app.formatter.formatter import Formatter, FormatterConfig
         config = FormatterConfig.from_db(db)
@@ -127,6 +127,9 @@ def get_discovery_items():
             "collisions": []
         }
         
+        # Map to store dynamically calculated parent planned paths
+        parent_planned_paths = {}
+
         # Először számoljuk meg a hash-eket a collisionökhöz
         hash_counts = {}
         for item in items:
@@ -134,33 +137,24 @@ def get_discovery_items():
                 hash_counts[item.group_hash] = hash_counts.get(item.group_hash, 0) + 1
         
         for item in items:
-            # Összeszedjük az összes aktív találat összes képét
             all_images = []
             active_matches = [m for m in item.matches if m.is_active]
             
             for am in active_matches:
                 loc = am.localizations[0] if am.localizations else None
                 if loc:
-                    # 1. Aktuális Epizód képe (Still)
                     if loc.still_path:
                         all_images.append({"type": "episode", "path": f"/media/images/stills{loc.still_path}"})
-                    
-                    # 2. További epizódképek (Galéria)
                     if loc.all_stills:
                         for s_path in loc.all_stills:
-                            if s_path != loc.still_path: # Ne duplikáljuk az aktuálisat
+                            if s_path != loc.still_path:
                                 all_images.append({"type": "episode", "path": f"/media/images/stills{s_path}"})
-
-                    # 3. Szezon vagy Film poszter
                     if loc.poster_path:
                         img_type = "poster" if item.item_type.value == "movie" else "season"
                         all_images.append({"type": img_type, "path": f"/media/images/posters{loc.poster_path}"})
-                    
-                    # 4. Fő sorozat poszter (Csak ha eltér a szezontól)
                     if loc.series_poster_path and loc.series_poster_path != loc.poster_path:
                         all_images.append({"type": "series", "path": f"/media/images/posters{loc.series_poster_path}"})
 
-            # matches_info for manual resolver
             matches_info = []
             for m in item.matches:
                 loc = m.localizations[0] if m.localizations else None
@@ -177,7 +171,6 @@ def get_discovery_items():
                     "confidence": m.confidence_score
                 })
 
-            # Dinamikus tervezett útvonal kiszámítása, ha matched
             p_path = item.planned_path
             if (item.status in [ItemStatus.MATCHED, ItemStatus.RENAMED, ItemStatus.ORGANIZED]) and active_matches:
                 try:
@@ -191,6 +184,9 @@ def get_discovery_items():
                             p_path = preview.target_name
                 except Exception as ex:
                     logger.warning(f"Failed to calculate planned path for item {item.id}: {ex}")
+
+            # Store for extras
+            parent_planned_paths[item.id] = p_path
 
             data = {
                 "id": item.id,
@@ -209,39 +205,36 @@ def get_discovery_items():
                 "resolution": item.resolution,
                 "duration": item.duration,
                 "video_codec": item.video_codec,
-                "audio_codec": item.audio_codec
+                "audio_codec": item.audio_codec,
+                "current_path": item.current_path
             }
             
-            # 1. Collision check (ha több elemnek ugyanaz a hash-e)
             if item.group_hash and hash_counts[item.group_hash] > 1:
                 groups["collisions"].append(data)
-                # A collisionök is belekerülhetnek a többi kategóriába is, 
-                # de a fül segít megtalálni őket.
             
-            # 2. Csoportosítási logika
             if item.status in [ItemStatus.NEW, ItemStatus.UNCERTAIN, ItemStatus.NO_MATCH, ItemStatus.MULTIPLE, ItemStatus.ERROR]:
                 groups["manual"].append(data)
             else:
-                # Matched
                 if item.item_type == ItemType.MOVIE:
                     groups["movies"].append(data)
                 elif item.item_type in [ItemType.SERIES, ItemType.EPISODE]:
                     groups["series"].append(data)
                 else:
-                    groups["movies"].append(data) # Fallback
+                    groups["movies"].append(data)
 
-        # PASS 1: Kiszámoljuk az összes tervezett útvonalat
+        # PASS 1: Kiszámoljuk az összes tervezett útvonalat az extrákhoz
         extra_paths = []
         path_counts = {}
 
-        # Re-use the same formatter/config loaded above
         for ex, p_status, p_planned, p_filename in extras:
-            # Ha matched, akkor a tervezett nevet használjuk, különben az eredetit
-            raw_parent_name = p_planned if (p_status == ItemStatus.MATCHED and p_planned) else p_filename
+            # Use dynamically calculated parent path if available
+            parent_p_path = parent_planned_paths.get(ex.parent_item_id) or p_planned
+            
+            raw_parent_name = parent_p_path if parent_p_path else p_filename
             parent_name = os.path.splitext(raw_parent_name)[0]
             
-            if p_status == ItemStatus.MATCHED and p_planned:
-                parent_dir = os.path.dirname(p_planned)
+            if parent_p_path:
+                parent_dir = os.path.dirname(parent_p_path)
             else:
                 parent_dir = ""
                 
@@ -257,20 +250,17 @@ def get_discovery_items():
             
             path_key = raw_planned_path.lower()
             path_counts[path_key] = path_counts.get(path_key, 0) + 1
-                
             extra_paths.append((ex, raw_planned_path, parent_name))
 
         # PASS 2: Collision handling és JSON összeállítás
         current_counts = {}
         for ex, raw_planned_path, parent_name in extra_paths:
             planned_path = raw_planned_path
-            
             if planned_path != "-":
                 path_key = raw_planned_path.lower()
                 if path_counts[path_key] > 1:
                     current_counts[path_key] = current_counts.get(path_key, 0) + 1
                     idx = current_counts[path_key]
-                    
                     if ex.extension:
                         base = raw_planned_path[:-len(ex.extension)]
                         planned_path = f"{base} {idx}{ex.extension}"
@@ -287,12 +277,10 @@ def get_discovery_items():
                 "subtype": ex.subtype.value if ex.subtype else "other",
                 "language": ex.language,
                 "path": ex.original_path,
+                "current_path": ex.original_path,
                 "planned_path": planned_path
             })
             
-        import json
-        
-        # Kényszerítjük az UTF-8 kódolást a JSON válaszhoz
         return JSONResponse(content=groups, media_type="application/json; charset=utf-8")
     except Exception as e:
         import traceback
@@ -308,7 +296,6 @@ def delete_discovery_items(payload: dict):
     """Deletes specified media items and extras from the database."""
     item_ids = payload.get("item_ids", [])
     extra_ids = payload.get("extra_ids", [])
-    
     db = Session()
     try:
         if item_ids:
@@ -334,21 +321,17 @@ def update_media_item(payload: dict):
         from app.formatter.formatter import Formatter
         
         item_id = payload.get("id")
-        item_type = payload.get("type", "media") # 'media' or 'extra'
+        item_type = payload.get("type", "media")
         updates = payload.get("updates", {})
         
         if item_type == "media":
             item = db.query(MediaItem).filter(MediaItem.id == item_id).first()
             if not item:
                 return JSONResponse(status_code=404, content={"error": "Media item not found"})
-            
-            # Update fields
             if "target_language" in updates: item.target_language = updates["target_language"]
             if "edition" in updates: item.edition = MovieEdition(updates["edition"])
             if "source" in updates: item.source = MediaSource(updates["source"])
             if "audio_type" in updates: item.audio_type = MediaAudioType(updates["audio_type"])
-            
-            # Special case: Season/Episode update (requires updating the active match)
             if "season" in updates or "episode" in updates:
                 active_match = next((m for m in item.matches if m.is_active), None)
                 if active_match:
@@ -356,34 +339,22 @@ def update_media_item(payload: dict):
                     if "episode" in updates: active_match.episode_number = updates["episode"]
                     active_match.item_type = ItemType.EPISODE
                     item.item_type = ItemType.EPISODE
-
-        else: # 'extra'
+        else:
             extra = db.query(ExtraFile).filter(ExtraFile.id == item_id).first()
             if not extra:
                 return JSONResponse(status_code=404, content={"error": "Extra file not found"})
-            
             if "subtype" in updates: extra.subtype = ExtraSubtype(updates["subtype"])
             if "language" in updates: extra.language = updates["language"]
             item = extra.parent_item
 
-        # Re-calculate planned path
         formatter = Formatter.from_db(db)
         active_match = next((m for m in item.matches if m.is_active), None)
         if active_match:
-            # Use enrichment logic to refresh paths
             from app.scanner.metadata_enricher import MetadataEnricher
             enricher = MetadataEnricher(db)
-            # We don't need full enrichment, just a re-plan
             preview = formatter.plan_rename(active_match, "")
             item.planned_path = preview.target_subpath + "/" + preview.target_name
             
-            # Also update extras' planned paths
-            for extra_prev in preview.extra_previews:
-                ex_item = db.query(ExtraFile).filter(ExtraFile.id == extra_prev.extra_id).first()
-                if ex_item:
-                    # Not stored in DB directly yet, but the discovery API re-calculates it anyway
-                    pass
-
         db.commit()
         return {"status": "success"}
     except Exception as e:
@@ -394,3 +365,21 @@ def update_media_item(payload: dict):
         return JSONResponse(status_code=500, content={"error": str(e)})
     finally:
         db.close()
+
+@router.post("/reveal")
+def reveal_in_explorer(payload: dict):
+    """Opens the file's parent folder in the OS file explorer."""
+    path = payload.get("path")
+    if not path or not os.path.exists(path):
+        return {"status": "error", "message": f"Path does not exist: {path}"}
+    folder = os.path.dirname(os.path.abspath(path))
+    try:
+        if platform.system() == "Windows":
+            os.startfile(folder)
+        elif platform.system() == "Darwin":
+            subprocess.run(["open", folder])
+        else:
+            subprocess.run(["xdg-open", folder])
+        return {"status": "success"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}

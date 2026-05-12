@@ -47,7 +47,11 @@ const ResolverModal = ({ show, item, onClose, onResolve, T }) => {
     }
   }, [show, item]);
 
-  const handleSearch = async (q = query, y = year, t = type) => {
+  const handleSearch = async (overrideQuery, overrideYear, overrideType) => {
+    const q = overrideQuery !== undefined ? overrideQuery : query;
+    const y = overrideYear !== undefined ? overrideYear : year;
+    const t = overrideType !== undefined ? overrideType : type;
+
     if (!q) return;
     setSearching(true);
     setSelectedResult(null);
@@ -56,7 +60,8 @@ const ResolverModal = ({ show, item, onClose, onResolve, T }) => {
       // Mark as NOT proposed (live search results)
       setResults(data.map(r => ({ ...r, is_proposed: false })) || []);
     } catch (e) {
-      console.error(e);
+      console.error('Search failed:', e);
+      setResults([]);
     } finally {
       setSearching(false);
     }
@@ -69,12 +74,14 @@ const ResolverModal = ({ show, item, onClose, onResolve, T }) => {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-container resolver-modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <div className="modal-title-group">
-            <Search className="modal-icon" size={20} />
+        <div className="resolver-header">
+          <div className="resolver-title-group">
+            <Film className="resolver-title-icon" size={20} />
             <h2>{T('modal.resolver.title')}</h2>
           </div>
-          <button className="modal-close" onClick={onClose}><X size={20} /></button>
+          <button className="resolver-close-btn" onClick={onClose}>
+            <X size={20} />
+          </button>
         </div>
 
         <div className="modal-body">
@@ -102,26 +109,54 @@ const ResolverModal = ({ show, item, onClose, onResolve, T }) => {
                   onKeyDown={e => e.key === 'Enter' && handleSearch()}
                 />
               </div>
+
+              {type === 'tv' && (
+                <>
+                  <div className="resolver-mini-wrapper">
+                    <span className="input-label">S</span>
+                    <input 
+                      type="number" 
+                      value={season} 
+                      onChange={e => setSeason(e.target.value)} 
+                      placeholder="Season"
+                      onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                    />
+                  </div>
+                  <div className="resolver-mini-wrapper">
+                    <span className="input-label">E</span>
+                    <input 
+                      type="number" 
+                      value={episode} 
+                      onChange={e => setEpisode(e.target.value)} 
+                      placeholder="Episode"
+                      onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                    />
+                  </div>
+                </>
+              )}
+
               <button className="btn-search-trigger" onClick={() => handleSearch()} disabled={searching}>
                 {searching ? <Loader2 className="spin" size={18} /> : <Search size={18} />}
               </button>
             </div>
 
-            <div className="resolver-type-toggle">
-              <button 
-                className={`toggle-btn ${type === 'movie' ? 'active' : ''}`}
-                onClick={() => { setType('movie'); handleSearch(query, year, 'movie'); }}
-              >
-                <Film size={16} />
-                {T('discovery.tabs.movies')}
-              </button>
-              <button 
-                className={`toggle-btn ${type === 'tv' ? 'active' : ''}`}
-                onClick={() => { setType('tv'); handleSearch(query, year, 'tv'); }}
-              >
-                <Tv size={16} />
-                {T('discovery.tabs.series')}
-              </button>
+            <div className="resolver-pro-tabs-container">
+              <div className="resolver-pro-tabs">
+                <button 
+                  className={`resolver-pro-tab ${type === 'movie' ? 'active' : ''}`}
+                  onClick={() => { setType('movie'); handleSearch(query, year, 'movie'); }}
+                >
+                  <Film size={16} />
+                  {T('discovery.tabs.movies')}
+                </button>
+                <button 
+                  className={`resolver-pro-tab ${type === 'tv' ? 'active' : ''}`}
+                  onClick={() => { setType('tv'); handleSearch(query, year, 'tv'); }}
+                >
+                  <Tv size={16} />
+                  {T('discovery.tabs.series')}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -149,7 +184,7 @@ const ResolverModal = ({ show, item, onClose, onResolve, T }) => {
                   >
                     <div className="result-poster">
                       {res.poster_path ? (
-                        <img src={`https://image.tmdb.org/t/p/w92${res.poster_path}`} alt="" />
+                        <img src={`https://image.tmdb.org/t/p/w185${res.poster_path}`} alt="" />
                       ) : (
                         <div className="poster-placeholder"><ImageIcon size={20} /></div>
                       )}
@@ -162,11 +197,18 @@ const ResolverModal = ({ show, item, onClose, onResolve, T }) => {
                       <div className="result-meta">
                         <span className="result-year">{(res.release_date || res.first_air_date || res.year || '').toString().split('-')[0]}</span>
                         <span className="result-rating">★ {res.vote_average?.toFixed(1)}</span>
-                        {res.confidence && <span className="result-confidence">{(res.confidence * 100).toFixed(0)}% Match</span>}
+                        {res.confidence && (
+                          <div className="match-score">
+                            <div className="match-bar" style={{ width: `${(res.confidence * 100)}%` }} />
+                            <span>{(res.confidence * 100).toFixed(0)}% Match</span>
+                          </div>
+                        )}
                       </div>
                       <div className="result-overview">{res.overview}</div>
                     </div>
-                    <ChevronRight className="result-arrow" size={18} />
+                    <div className="result-selection-indicator">
+                      <ChevronRight size={18} />
+                    </div>
                   </div>
                 ))
               )}
@@ -189,29 +231,9 @@ const ResolverModal = ({ show, item, onClose, onResolve, T }) => {
                   </div>
 
                   {(type === 'tv' || selectedResult.type === 'episode' || selectedResult.type === 'tv') && (
-                    <div className="resolver-series-meta">
-                      <div className="meta-field">
-                        <label>{T('modal.resolver.season')}</label>
-                        <div className="input-with-icon">
-                          <Hash size={14} />
-                          <input 
-                            type="number" 
-                            value={season} 
-                            onChange={e => setSeason(e.target.value)} 
-                          />
-                        </div>
-                      </div>
-                      <div className="meta-field">
-                        <label>{T('modal.resolver.episode')}</label>
-                        <div className="input-with-icon">
-                          <Hash size={14} />
-                          <input 
-                            type="number" 
-                            value={episode} 
-                            onChange={e => setEpisode(e.target.value)} 
-                          />
-                        </div>
-                      </div>
+                    <div className="resolver-series-meta-summary">
+                      <div className="meta-badge">Season {season || '?'}</div>
+                      <div className="meta-badge">Episode {episode || '?'}</div>
                     </div>
                   )}
 

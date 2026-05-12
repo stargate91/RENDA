@@ -655,8 +655,18 @@ class Formatter:
     # =========================================================================
 
     def _build_common_tech_context(self, item) -> Dict[str, Any]:
+        from .tech_mapping import map_resolution
+        res = item.resolution or ""
+        if "x" in res.lower() and "p" not in res.lower():
+            try:
+                parts = res.lower().split("x")
+                if len(parts) == 2:
+                    w, h = int(parts[0]), int(parts[1])
+                    res = map_resolution(w, h)
+            except: pass
+            
         return {
-            "Resolution": item.resolution or "",
+            "Resolution": res,
             "VideoCodec": item.video_codec or "",
             "AudioCodec": item.audio_codec or "",
             "AudioChannels": item.audio_channels or "",

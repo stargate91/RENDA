@@ -45,6 +45,7 @@ const en = {
     "found_items": "Found {{count}} new items.",
     "scan_now": "Browse & Scan",
     "background_images": "Fetching Images",
+    "reveal_explorer": "Show in Folder",
     "refresh": "Refresh",
     "processing": "Processing...",
     "search_placeholder": "Search in this view...",

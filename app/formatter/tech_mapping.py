@@ -15,13 +15,13 @@ def map_resolution(width: int, height: int) -> str:
     h = min(width, height) if width > height else height
     w = max(width, height)
     
-    if w >= 7680: return "8K"
-    if w >= 3840: return "2160p"
-    if w >= 2560: return "1440p"
-    if w >= 1920: return "1080p"
-    if w >= 1280: return "720p"
-    if w >= 720 and h >= 560: return "576p"   # PAL DVD
-    if w >= 720: return "480p"                 # NTSC DVD
+    if w >= 7000: return "8K"
+    if w >= 3500: return "2160p"
+    if w >= 2500: return "1440p"
+    if w >= 1800: return "1080p"
+    if w >= 1200: return "720p"
+    if w >= 700 and h >= 500: return "576p"
+    if w >= 640: return "480p"
     return f"{h}p"
 
 
