@@ -19,12 +19,22 @@ class SearchRequest(BaseModel):
     year: Optional[int] = None
     language: str = "en-US"
 
-class ResolveRequest(BaseModel):
-    item_id: int
+class MatchTarget(BaseModel):
     tmdb_id: int
-    item_type: str
+    item_type: str # 'movie', 'series', 'season', 'episode'
     season: Optional[int] = None
     episode: Optional[int] = None
+    episodes: Optional[List[int]] = None
+
+class ResolveRequest(BaseModel):
+    item_id: int
+    targets: Optional[List[MatchTarget]] = None
+    # Backward compatibility
+    tmdb_id: Optional[int] = None
+    item_type: Optional[str] = None
+    season: Optional[int] = None
+    episode: Optional[int] = None
+    episodes: Optional[List[int]] = None
 
 @router.get("/metadata/search")
 def search_metadata(query: str, item_type: str = "movie", year: Optional[int] = None, language: str = "en-US"):
@@ -32,9 +42,39 @@ def search_metadata(query: str, item_type: str = "movie", year: Optional[int] = 
     db = Session()
     try:
         from app.api.tmdb_client import TMDBClient
+        from app.db.models import UserSetting
+        
+        # Get include_adult setting
+        adult_setting = db.query(UserSetting).filter(UserSetting.key == "include_adult").first()
+        include_adult = adult_setting.value.lower() == "true" if adult_setting else False
+        
         client = TMDBClient(db)
-        results = client.search(query, item_type=item_type, year=year, language=language)
+        results = client.search(query, item_type=item_type, year=year, language=language, include_adult=include_adult)
         return results
+    finally:
+        db.close()
+
+@router.get("/metadata/tv/{tmdb_id}/seasons")
+def get_tv_seasons(tmdb_id: int, language: str = "en-US"):
+    """Fetches seasons for a TV series."""
+    db = Session()
+    try:
+        from app.api.tmdb_client import TMDBClient
+        client = TMDBClient(db)
+        data = client.get_details(tmdb_id, item_type="tv", language=language)
+        return data.get("seasons", [])
+    finally:
+        db.close()
+
+@router.get("/metadata/tv/{tmdb_id}/season/{season_number}/episodes")
+def get_tv_season_episodes(tmdb_id: int, season_number: int, language: str = "en-US"):
+    """Fetches episodes for a TV season."""
+    db = Session()
+    try:
+        from app.api.tmdb_client import TMDBClient
+        client = TMDBClient(db)
+        data = client.get_season_details(tmdb_id, season_number, language=language)
+        return data.get("episodes", [])
     finally:
         db.close()
 
@@ -53,32 +93,74 @@ def resolve_metadata(request: ResolveRequest):
         # 1. Deactivate existing matches
         db.query(MediaMatch).filter(MediaMatch.media_item_id == item.id).update({"is_active": False})
         
-        # 2. Check for existing match with this TMDB ID
-        match = db.query(MediaMatch).filter(
-            MediaMatch.media_item_id == item.id,
-            MediaMatch.tmdb_id == request.tmdb_id,
-            MediaMatch.season_number == request.season,
-            MediaMatch.episode_number == request.episode
-        ).first()
-        
-        if not match:
-            # Create new match
-            match = MediaMatch(
-                media_item_id=item.id,
+        # 2. Process targets
+        targets = request.targets
+        if not targets and request.tmdb_id:
+            # Fallback for legacy requests
+            targets = [MatchTarget(
                 tmdb_id=request.tmdb_id,
-                item_type=ItemType.MOVIE if request.item_type == "movie" else ItemType.EPISODE,
-                season_number=request.season,
-                episode_number=request.episode,
-                is_active=True,
-                confidence_score=1.0
-            )
-            db.add(match)
+                item_type=request.item_type,
+                season=request.season,
+                episode=request.episode,
+                episodes=request.episodes
+            )]
+
+        if not targets:
+            return JSONResponse(status_code=400, content={"error": "No targets provided"})
+
+        final_item_type = ItemType.MOVIE
+        
+        for target in targets:
+            # Prepare episode data
+            target_episode = target.episode
+            if target.episodes and len(target.episodes) > 0:
+                target_episode = target.episodes if len(target.episodes) > 1 else target.episodes[0]
+
+            # Determine Match ItemType
+            m_type = ItemType.MOVIE
+            if target.item_type == "tv" or target.item_type == "series":
+                if target_episode is not None: m_type = ItemType.EPISODE
+                elif target.season is not None: m_type = ItemType.SEASON
+                else: m_type = ItemType.SERIES
+            elif target.item_type == "season": m_type = ItemType.SEASON
+            elif target.item_type == "episode": m_type = ItemType.EPISODE
+
+            # Use last target type as item's primary type (or logic can be smarter)
+            final_item_type = m_type
+
+            # Check for existing
+            match = db.query(MediaMatch).filter(
+                MediaMatch.media_item_id == item.id,
+                MediaMatch.tmdb_id == target.tmdb_id,
+                MediaMatch.season_number == target.season,
+                MediaMatch.episode_number == target_episode
+            ).first()
+
+            if not match:
+                match = MediaMatch(
+                    media_item_id=item.id,
+                    tmdb_id=target.tmdb_id,
+                    item_type=m_type,
+                    season_number=target.season,
+                    episode_number=target_episode,
+                    is_active=True,
+                    confidence_score=1.0
+                )
+                db.add(match)
+            else:
+                match.is_active = True
+                match.item_type = m_type
+                match.episode_number = target_episode
+                match.season_number = target.season
+
+        # Update item status: matched ONLY if we have at least one high-specificity match
+        # (Simplified logic: use the last target's type)
+        if final_item_type in [ItemType.MOVIE, ItemType.EPISODE]:
+            item.status = ItemStatus.MATCHED
         else:
-            match.is_active = True
-            
-        # Update item status
-        item.status = ItemStatus.MATCHED
-        item.item_type = match.item_type
+            item.status = ItemStatus.UNCERTAIN
+
+        item.item_type = final_item_type
         db.commit()
         
         # 3. Enrich

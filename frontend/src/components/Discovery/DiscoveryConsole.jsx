@@ -8,8 +8,8 @@ const DiscoveryConsole = ({
   items, loading, handleScan, handleDropScan, loadSession, 
   fetchFullMetadata, selectedItem, setSelectedItem,
   selectedIds, setSelectedIds, deleteDiscoveryItems,
-  openResolver,
-  stats, isDragging, T 
+  openResolver, handleOrganizeLibrary,
+  stats, isDragging, progress, T 
 }) => {
   const [activeTab, setActiveTab] = useState('manual');
   const [extraSubTab, setExtraSubTab] = useState('video');
@@ -19,6 +19,10 @@ const DiscoveryConsole = ({
   const [overrideModal, setOverrideModal] = useState({ show: false, item: null });
 
   const totalPending = (items?.manual?.length || 0) + (items?.movies?.length || 0) + (items?.series?.length || 0) + (items?.extras?.length || 0) + (items?.collisions?.length || 0);
+  const matchedCount = (items?.movies?.length || 0) + (items?.series?.length || 0);
+  const hasCollisions = (items?.collisions?.length || 0) > 0;
+  const isOrganizing = progress?.active && progress?.phase === 'organizing';
+  const isBusy = progress?.active; // Disable critical actions if ANY scan/organize is active
 
   const getFilteredCount = (tab) => {
     if (tab === 'extras') return items?.extras?.length || 0;
@@ -137,13 +141,24 @@ const DiscoveryConsole = ({
             <span className="badge-count">{totalPending}</span>
           </div>
           <div className="action-block">
-            <button className="btn-icon" onClick={loadSession} title={T('discovery.refresh')}>
-              <RefreshCw size={20} className={loading ? 'spin' : ''} />
+            <button className="btn-icon" onClick={loadSession} title={T('discovery.refresh')} disabled={isBusy}>
+              <RefreshCw size={20} className={(loading || isBusy) ? 'spin' : ''} />
             </button>
-            <button className="btn-browse" onClick={handleScan}>
+            <button className="btn-browse" onClick={handleScan} disabled={isBusy}>
               <FolderOpen size={18} />
               {T('discovery.scan_now')}
             </button>
+            {matchedCount > 0 && (
+              <button 
+                className={`btn-organize ${hasCollisions ? 'disabled' : ''}`} 
+                onClick={handleOrganizeLibrary}
+                disabled={isBusy || hasCollisions}
+                title={hasCollisions ? T('discovery.organize_disabled_collision') : T('discovery.organize_now')}
+              >
+                {isOrganizing ? <Loader2 size={18} className="spin" /> : <Database size={18} />}
+                {isOrganizing ? T('discovery.organizing') : T('discovery.organize_now')}
+              </button>
+            )}
           </div>
         </div>
 
@@ -215,6 +230,7 @@ const DiscoveryConsole = ({
           deleteDiscoveryItems={deleteDiscoveryItems}
           openResolver={openResolver}
           openOverride={openOverride}
+          isBusy={isBusy}
           T={T}
         />
 
@@ -224,7 +240,7 @@ const DiscoveryConsole = ({
               {T('discovery.bulk.selected', { count: selectedIds.length })}
             </div>
             <div className="batch-actions">
-              <button className="btn-danger" onClick={() => deleteDiscoveryItems(selectedIds, activeTab === 'extras' ? 'extras' : 'media')}>
+              <button className="btn-danger" onClick={() => deleteDiscoveryItems(selectedIds, activeTab === 'extras' ? 'extras' : 'media')} disabled={isBusy}>
                 {T('discovery.bulk.delete')}
               </button>
             </div>

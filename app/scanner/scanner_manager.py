@@ -138,20 +138,20 @@ class ScannerManager:
                 logger.info(f"Scan complete. {len(to_process)} items need processing.")
                 self.enrich_all(to_process)
                 self.resolve_all(to_process)
-                self.db.expire_all()
-                
-                # Start background image downloading
-                import threading
-                from .image_worker import ImageWorker
-                def run_image_worker():
-                    local_db = DbSession()
-                    try:
-                        iw = ImageWorker(local_db, "./data")
-                        iw.process_all()
-                    finally:
-                        DbSession.remove()
-                threading.Thread(target=run_image_worker, daemon=True).start()
-        
+            
+            # ALWAYS trigger ImageWorker at the end of scan to handle pending/interrupted tasks
+            import threading
+            from .image_worker import ImageWorker
+            def run_image_worker():
+                local_db = DbSession()
+                try:
+                    iw = ImageWorker(local_db, "./data")
+                    iw.process_all()
+                finally:
+                    local_db.close()
+            threading.Thread(target=run_image_worker, daemon=True).start()
+            
+            self.db.expire_all()
             logger.info("Scan complete.")
         except Exception as e:
             import traceback
@@ -159,6 +159,7 @@ class ScannerManager:
             logger.error(traceback.format_exc())
             raise
         finally:
+            self.db.close()
             scan_status["active"] = False
             scan_status["phase"] = "idle"
 

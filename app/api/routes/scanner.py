@@ -48,6 +48,22 @@ def get_image_status():
     finally:
         db.close()
 
+@router.post("/reset-image-status")
+def reset_image_status():
+    """Forces all pending image tasks to FAILED to clear a stuck progress bar."""
+    db = Session()
+    try:
+        db.query(MediaMatch).filter(MediaMatch.image_status == ImageStatus.PENDING).update({"image_status": ImageStatus.FAILED})
+        db.query(MediaMatch).filter(MediaMatch.backdrop_status == ImageStatus.PENDING).update({"backdrop_status": ImageStatus.FAILED})
+        db.query(Person).filter(Person.image_status == ImageStatus.PENDING).update({"image_status": ImageStatus.FAILED})
+        db.commit()
+        return {"status": "success", "message": "Image status reset"}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+    finally:
+        db.close()
+
 
 @router.post("/scan")
 def start_scan(request: ScanRequest, background_tasks: BackgroundTasks):

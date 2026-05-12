@@ -12,7 +12,7 @@ class MediaMatch(Base):
     parent_id: Mapped[Optional[int]] = mapped_column(ForeignKey("media_matches.id"), index=True); tmdb_id: Mapped[int] = mapped_column(Integer, index=True)
     imdb_id: Mapped[Optional[str]] = mapped_column(String, index=True); series_tmdb_id: Mapped[Optional[int]] = mapped_column(Integer)
     season_tmdb_id: Mapped[Optional[int]] = mapped_column(Integer); item_type: Mapped[ItemType] = mapped_column(SQLEnum(ItemType))
-    season_number: Mapped[Optional[int]] = mapped_column(Integer); episode_number: Mapped[Optional[int]] = mapped_column(Integer)
+    season_number: Mapped[Optional[int]] = mapped_column(Integer); episode_number: Mapped[Optional[Any]] = mapped_column(JSON)
     episode_count: Mapped[Optional[int]] = mapped_column(Integer); rating_tmdb: Mapped[Optional[float]] = mapped_column(Float)
     rating_imdb: Mapped[Optional[float]] = mapped_column(Float); rating_rotten: Mapped[Optional[str]] = mapped_column(String)
     rating_meta: Mapped[Optional[int]] = mapped_column(Integer); vote_count_tmdb: Mapped[Optional[int]] = mapped_column(Integer)

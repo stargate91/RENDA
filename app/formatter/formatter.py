@@ -269,9 +269,14 @@ class Formatter:
             parts = [p for p in [cat_folder, folder_name] if p and str(p).strip() and str(p) != "."]
             target_subpath = "/".join(parts) if parts else ""
             
-        elif match.item_type in [ItemType.SERIES, ItemType.EPISODE]:
+        elif match.item_type in [ItemType.SERIES, ItemType.SEASON, ItemType.EPISODE]:
             context = self.build_tv_context(item, match, loc)
+            
+            # Always use the configured episode template for files in TV categories,
+            # regardless of match specificity (SERIES/SEASON/EPISODE).
+            # This ensures user-defined naming settings are always respected.
             target_name = self.format_episode_filename(context)
+                
             cat_folder = self.get_category_folder("series")
             series_folder = self.format_series_foldername(context)
             season_folder = self.format_season_foldername(context)
@@ -325,7 +330,10 @@ class Formatter:
                 target_subpath = str(Path(cat_folder) / folder_name)
             else:
                 context = self.build_tv_context(item, match, loc)
+                
+                # Use the configured episode template for all TV-related file matches
                 target_name = self.format_episode_filename(context)
+                    
                 cat_folder = self.get_category_folder("series")
                 series_folder = self.format_series_foldername(context)
                 season_folder = self.format_season_foldername(context)
@@ -601,8 +609,8 @@ class Formatter:
 
         # Sorozat/Szezon/Epizód meta (PascalCase)
         ctx.update({
-            "SeriesTitle": loc.series_title or "",
-            "ShowTitle": loc.series_title or "",
+            "SeriesTitle": loc.series_title or loc.title or "",
+            "ShowTitle": loc.series_title or loc.title or "",
             "SeriesOriginalTitle": loc.original_series_title or "",
             "ShowOriginalTitle": loc.original_series_title or "",
             "SeriesTmdbId": str(match.series_tmdb_id or match.tmdb_id or ""),
@@ -630,8 +638,11 @@ class Formatter:
 
             "EpisodeNumber": self.format_number(match.episode_number),
             "Episode": self.format_number(match.episode_number),
-            "EpisodeTitle": loc.episode_title or "",
-            "EpisodeName": loc.episode_title or "",
+            "episode": self.format_number(match.episode_number),
+            "EpisodeTitle": loc.episode_title or (loc.title if loc.title != loc.series_title else ""),
+            "EpisodeName": loc.episode_title or (loc.title if loc.title != loc.series_title else ""),
+            "episode_title": loc.episode_title or (loc.title if loc.title != loc.series_title else ""),
+            "episode_name": loc.episode_title or (loc.title if loc.title != loc.series_title else ""),
             "EpisodeAirDate": match.episode_air_date.strftime("%Y-%m-%d") if match.episode_air_date else "",
             "EpisodeAirYear": str(match.episode_air_date.year) if match.episode_air_date else "",
             "EpisodeRatingImdb": str(match.rating_imdb) if match.item_type.value == "episode" else "",
@@ -724,14 +735,21 @@ class Formatter:
 
     def _render(self, template: str, context: Dict[str, Any], is_file: bool = True) -> str:
         """Rendereli a template-et, és automatikusan hozzáadja a kiterjesztést, ha fájlról van szó."""
-        # 1. Behelyettesítés (Case-insensitive lookup)
-        # Create a lowercase mapping for the context to handle case mismatches gracefully
-        lower_ctx = {k.lower(): v for k, v in context.items()}
-        result = self.TEMPLATE_VAR.sub(lambda m: str(lower_ctx.get(m.group(1).lower(), "")), template)
+        # 1. Behelyettesítés (Case and Underscore insensitive lookup)
+        # Create a normalized mapping (lowercase, no underscores)
+        norm_ctx = {k.lower().replace("_", ""): v for k, v in context.items()}
+        result = self.TEMPLATE_VAR.sub(lambda m: str(norm_ctx.get(m.group(1).lower().replace("_", ""), "")), template)
         
         # 2. Üres zárójelek/maradványok takarítása
         result = re.sub(r'\(\s*\)', '', result)
         result = re.sub(r'\[\s*\]', '', result)
+        
+        # Collapse multiple separators (e.g., " -  - " -> " - ")
+        sep = self.config.separator.value
+        if sep == " ":
+            result = re.sub(r'\s*-\s*-\s*', ' - ', result)
+            result = re.sub(r'\s{2,}', ' ', result)
+        
         result = re.sub(r'\s*-\s*$', '', result)
         result = re.sub(r'^\s*-\s*', '', result)
         result = self.sanitize(result)

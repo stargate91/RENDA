@@ -47,6 +47,9 @@ const en = {
     "background_images": "Fetching Images",
     "reveal_explorer": "Show in Folder",
     "refresh": "Refresh",
+    "organize_now": "Organize Library",
+    "organizing": "Organizing...",
+    "organize_disabled_collision": "Naming collision detected. Resolve before organizing.",
     "processing": "Processing...",
     "search_placeholder": "Search in this view...",
     "no_items": "No items in this category.",
@@ -88,6 +91,13 @@ const en = {
       "image": "Images",
       "metadata": "Metadata"
     }
+  },
+  "history": {
+    "title": "Organization History",
+    "subtitle": "Track and manage past library organization tasks. Revert any batch with a single click.",
+    "empty": "No history records found. Start organizing your library to see past activity here.",
+    "items_count": "{{count}} items processed",
+    "undo_action": "Undo This Batch"
   },
   "progress": {
     "estimating": "Estimating time...",
@@ -226,7 +236,9 @@ const en = {
     "delete_title": "Delete Item",
     "delete_msg": "Are you sure you want to delete this item from the database?",
     "bulk_delete_title": "Bulk Delete",
-    "bulk_delete_msg": "Are you sure you want to delete {{count}} selected items from the database?"
+    "bulk_delete_msg": "Are you sure you want to delete {{count}} selected items from the database?",
+    "undo_title": "Undo Organization",
+    "undo_msg": "Are you sure you want to revert this entire organization batch? All files will be moved back to their original locations."
   },
   "extras": {
     "categories": {

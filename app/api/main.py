@@ -6,7 +6,7 @@ from app.db.base import Session, Base, engine
 from app.db.models import *
 
 # Import routers
-from app.api.routes import scanner, settings, media, metadata
+from app.api.routes import scanner, settings, media, metadata, renamer
 
 # Automatically create tables if they don't exist
 Base.metadata.create_all(bind=engine)
@@ -29,6 +29,7 @@ app.include_router(scanner.router)
 app.include_router(settings.router)
 app.include_router(media.router)
 app.include_router(metadata.router)
+app.include_router(renamer.router)
 
 if __name__ == "__main__":
     import uvicorn

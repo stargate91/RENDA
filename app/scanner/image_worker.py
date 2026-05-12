@@ -18,6 +18,24 @@ class ImageWorker:
         self.db = db_session
         self.storage_path = Path(storage_path) / "media" / "images"
         self._ensure_folders()
+        self._reset_stale_tasks()
+        
+        # Central session with retries
+        self.session = requests.Session()
+        adapter = requests.adapters.HTTPAdapter(max_retries=3)
+        self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)
+
+    def _reset_stale_tasks(self):
+        """Resets any stuck 'DOWNLOADING' tasks back to 'PENDING' on startup."""
+        try:
+            self.db.query(MediaMatch).filter(MediaMatch.image_status == ImageStatus.DOWNLOADING).update({"image_status": ImageStatus.PENDING})
+            self.db.query(MediaMatch).filter(MediaMatch.backdrop_status == ImageStatus.DOWNLOADING).update({"backdrop_status": ImageStatus.PENDING})
+            self.db.query(Person).filter(Person.image_status == ImageStatus.DOWNLOADING).update({"image_status": ImageStatus.PENDING})
+            self.db.commit()
+        except Exception as e:
+            logger.error(f"Failed to reset stale image tasks: {e}")
+            self.db.rollback()
 
     def _ensure_folders(self):
         """Creates the necessary subdirectories for different image types and thumbnails."""
@@ -73,7 +91,7 @@ class ImageWorker:
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
         
         try:
-            response = requests.get(url, stream=True, timeout=15, headers=headers)
+            response = self.session.get(url, stream=True, timeout=(5, 20), headers=headers)
             if response.status_code == 200:
                 # Verify it's actually an image
                 content_type = response.headers.get("Content-Type", "")
@@ -129,7 +147,7 @@ class ImageWorker:
         """Processes pending movie/series images in batches."""
         while True:
             matches = self.db.query(MediaMatch.id).filter(
-                MediaMatch.image_status.in_([ImageStatus.PENDING, ImageStatus.DOWNLOADING])
+                MediaMatch.image_status == ImageStatus.PENDING
             ).limit(50).all()
             
             if not matches:
@@ -234,7 +252,7 @@ class ImageWorker:
         """Processes pending backdrops (large images) in batches."""
         while True:
             matches = self.db.query(MediaMatch.id).filter(
-                MediaMatch.backdrop_status.in_([ImageStatus.PENDING, ImageStatus.DOWNLOADING])
+                MediaMatch.backdrop_status == ImageStatus.PENDING
             ).limit(50).all()
             
             if not matches:
@@ -288,7 +306,7 @@ class ImageWorker:
         from ..db.models import Person, MediaPersonLink
         while True:
             persons = self.db.query(Person.id).filter(
-                Person.image_status.in_([ImageStatus.PENDING, ImageStatus.DOWNLOADING])
+                Person.image_status == ImageStatus.PENDING
             ).limit(100).all()
             
             if not persons:

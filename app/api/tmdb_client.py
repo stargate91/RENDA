@@ -105,7 +105,7 @@ class TMDBClient:
         
         return {}
 
-    def search(self, query: str, item_type: str = "movie", year: Optional[int] = None, language: str = "en-US") -> List[Dict[str, Any]]:
+    def search(self, query: str, item_type: str = "movie", year: Optional[int] = None, language: str = "en-US", include_adult: bool = False) -> List[Dict[str, Any]]:
         """Keresés TMDB-n (Film vagy Sorozat)."""
         if not self._api_key or not query:
             return []
@@ -115,7 +115,7 @@ class TMDBClient:
             "api_key": self._api_key,
             "query": query,
             "language": language,
-            "include_adult": "true"
+            "include_adult": "true" if include_adult else "false"
         }
         if year:
             key = "primary_release_year" if item_type == "movie" else "first_air_date_year"

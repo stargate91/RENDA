@@ -8,6 +8,11 @@
 .app-container.has-inspector {
   display: grid;
   grid-template-columns: 240px 1fr 350px;
+  transition: grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.app-container.sidebar-collapsed.has-inspector {
+  grid-template-columns: 78px 1fr 350px;
 }
 
 .main-content {

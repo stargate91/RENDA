@@ -1,4 +1,5 @@
 import React from 'react';
+import HistoryView from './components/History/HistoryView';
 import MetadataModal from './components/Modals/MetadataModal';
 import WelcomeModal from './components/Modals/WelcomeModal';
 import ConfirmModal from './components/Modals/ConfirmModal';
@@ -21,8 +22,9 @@ function App() {
     settingsTab, setSettingsTab,
     imageStatus,
     selectedItem, setSelectedItem,
-    stats, fullMetadata, showMetadataModal, setShowMetadataModal,
-    handleScan, handleDropScan, fetchFullMetadata, saveSettings, wipeDatabase, deleteDiscoveryItems,
+    stats, history, fetchHistory,
+    fullMetadata, showMetadataModal, setShowMetadataModal,
+    handleScan, handleDropScan, fetchFullMetadata, saveSettings, wipeDatabase, deleteDiscoveryItems, handleOrganizeLibrary, handleUndo,
     loadSession, isDragging,
     selectedIds, setSelectedIds,
     showResolverModal, setShowResolverModal,
@@ -72,6 +74,18 @@ function App() {
           openResolver={openResolver}
           stats={stats}
           isDragging={isDragging}
+          progress={progress}
+          handleOrganizeLibrary={handleOrganizeLibrary}
+          T={T}
+        />
+      )}
+
+      {view === 'history' && (
+        <HistoryView 
+          history={history}
+          fetchHistory={fetchHistory}
+          handleUndo={handleUndo}
+          loading={loading}
           T={T}
         />
       )}

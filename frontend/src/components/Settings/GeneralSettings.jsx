@@ -2,6 +2,7 @@ import React from 'react';
 import { User, Globe, Search, Library, HardDrive } from 'lucide-react';
 import CustomSelect from '../Forms/CustomSelect';
 import { METADATA_LANGUAGES } from '../../constants/settings';
+import Switch from './Switch';
 
 const GeneralSettings = ({ settings, setSettings, T, availableLocales }) => {
   return (
@@ -70,6 +71,19 @@ const GeneralSettings = ({ settings, setSettings, T, availableLocales }) => {
               ]}
             />
           </div>
+        </div>
+      </div>
+
+      <div className="form-group split">
+        <div className="form-group-info">
+          <label>Include Adult Content</label>
+          <div className="input-hint">Allow adult/pornographic results in metadata searches.</div>
+        </div>
+        <div className="form-group-input">
+          <Switch 
+            checked={settings.include_adult || false} 
+            onChange={val => setSettings({ ...settings, include_adult: val })}
+          />
         </div>
       </div>
 

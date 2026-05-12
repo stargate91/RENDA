@@ -31,19 +31,23 @@ class MetadataEnricher:
         if not active_match: return
 
         # --- TÍPUS KÉNYSZERÍTÉS (API VÁLASZ ALAPJÁN) ---
-        imdb_id = getattr(active_match, 'imdb_id', None) or item.nfo_imdb_id
-        if imdb_id and imdb_id.startswith("tt"):
-            find_res = self.api.find_by_imdb(imdb_id, language=language)
-            if find_res and "item_type" in find_res:
-                actual_type = ItemType.MOVIE if find_res["item_type"] == "movie" else ItemType.EPISODE
-                
-                if active_match.item_type != actual_type:
-                    logger.info(f"Correcting type for item {item.id} to {actual_type} based on API")
-                    active_match.item_type = actual_type
-                    item.item_type = actual_type
-                    if actual_type == ItemType.EPISODE:
-                        if active_match.season_number is None: active_match.season_number = 1
-                        if active_match.episode_number is None: active_match.episode_number = 1
+        # Csak akkor kényszerítünk, ha még nem tudjuk pontosan mi ez (pl. auto-match esetén)
+        # Ha manuálisan állítottuk be (pl. SERIES-re), ne írjuk felül EPISODE-ra.
+        if active_match.item_type not in [ItemType.SERIES, ItemType.SEASON]:
+            imdb_id = getattr(active_match, 'imdb_id', None) or item.nfo_imdb_id
+            if imdb_id and imdb_id.startswith("tt"):
+                find_res = self.api.find_by_imdb(imdb_id, language=language)
+                if find_res and "item_type" in find_res:
+                    api_type = find_res["item_type"]
+                    actual_type = ItemType.MOVIE if api_type == "movie" else ItemType.EPISODE
+                    
+                    if active_match.item_type != actual_type:
+                        logger.info(f"Correcting type for item {item.id} to {actual_type} based on API")
+                        active_match.item_type = actual_type
+                        item.item_type = actual_type
+                        if actual_type == ItemType.EPISODE:
+                            if active_match.season_number is None: active_match.season_number = 1
+                            if active_match.episode_number is None: active_match.episode_number = 1
 
         # Primary language enrichment
         if active_match.item_type == ItemType.MOVIE:

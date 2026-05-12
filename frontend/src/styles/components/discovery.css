@@ -88,6 +88,49 @@
   filter: brightness(1.1);
 }
 
+.btn-organize {
+  background: linear-gradient(135deg, var(--success), #1db954);
+  border: none;
+  color: #fff;
+  padding: 0 20px;
+  height: 38px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 10px 20px rgba(46, 213, 115, 0.2);
+}
+
+.btn-organize:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 25px rgba(46, 213, 115, 0.3);
+}
+
+.btn-organize:disabled {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border-card);
+  color: var(--text-dim);
+  cursor: not-allowed;
+  box-shadow: none;
+  opacity: 0.5;
+}
+
+.btn-organize.disabled {
+  background: rgba(255, 71, 87, 0.1);
+  border: 1px solid rgba(255, 71, 87, 0.2);
+  color: #ff4757;
+  opacity: 0.8;
+}
+
+.btn-icon:disabled, .btn-browse:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
 /* Row 2: Navigation & Search */
 .header-nav-row {
   display: flex;
@@ -283,7 +326,7 @@
 }
 
 /* Row Actions - Overlay Logic */
-.row-actions {
+.cell-actions {
   position: absolute;
   top: 50%;
   right: 15px;
@@ -300,7 +343,7 @@
   box-shadow: 0 4px 15px rgba(0,0,0,0.3);
 }
 
-.data-table tbody tr:hover .row-actions {
+.data-table tbody tr:hover .cell-actions {
   opacity: 1;
   transform: translateY(-50%) scale(1);
   pointer-events: all;
@@ -318,7 +361,7 @@
   pointer-events: none;
 }
 
-.action-btn {
+.action-pill {
   background: var(--bg-card);
   border: 1px solid var(--border-card);
   color: var(--text-dim);
@@ -332,32 +375,37 @@
   transition: all 0.2s ease;
 }
 
-.action-btn.edit:hover {
+.action-pill.edit:hover:not(:disabled) {
   background: var(--bg-glass);
   border-color: var(--accent-blue);
   color: var(--accent-blue);
   box-shadow: 0 0 10px var(--accent-glow);
 }
 
-.action-btn.resolve:hover {
+.action-pill.resolve:hover:not(:disabled) {
   background: var(--bg-glass);
   border-color: var(--success);
   color: var(--success);
-  box-shadow: 0 0 10px var(--success-bg);
+  box-shadow: 0 0 10px rgba(46, 213, 115, 0.2);
 }
 
-.action-btn.reveal:hover {
+.action-pill.reveal:hover:not(:disabled) {
   background: var(--bg-glass);
   border-color: var(--info);
   color: var(--info);
   box-shadow: 0 0 10px rgba(0, 136, 255, 0.2);
 }
 
-.action-btn.delete:hover {
+.action-pill.delete:hover:not(:disabled) {
   background: var(--danger-bg);
   border-color: var(--danger);
   color: var(--danger);
   box-shadow: 0 0 10px rgba(255, 60, 60, 0.2);
+}
+
+.action-pill:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
 }
 
 /* Batch Action Bar - Floating at the bottom */
@@ -502,11 +550,34 @@
 }
 
 .planned-name-text {
-  color: var(--color-success);
+  color: var(--text-main);
   font-weight: 500;
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.btn-link {
+  background: transparent;
+  border: none;
+  color: var(--accent-blue);
+  padding: 2px 0;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.btn-link:hover {
+  color: white;
+  transform: translateX(2px);
+}
+
+.btn-link svg {
+  color: var(--accent-blue);
 }
 
 .path-prefix {

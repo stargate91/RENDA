@@ -1,16 +1,21 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown } from 'lucide-react';
+  import { ChevronDown, Search } from 'lucide-react';
 
-const CustomSelect = ({ value, options, onChange, placeholder = 'Select...' }) => {
+const CustomSelect = ({ value, options, onChange, placeholder = 'Select...', searchable = false }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const ref = useRef(null);
 
   const selectedOption = options.find(opt => opt.value === value);
+  const filteredOptions = searchable 
+    ? options.filter(opt => opt.label.toLowerCase().includes(searchTerm.toLowerCase()))
+    : options;
 
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (ref.current && !ref.current.contains(event.target)) {
         setIsOpen(false);
+        setSearchTerm('');
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -31,19 +36,37 @@ const CustomSelect = ({ value, options, onChange, placeholder = 'Select...' }) =
       
       {isOpen && (
         <div className="custom-select-dropdown">
+          {searchable && (
+            <div className="select-search-wrapper">
+              <Search size={14} />
+              <input 
+                type="text" 
+                placeholder="Search..." 
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                autoFocus
+                onClick={e => e.stopPropagation()}
+              />
+            </div>
+          )}
           <div className="dropdown-scroll">
-            {options.map(opt => (
-              <div 
-                key={opt.value} 
-                className={`custom-select-option ${opt.value === value ? 'selected' : ''}`}
-                onClick={() => {
-                  onChange(opt.value);
-                  setIsOpen(false);
-                }}
-              >
-                {opt.label}
-              </div>
-            ))}
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map(opt => (
+                <div 
+                  key={opt.value} 
+                  className={`custom-select-option ${opt.value === value ? 'selected' : ''}`}
+                  onClick={() => {
+                    onChange(opt.value);
+                    setIsOpen(false);
+                    setSearchTerm('');
+                  }}
+                >
+                  {opt.label}
+                </div>
+              ))
+            ) : (
+              <div className="no-results">No results found</div>
+            )}
           </div>
         </div>
       )}

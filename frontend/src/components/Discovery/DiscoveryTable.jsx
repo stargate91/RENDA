@@ -1,5 +1,5 @@
-import React from 'react';
-import { Trash2, Square, CheckSquare, Search, Settings, ArrowRight, Folder } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Trash2, Square, CheckSquare, Search, ArrowRight, Folder, Loader2, Edit3 } from 'lucide-react';
 import { api } from '../../services/api';
 
 const DiscoveryTable = ({ 
@@ -8,8 +8,15 @@ const DiscoveryTable = ({
   loading, selectedItem, setSelectedItem,
   selectedIds, setSelectedIds, deleteDiscoveryItems,
   openResolver, openOverride,
+  isBusy,
   T 
 }) => {
+  const [visibleLimit, setVisibleLimit] = useState(40);
+  const sentinelRef = useRef(null);
+
+  useEffect(() => {
+    setVisibleLimit(40);
+  }, [activeTab, extraSubTab, searchQuery]);
   const getFilteredRows = () => {
     let rows = activeTab === 'extras'
       ? (items.extras || []).filter(ex => ex.category === extraSubTab)
@@ -42,7 +49,22 @@ const DiscoveryTable = ({
     return rows;
   };
 
-  const rows = getFilteredRows();
+  const allRows = getFilteredRows();
+  const rows = allRows.slice(0, visibleLimit);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && allRows.length > visibleLimit) {
+        setVisibleLimit(prev => prev + 40);
+      }
+    }, { threshold: 0.1 });
+
+    if (sentinelRef.current) {
+      observer.observe(sentinelRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [allRows.length, visibleLimit]);
   const allSelected = rows.length > 0 && rows.every(r => selectedIds.includes(r.id));
 
   const toggleSelectAll = (e) => {
@@ -112,7 +134,7 @@ const DiscoveryTable = ({
               <td>
                 <div className="planned-name" title={item.planned_path}>
                   <span className="arrow">➔</span>
-                  {item.planned_path && item.planned_path !== item.filename ? (
+                  {item.planned_path ? (
                     <span className="planned-name-text" title={item.planned_path}>
                       {(() => {
                         const fullPath = item.planned_path;
@@ -121,9 +143,15 @@ const DiscoveryTable = ({
                       })()}
                     </span>
                   ) : (
-                    <button className="btn-link" onClick={(e) => { e.stopPropagation(); openResolver(item); }}>
-                      <ArrowRight size={14} /> {T('discovery.table.pending_match')}
-                    </button>
+                    activeTab !== 'extras' && (
+                      <button 
+                        className="btn-link" 
+                        onClick={(e) => { e.stopPropagation(); openResolver(item); }}
+                        disabled={isBusy}
+                      >
+                        {T('discovery.table.pending_match')}
+                      </button>
+                    )
                   )}
                 </div>
               </td>
@@ -152,40 +180,26 @@ const DiscoveryTable = ({
                     </span>
                   ) : (
                     <span className="status-badge extras">
-                      {item.extension ? item.extension.toUpperCase() : 'FILE'}
+                      {item.subtype && item.subtype.toLowerCase() !== 'other' && item.subtype.toLowerCase() !== 'none'
+                        ? (item.subtype.charAt(0).toUpperCase() + item.subtype.slice(1).replace(/_/g, ' '))
+                        : '-'}
                     </span>
                   )}
                 </div>
                 
-                <div className="row-actions">
-                  <button 
-                    className="action-btn reveal" 
-                    onClick={(e) => { e.stopPropagation(); api.revealInExplorer(item.current_path); }}
-                    title={T('discovery.reveal_explorer') || 'Show in Folder'}
-                  >
+                <div className="cell-actions">
+                  <button className="action-pill reveal" onClick={(e) => { e.stopPropagation(); api.revealInExplorer(item.current_path); }} title={T('discovery.reveal_explorer')} disabled={isBusy}>
                     <Folder size={16} />
                   </button>
-                  <button 
-                    className="action-btn edit" 
-                    onClick={(e) => { e.stopPropagation(); openOverride(item); }}
-                    title={T('modal.override.action') || 'Manual Override'}
-                  >
-                    <Settings size={16} />
+                  <button className="action-pill edit" onClick={(e) => { e.stopPropagation(); openOverride(item); }} title={T('modal.override.action')} disabled={isBusy}>
+                    <Edit3 size={16} />
                   </button>
                   {activeTab !== 'extras' && (
-                    <button 
-                      className="action-btn resolve" 
-                      onClick={(e) => { e.stopPropagation(); openResolver(item); }}
-                      title={T('modal.resolver.action')}
-                    >
+                    <button className="action-pill resolve" onClick={(e) => { e.stopPropagation(); openResolver(item); }} title={T('modal.resolver.action')} disabled={isBusy}>
                       <Search size={16} />
                     </button>
                   )}
-                  <button 
-                    className="action-btn delete" 
-                    onClick={(e) => { e.stopPropagation(); deleteDiscoveryItems(item.id, activeTab === 'extras' ? 'extras' : 'media'); }}
-                    title={T('discovery.bulk.delete')}
-                  >
+                  <button className="action-pill delete" onClick={(e) => { e.stopPropagation(); deleteDiscoveryItems(item.id, activeTab === 'extras' ? 'extras' : 'media'); }} title={T('common.delete')} disabled={isBusy}>
                     <Trash2 size={16} />
                   </button>
                 </div>
@@ -196,6 +210,13 @@ const DiscoveryTable = ({
             <tr>
               <td colSpan="5" style={{ textAlign: 'center', padding: '100px', color: '#666' }}>
                 {T('discovery.no_items')}
+              </td>
+            </tr>
+          )}
+          {allRows.length > visibleLimit && (
+            <tr ref={sentinelRef}>
+              <td colSpan="5" style={{ textAlign: 'center', padding: '20px', opacity: 0.5 }}>
+                <Loader2 size={20} className="spin" />
               </td>
             </tr>
           )}

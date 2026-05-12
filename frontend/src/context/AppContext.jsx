@@ -95,6 +95,7 @@ const DEFAULT_SETTINGS = {
   extras_meta_template: '{{ParentName}}',
   extras_folder_mode: 'subfolder',
   ui_theme: 'dark_pro',
+  include_adult: false,
 };
 
 export const AppProvider = ({ children }) => {
@@ -117,6 +118,7 @@ export const AppProvider = ({ children }) => {
   const [showMetadataModal, setShowMetadataModal] = useState(false);
   const [showResolverModal, setShowResolverModal] = useState(false);
   const [resolverItem, setResolverItem] = useState(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
   const wasActiveRef = useRef(false);
   const scanTriggeredRef = useRef(false);
@@ -262,6 +264,10 @@ export const AppProvider = ({ children }) => {
 
   const handleDropScan = React.useCallback(async (paths) => {
     if (!paths || paths.length === 0) return;
+    if (progress?.active) {
+      console.warn("Scan ignored: A task is already in progress.");
+      return;
+    }
     try {
       setLoading(true);
       setView('discovery');
@@ -308,10 +314,10 @@ export const AppProvider = ({ children }) => {
     setShowResolverModal(true);
   };
   
-  const resolveItem = async (itemId, tmdbId, type, season, episode) => {
+  const resolveItem = async (itemId, tmdbId, type, season, episode, episodes, targets) => {
     try {
       setLoading(true);
-      await api.resolveMetadata(itemId, tmdbId, type, season, episode);
+      await api.resolveMetadata(itemId, tmdbId, type, season, episode, episodes, targets);
       setShowResolverModal(false);
       await fetchDiscovery();
       fetchStats();
@@ -369,6 +375,8 @@ export const AppProvider = ({ children }) => {
     const isBulk = Array.isArray(ids);
     const idList = isBulk ? ids : [ids];
     
+    if (loading) return;
+
     confirmAction(
       T(isBulk ? 'alerts.bulk_delete_title' : 'alerts.delete_title'),
       T(isBulk ? 'alerts.bulk_delete_msg' : 'alerts.delete_msg', { count: idList.length }),
@@ -391,6 +399,68 @@ export const AppProvider = ({ children }) => {
     );
   };
 
+  const handleOrganizeLibrary = async () => {
+    try {
+      setLoading(true);
+      const res = await api.startRename();
+      if (res.status === 'success') {
+        // We don't need to do much, the progress polling will take over
+        fetchProgress();
+      } else {
+        alert(res.message || "Failed to start organization");
+      }
+    } catch (e) {
+      console.error("Organize failed:", e);
+      alert("An error occurred while starting the organization process.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const [history, setHistory] = useState([]);
+  const fetchHistory = async () => {
+    try {
+      const data = await api.fetchHistory();
+      setHistory(data);
+    } catch (e) {
+      console.error("Fetch history failed:", e);
+    }
+  };
+
+  const handleUndo = async (batchId) => {
+    confirmAction(
+      T('alerts.undo_title'),
+      T('alerts.undo_msg'),
+      async () => {
+        try {
+          setLoading(true);
+          const res = await api.undoRename(batchId);
+          if (res.status === 'success') {
+            await fetchHistory();
+            await fetchDiscovery();
+            fetchStats();
+          } else {
+            alert(res.message || "Undo failed");
+          }
+        } catch (e) {
+          console.error("Undo failed:", e);
+        } finally {
+          setLoading(false);
+        }
+      }
+    );
+  };
+
+  const handleResetImageStatus = async () => {
+    try {
+      await api.resetImageStatus();
+      const status = await api.getImageStatus();
+      setImageStatus(status);
+    } catch (e) {
+      console.error("Failed to reset image status:", e);
+    }
+  };
+
   return (
     <AppContext.Provider value={{
       view, setView,
@@ -406,6 +476,7 @@ export const AppProvider = ({ children }) => {
       selectedItem, setSelectedItem,
       selectedIds, setSelectedIds,
       stats, setStats,
+      history, setHistory,
       fullMetadata, setFullMetadata,
       showMetadataModal, setShowMetadataModal,
       showResolverModal, setShowResolverModal,
@@ -413,9 +484,11 @@ export const AppProvider = ({ children }) => {
       confirmDialog, setConfirmDialog, confirmAction,
       isSettingsDirty, resetSettings,
       loadSession,
-      fetchDiscovery, fetchStats, fetchSettings,
+      fetchDiscovery, fetchStats, fetchSettings, fetchHistory,
       handleScan, handleDropScan, fetchFullMetadata, saveSettings, wipeDatabase, deleteDiscoveryItems,
+      handleOrganizeLibrary, handleUndo, handleResetImageStatus,
       openResolver, resolveItem,
+      isSidebarCollapsed, setIsSidebarCollapsed,
       T: (key, params) => T(key, params, settings.ui_language || 'en'),
       availableLocales
     }}>

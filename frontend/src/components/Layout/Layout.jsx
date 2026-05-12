@@ -1,12 +1,16 @@
 import React from 'react';
 import { Upload } from 'lucide-react';
+import { X } from 'lucide-react';
 import Sidebar from '../Navigation/Sidebar';
 import GlobalProgress from '../Navigation/GlobalProgress';
 import FloatingActionBar from '../Navigation/FloatingActionBar';
+import { useAppContext } from '../../context/AppContext';
 
 const Layout = ({ view, setView, isDragging, progress, imageStatus, hasInspector, inspector, T, children }) => {
+  const { isSidebarCollapsed, handleResetImageStatus } = useAppContext();
+  
   return (
-    <div className={`app-container ${(view === 'discovery' && hasInspector) ? 'has-inspector' : ''}`}>
+    <div className={`app-container ${isSidebarCollapsed ? 'sidebar-collapsed' : ''} ${(view === 'discovery' && hasInspector) ? 'has-inspector' : ''}`}>
       <Sidebar view={view} setView={setView} T={T} />
 
       <div className={`main-content ${isDragging ? 'dragging' : ''}`}>
@@ -48,6 +52,24 @@ const Layout = ({ view, setView, isDragging, progress, imageStatus, hasInspector
               {imageStatus.current_item || T('discovery.processing')}
             </div>
           </div>
+          <button 
+            className="btn-close-bg-process" 
+            onClick={handleResetImageStatus}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-dim)',
+              padding: '4px',
+              cursor: 'pointer',
+              marginLeft: '10px',
+              opacity: 0.5,
+              transition: 'opacity 0.2s'
+            }}
+            onMouseOver={e => e.currentTarget.style.opacity = 1}
+            onMouseOut={e => e.currentTarget.style.opacity = 0.5}
+          >
+            <X size={16} />
+          </button>
         </div>
       )}
     </div>

@@ -328,15 +328,25 @@ def update_media_item(payload: dict):
             item = db.query(MediaItem).filter(MediaItem.id == item_id).first()
             if not item:
                 return JSONResponse(status_code=404, content={"error": "Media item not found"})
+            
+            # Basic overrides
             if "target_language" in updates: item.target_language = updates["target_language"]
             if "edition" in updates: item.edition = MovieEdition(updates["edition"])
             if "source" in updates: item.source = MediaSource(updates["source"])
             if "audio_type" in updates: item.audio_type = MediaAudioType(updates["audio_type"])
+            if "item_type" in updates: item.item_type = ItemType(updates["item_type"])
+            
+            # Part management
+            if "part" in updates: item.part = int(updates["part"]) if updates["part"] else None
+            if "part_type" in updates: item.part_type = PartType(updates["part_type"])
+            if "part_style" in updates: item.part_style = PartStyle(updates["part_style"])
+
+            # Season/Episode management
             if "season" in updates or "episode" in updates:
                 active_match = next((m for m in item.matches if m.is_active), None)
                 if active_match:
-                    if "season" in updates: active_match.season_number = updates["season"]
-                    if "episode" in updates: active_match.episode_number = updates["episode"]
+                    if "season" in updates: active_match.season_number = int(updates["season"]) if updates["season"] else None
+                    if "episode" in updates: active_match.episode_number = updates["episode"] # Keep as JSON/Any
                     active_match.item_type = ItemType.EPISODE
                     item.item_type = ItemType.EPISODE
         else:
@@ -345,6 +355,7 @@ def update_media_item(payload: dict):
                 return JSONResponse(status_code=404, content={"error": "Extra file not found"})
             if "subtype" in updates: extra.subtype = ExtraSubtype(updates["subtype"])
             if "language" in updates: extra.language = updates["language"]
+            if "parent_id" in updates: extra.parent_item_id = int(updates["parent_id"]) if updates["parent_id"] else extra.parent_item_id
             item = extra.parent_item
 
         formatter = Formatter.from_db(db)
@@ -368,18 +379,24 @@ def update_media_item(payload: dict):
 
 @router.post("/reveal")
 def reveal_in_explorer(payload: dict):
-    """Opens the file's parent folder in the OS file explorer."""
+    """Opens the file's parent folder and selects the file in the OS file explorer."""
     path = payload.get("path")
     if not path or not os.path.exists(path):
         return {"status": "error", "message": f"Path does not exist: {path}"}
-    folder = os.path.dirname(os.path.abspath(path))
+    
+    path = os.path.abspath(path)
     try:
         if platform.system() == "Windows":
-            os.startfile(folder)
+            # /select highlights the file and usually brings explorer to front
+            subprocess.Popen(f'explorer /select,"{os.path.normpath(path)}"')
         elif platform.system() == "Darwin":
-            subprocess.run(["open", folder])
+            # -R reveals the file in Finder
+            subprocess.run(["open", "-R", path])
         else:
+            # For Linux, we still just open the folder as xdg-open doesn't have a universal select
+            folder = os.path.dirname(path)
             subprocess.run(["xdg-open", folder])
         return {"status": "success"}
     except Exception as e:
+        logger.error(f"Reveal failed: {e}")
         return {"status": "error", "message": str(e)}
