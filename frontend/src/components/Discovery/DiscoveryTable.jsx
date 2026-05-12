@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trash2, Square, CheckSquare, Search, Settings } from 'lucide-react';
+import { Trash2, Square, CheckSquare, Search, Settings, ArrowRight } from 'lucide-react';
 
 const DiscoveryTable = ({ 
   items, activeTab, extraSubTab, searchQuery, 
@@ -79,22 +79,22 @@ const DiscoveryTable = ({
               {T('discovery.table.planned_name')} {sortKey === 'planned_path' && (sortDir === 'asc' ? '▲' : '▼')}
             </th>
             {activeTab === 'manual' && (
-              <th className="cell-center sortable-th" onClick={() => { setSortKey('type'); setSortDir(sortKey === 'type' && sortDir === 'asc' ? 'desc' : 'asc'); }}>
+              <th className="cell-center sortable-th type-col" onClick={() => { setSortKey('type'); setSortDir(sortKey === 'type' && sortDir === 'asc' ? 'desc' : 'asc'); }}>
                 {T('discovery.table.type')} {sortKey === 'type' && (sortDir === 'asc' ? '▲' : '▼')}
               </th>
             )}
             {activeTab === 'extras' && (extraSubTab === 'subtitle' || extraSubTab === 'audio') && (
-              <th className="cell-center sortable-th" onClick={() => { setSortKey('language'); setSortDir(sortKey === 'language' && sortDir === 'asc' ? 'desc' : 'asc'); }}>
+              <th className="cell-center sortable-th type-col" onClick={() => { setSortKey('language'); setSortDir(sortKey === 'language' && sortDir === 'asc' ? 'desc' : 'asc'); }}>
                 {T('discovery.table.language')} {sortKey === 'language' && (sortDir === 'asc' ? '▲' : '▼')}
               </th>
             )}
             {activeTab === 'extras' && extraSubTab !== 'metadata' && (
-              <th className="cell-center sortable-th" onClick={() => { setSortKey('subtype'); setSortDir(sortKey === 'subtype' && sortDir === 'asc' ? 'desc' : 'asc'); }}>
+              <th className="cell-center sortable-th type-col" onClick={() => { setSortKey('subtype'); setSortDir(sortKey === 'subtype' && sortDir === 'asc' ? 'desc' : 'asc'); }}>
                 {T('discovery.table.subcategory')} {sortKey === 'subtype' && (sortDir === 'asc' ? '▲' : '▼')}
               </th>
             )}
             {activeTab !== 'extras' && (
-              <th className="cell-center sortable-th" onClick={() => { setSortKey('status'); setSortDir(sortKey === 'status' && sortDir === 'asc' ? 'desc' : 'asc'); }}>
+              <th className="cell-center sortable-th status-col" onClick={() => { setSortKey('status'); setSortDir(sortKey === 'status' && sortDir === 'asc' ? 'desc' : 'asc'); }}>
                 {T('discovery.table.status')} {sortKey === 'status' && (sortDir === 'asc' ? '▲' : '▼')}
               </th>
             )}
@@ -118,38 +118,31 @@ const DiscoveryTable = ({
               <td>
                 <div className="planned-name" title={item.planned_path}>
                   <span className="arrow">➔</span>
-                  <span className="planned-name-text">
-                    {item.planned_path && item.planned_path.length > item.extension?.length + 1 ? (
-                      activeTab === 'extras' ? (
-                        <>
-                          {item.planned_path.split('/').pop().replace(new RegExp((item.extension || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i'), '')}
-                          {item.extension && <span className="extension-text">{item.extension.toLowerCase()}</span>}
-                        </>
-                      ) : (
-                        item.planned_path
-                      )
-                    ) : (
-                      <span className="pending-name">
-                        {item.status === 'MATCHED' ? 'Enriching...' : 'Pending Match'}
-                      </span>
-                    )}
-                  </span>
+                  {item.planned_path && item.planned_path !== item.filename ? (
+                    <span className="planned-name-text" title={item.planned_path}>
+                      {item.planned_path.split('/').pop()}
+                    </span>
+                  ) : (
+                    <button className="btn-link" onClick={(e) => { e.stopPropagation(); openResolver(item); }}>
+                      <ArrowRight size={14} /> {T('discovery.table.pending_match')}
+                    </button>
+                  )}
                 </div>
               </td>
               {activeTab === 'manual' && (
-                <td className="cell-center">
+                <td className="cell-center type-col">
                   <span className={`badge badge-type hide-on-hover`}>{item.type}</span>
                 </td>
               )}
               {activeTab === 'extras' && (extraSubTab === 'subtitle' || extraSubTab === 'audio') && (
-                <td className="cell-center">
+                <td className="cell-center type-col">
                   <span className="language-text hide-on-hover">
                     {item.language ? item.language.toUpperCase() : '-'}
                   </span>
                 </td>
               )}
               {activeTab === 'extras' && extraSubTab !== 'metadata' && (
-                <td className="cell-center">
+                <td className="cell-center type-col">
                   <span className="subcategory-text hide-on-hover">
                     {item.subtype && item.subtype.toLowerCase() !== 'other'
                       ? (item.subtype.charAt(0).toUpperCase() + item.subtype.slice(1).replace(/_/g, ' '))
@@ -157,7 +150,7 @@ const DiscoveryTable = ({
                   </span>
                 </td>
               )}
-              <td className="cell-center" style={{ position: 'relative' }}>
+              <td className="cell-center status-col" style={{ position: 'relative' }}>
                 {activeTab !== 'extras' && (
                   <span className={`status-badge ${(item.status || '').toLowerCase()} hide-on-hover`}>
                     {item.status || T('discovery.table.unknown')}

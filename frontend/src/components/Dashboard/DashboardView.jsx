@@ -22,7 +22,7 @@ const DashboardView = ({ settings, stats, T }) => {
         <div className="stat-card">
           <div className="stat-label">{T('dashboard.stats.storage_used')}</div>
           <div className="stat-value">{stats.storage || '0 MB'}</div>
-          <div className="stat-sub">{T('dashboard.stats.storage_sub')}</div>
+          <div className="stat-sub">{T('dashboard.stats.storage_sub', { count: stats.drive_count || 0 })}</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">{T('dashboard.stats.unmatched')}</div>

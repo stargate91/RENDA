@@ -87,35 +87,60 @@
 .metadata-scroll-container::-webkit-scrollbar { width: 4px; }
 .metadata-scroll-container::-webkit-scrollbar-thumb { background: var(--border-card); border-radius: 10px; }
 
-.metadata-section {
-  margin-bottom: 40px;
-}
-
-.metadata-section h3 {
-  font-size: 16px;
-  text-transform: uppercase;
-  letter-spacing: 2px;
+.metadata-match-header {
+  font-size: 13px;
+  font-weight: 800;
   color: var(--accent-blue);
   margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  letter-spacing: 0.5px;
+}
+
+.metadata-active-badge {
+  background: var(--success);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  box-shadow: 0 0 10px rgba(0, 255, 100, 0.2);
+}
+
+.metadata-match-subheader {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #fff;
+  opacity: 0.5;
+  margin-top: 30px;
+  margin-bottom: 15px;
   font-weight: 800;
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.metadata-match-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-card);
-  border-radius: var(--radius-lg);
-  padding: 24px;
-  margin-bottom: 20px;
-  transition: all 0.3s ease;
+.metadata-match-subheader::after {
+  content: '';
+  flex-grow: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.05);
 }
 
-.metadata-match-card:hover {
-  background: var(--bg-glass);
-  border-color: var(--border-glass);
-  transform: translateX(5px);
+.metadata-loc-card {
+  margin-bottom: 30px;
+}
+
+.metadata-loc-lang {
+  font-size: 14px;
+  font-weight: 800;
+  color: #fff;
+  margin-bottom: 15px;
+  padding-left: 5px;
+  border-left: 3px solid var(--accent-blue);
 }
 
 .metadata-close-btn {
@@ -139,60 +164,92 @@
   transform: rotate(90deg);
 }
 
-/* Metadata Tabs */
-.metadata-tabs {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 25px;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: var(--radius-md);
+/* Metadata Tabs - Pro Pill Design */
+.metadata-pro-tabs-container {
+  background: rgba(0, 0, 0, 0.2);
   padding: 6px;
+  border-radius: var(--radius-lg);
   width: fit-content;
+  margin-bottom: 30px;
+  border: 1px solid var(--border-card);
+  backdrop-filter: var(--glass-blur);
 }
 
-.metadata-tab {
-  padding: 10px 20px;
-  background: none;
+.metadata-pro-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.metadata-pro-tab {
+  padding: 10px 24px;
+  background: transparent;
   border: none;
   color: var(--text-dim);
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
-  border-radius: var(--radius-sm);
-  transition: all 0.2s ease;
+  border-radius: var(--radius-md);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
 }
 
-.metadata-tab.active {
+.metadata-pro-tab:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.metadata-pro-tab.active {
   background: var(--accent-gradient);
   color: white;
-  box-shadow: 0 4px 10px var(--accent-glow);
+  box-shadow: 0 4px 15px var(--accent-glow);
 }
 
 /* Grid Layout for Attributes */
 .metadata-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 12px;
 }
 
 .metadata-grid-item {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px 20px;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: var(--radius-md);
-  border: 1px solid transparent;
-  transition: all 0.2s ease;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 16px 22px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-card);
+  transition: all 0.3s ease;
+  min-height: 80px;
+}
+
+.metadata-grid-item.full {
+  grid-column: 1 / -1;
 }
 
 .metadata-grid-item:hover {
-  border-color: var(--border-card);
-  background: rgba(0, 0, 0, 0.3);
+  border-color: var(--border-glass);
+  background: var(--bg-glass);
+  transform: translateY(-2px);
 }
 
-.metadata-key { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 800; }
-.metadata-val { font-size: 14px; font-weight: 600; color: #fff; }
+.metadata-key { 
+  font-size: 10px; 
+  text-transform: uppercase; 
+  letter-spacing: 1.5px; 
+  color: var(--accent-blue); 
+  font-weight: 800; 
+  opacity: 0.8;
+}
+
+.metadata-val { 
+  font-size: 14px; 
+  font-weight: 600; 
+  color: #fff; 
+  word-break: break-word;
+  line-height: 1.4;
+}
 
 /* Resolver Modal - Manual Search & Fix */
 .resolver-modal {

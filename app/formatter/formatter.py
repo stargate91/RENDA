@@ -69,7 +69,7 @@ class FormatterConfig:
     custom_text: str = ""  # {custom} változó értéke (Settingsből)
 
     # Naming Templates (from Settings)
-    movie_file: str = "{title} ({year})"
+    movie_file: str = "{title} ({year}) {resolution}"
     episode_file: str = "{series_title} - S{season}E{episode} - {episode_title}"
     
     # Part Formatting
@@ -87,7 +87,7 @@ class FormatterConfig:
     
     # Folder Templates
     create_movie_subdir: bool = True
-    movie_folder: str = "{title} ({year}) - {resolution}"
+    movie_folder: str = "{title} ({year})"
     create_collection_dir: bool = True
     collection_folder: str = "{collection}"
     create_series_dir: bool = True
@@ -102,16 +102,16 @@ class FormatterConfig:
     # Extras Handling
     extras_enabled: bool = True
     # Actions: 'rename', 'delete', 'ignore'
-    extra_video_action: str = "delete"
+    extra_video_action: str = "rename"
     extra_sub_action: str = "rename"
     extra_audio_action: str = "rename"
     extra_img_action: str = "rename"
     extra_meta_action: str = "rename"
     
     # Extras Templates
-    extra_video_template: str = "{parent_name} - {sub_category}"
-    extra_sub_template: str = "{parent_name} ({language}) {sub_category}"
-    extra_audio_template: str = "{parent_name} ({language}) {sub_category}"
+    extra_video_template: str = "{parent_name}-{sub_category}"
+    extra_sub_template: str = "{parent_name}.{language}"
+    extra_audio_template: str = "{parent_name}.{language}"
     extra_img_template: str = "{sub_category}"
     extra_meta_template: str = "{parent_name}"
     
@@ -176,7 +176,7 @@ class FormatterConfig:
 
             # Extras Switches & Actions
             config.extras_enabled = settings.get("extras_enabled", True)
-            config.extra_video_action = settings.get("extras_video_action", "delete")
+            config.extra_video_action = settings.get("extras_video_action", "rename")
             config.extra_sub_action = settings.get("extras_sub_action", "rename")
             config.extra_audio_action = settings.get("extras_audio_action", "rename")
             config.extra_img_action = settings.get("extras_img_action", "rename")
@@ -264,14 +264,28 @@ class Formatter:
             target_name = self.format_movie_filename(context)
             cat_folder = self.get_category_folder("movie")
             folder_name = self.format_movie_foldername(context)
-            target_subpath = str(Path(cat_folder) / folder_name)
-        else:
+            
+            # Build subpath carefully to avoid empty parts or '.'
+            parts = [p for p in [cat_folder, folder_name] if p and str(p).strip() and str(p) != "."]
+            target_subpath = "/".join(parts) if parts else ""
+            
+        elif match.item_type in [ItemType.SERIES, ItemType.EPISODE]:
             context = self.build_tv_context(item, match, loc)
             target_name = self.format_episode_filename(context)
             cat_folder = self.get_category_folder("series")
             series_folder = self.format_series_foldername(context)
             season_folder = self.format_season_foldername(context)
-            target_subpath = str(Path(cat_folder) / series_folder / season_folder)
+            
+            # Build subpath carefully
+            parts = [p for p in [cat_folder, series_folder, season_folder] if p and str(p).strip() and str(p) != "."]
+            target_subpath = "/".join(parts) if parts else ""
+        else:
+            target_name = item.filename
+            target_subpath = ""
+
+        # Normalize slashes
+        target_subpath = target_subpath.replace("\\", "/")
+        target_name = target_name.replace("\\", "/")
 
         dest_root = self.config.library_path if self.config.move_to_library and self.config.library_path else os.path.dirname(item.current_path)
 
@@ -440,22 +454,28 @@ class Formatter:
     # =========================================================================
 
     def format_movie_filename(self, context: Dict[str, Any]) -> str:
-        return self._render(self.config.movie_file, context)
+        return self._render(self.config.movie_file, context, is_file=True)
 
     def format_movie_foldername(self, context: Dict[str, Any]) -> str:
         if not self.config.create_movie_subdir:
             return ""
             
         # Ha van gyűjtemény, és be van kapcsolva a gyűjtemény mappa
-        if self.config.create_collection_dir and context.get("collection"):
+        # Check both cases just to be safe
+        coll_val = context.get("Collection") or context.get("collection")
+        if self.config.create_collection_dir and coll_val and str(coll_val).strip():
             coll_name = self.format_collection_foldername(context)
-            movie_name = self._render(self.config.movie_folder, context)
-            return str(Path(coll_name) / movie_name)
+            movie_name = self._render(self.config.movie_folder, context, is_file=False)
+            if coll_name and movie_name:
+                return f"{coll_name}/{movie_name}"
+            return movie_name or coll_name
             
-        return self._render(self.config.movie_folder, context)
+        return self._render(self.config.movie_folder, context, is_file=False)
 
     def format_collection_foldername(self, context: Dict[str, Any]) -> str:
-        return self._render(self.config.collection_folder, context)
+        # Ensure we have a valid template for collection
+        tmpl = self.config.collection_folder or "{Collection}"
+        return self._render(tmpl, context, is_file=False)
 
     # =========================================================================
     # Publikus API - Sorozatok
@@ -464,15 +484,15 @@ class Formatter:
     def format_series_foldername(self, context: Dict[str, Any]) -> str:
         if not self.config.create_series_dir:
             return ""
-        return self._render(self.config.series_folder, context)
+        return self._render(self.config.series_folder, context, is_file=False)
 
     def format_season_foldername(self, context: Dict[str, Any]) -> str:
         if not self.config.create_season_dir:
             return ""
-        return self._render(self.config.season_folder, context)
+        return self._render(self.config.season_folder, context, is_file=False)
 
     def format_episode_filename(self, context: Dict[str, Any]) -> str:
-        return self._render(self.config.episode_file, context)
+        return self._render(self.config.episode_file, context, is_file=True)
 
     def format_extra_filename(self, context: Dict[str, Any]) -> str:
         cat = context.get("category", "")
@@ -489,7 +509,7 @@ class Formatter:
         else:
             tmpl = "{parent_name} {sub_category}"
             
-        name = self._render(tmpl, context)
+        name = self._render(tmpl, context, is_file=True)
         # Eltávolítjuk a felesleges szóközöket, amik az üres változókból adódnak
         name = " ".join(name.split())
         return name
@@ -513,9 +533,13 @@ class Formatter:
             sub_cat = ""
 
         return {
-            "parent_name": parent_formatted_name,
+            "ParentName": parent_formatted_name,
+            "parent_name": parent_formatted_name, # keep old for safety
+            "Category": extra.category.value if extra.category else "",
             "category": extra.category.value if extra.category else "",
-            "sub_category": sub_cat,
+            "SubCategory": sub_cat,
+            "sub_category": sub_cat, # keep old for safety
+            "Language": extra.language.upper() if extra.language else "",
             "language": extra.language.upper() if extra.language else "",
             "ext": extra.extension or "",
             "custom": self.config.custom_text
@@ -578,15 +602,18 @@ class Formatter:
         # Sorozat/Szezon/Epizód meta (PascalCase)
         ctx.update({
             "SeriesTitle": loc.series_title or "",
+            "ShowTitle": loc.series_title or "",
             "SeriesOriginalTitle": loc.original_series_title or "",
+            "ShowOriginalTitle": loc.original_series_title or "",
             "SeriesTmdbId": str(match.series_tmdb_id or match.tmdb_id or ""),
-            "SeriesImdbId": match.series_imdb_id or match.imdb_id or "",
-            "SeriesRatingImdb": str(match.series_rating_imdb or match.rating_imdb or ""),
+            "SeriesImdbId": getattr(match, 'series_imdb_id', None) or match.imdb_id or "",
+            "SeriesRatingImdb": str(getattr(match, 'series_rating_imdb', None) or match.rating_imdb or ""),
             "Networks": ", ".join(match.networks) if match.networks else "",
             "FirstAirDate": match.first_air_date.strftime("%Y-%m-%d") if match.first_air_date else "",
             "FirstAirYear": str(match.first_air_date.year) if match.first_air_date else "",
             "LastAirDate": match.last_air_date.strftime("%Y-%m-%d") if match.last_air_date else "",
             "LastAirYear": str(match.last_air_date.year) if match.last_air_date else "",
+            "YearRange": f"{match.first_air_date.year}-{match.last_air_date.year}" if (match.first_air_date and match.last_air_date and match.first_air_date.year != match.last_air_date.year) else (str(match.first_air_date.year) if match.first_air_date else ""),
             "SeriesSeasonCount": str(match.number_of_seasons or ""),
             "SeriesEpisodeCount": str(match.number_of_episodes or ""),
             "SeriesStatus": match.release_status or "",
@@ -594,6 +621,7 @@ class Formatter:
             "Director": match.director or "",
             
             "SeasonNumber": self.format_number(match.season_number),
+            "Season": self.format_number(match.season_number),
             "SeasonName": loc.season_title or "",
             "SeasonTmdbId": str(match.season_tmdb_id or ""),
             "SeasonEpisodeCount": str(match.episode_count or ""),
@@ -601,7 +629,9 @@ class Formatter:
             "SeasonAirYear": str(match.season_air_date.year) if match.season_air_date else "",
 
             "EpisodeNumber": self.format_number(match.episode_number),
+            "Episode": self.format_number(match.episode_number),
             "EpisodeTitle": loc.episode_title or "",
+            "EpisodeName": loc.episode_title or "",
             "EpisodeAirDate": match.episode_air_date.strftime("%Y-%m-%d") if match.episode_air_date else "",
             "EpisodeAirYear": str(match.episode_air_date.year) if match.episode_air_date else "",
             "EpisodeRatingImdb": str(match.rating_imdb) if match.item_type.value == "episode" else "",
@@ -682,7 +712,7 @@ class Formatter:
         if len(res_list) == 2: return f"{res_list[0]}-{res_list[1]}"
         return "Mixed"
 
-    def _render(self, template: str, context: Dict[str, Any]) -> str:
+    def _render(self, template: str, context: Dict[str, Any], is_file: bool = True) -> str:
         """Rendereli a template-et, és automatikusan hozzáadja a kiterjesztést, ha fájlról van szó."""
         # 1. Behelyettesítés (Case-insensitive lookup)
         # Create a lowercase mapping for the context to handle case mismatches gracefully
@@ -701,11 +731,12 @@ class Formatter:
         result = self.apply_separator(result)
 
         # 4. Automatikus kiterjesztés hozzáadása, ha fájlról van szó
-        ext = context.get("ext", "")
-        if ext:
-            ext_lower = ext.lower()
-            if not result.lower().endswith(ext_lower):
-                result = f"{result}{ext_lower}"
+        if is_file:
+            ext = context.get("ext", "")
+            if ext:
+                ext_lower = ext.lower()
+                if not result.lower().endswith(ext_lower):
+                    result = f"{result}{ext_lower}"
 
         return result.strip()
 

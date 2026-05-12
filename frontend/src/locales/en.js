@@ -71,7 +71,9 @@ const en = {
       "subcategory": "Category",
       "subtype": "Extension",
       "language": "Language",
-      "unknown": "UNKNOWN"
+      "unknown": "UNKNOWN",
+      "enriching": "Enriching...",
+      "pending_match": "Identify Media"
     },
     "tabs": {
       "manual": "Manual Review",

@@ -31,7 +31,7 @@ def update_settings(settings: dict):
         
         # If naming settings changed, we should ideally refresh planned paths.
         # For simplicity, we'll check if any 'naming_' key was in the update.
-        if any(k.startswith("naming_") for k in settings.keys()):
+        if any(k.startswith(("naming_", "folder_", "extras_")) for k in settings.keys()):
             try:
                 from app.formatter.formatter import Formatter, FormatterConfig
                 from app.db.models import MediaItem, ItemStatus
@@ -53,7 +53,10 @@ def update_settings(settings: dict):
                                   active_match.localizations[0] if active_match.localizations else None)
                         if loc:
                             preview = formatter.format_item(item, active_match, loc)
-                            item.planned_path = preview.target_path
+                            if preview.target_subpath:
+                                item.planned_path = f"{preview.target_subpath}/{preview.target_name}".replace("\\", "/")
+                            else:
+                                item.planned_path = preview.target_name
                 db.commit()
             except Exception as e:
                 print(f"Error refreshing planned paths: {e}")

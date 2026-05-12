@@ -217,8 +217,16 @@
 /* Data Table - Hybrid Slab Design */
 /* Column widths for stability */
 .data-table th.checkbox-col, .data-table td.checkbox-col { width: 50px; text-align: center; padding: 15px 10px; }
-.data-table th:nth-child(2), .data-table td:nth-child(2) { width: 30%; }
-.data-table th:nth-child(3), .data-table td:nth-child(3) { width: 45%; }
+.data-table th:nth-child(2), .data-table td:nth-child(2) { width: 25%; }
+.data-table th:nth-child(3), .data-table td:nth-child(3) { width: 40%; }
+
+.type-col { width: 140px; }
+.status-col { width: 180px; }
+
+.cell-center {
+  text-align: center !important;
+}
+
 .data-table th.actions-col, .data-table td.actions-col { 
   width: 80px; 
   position: relative;

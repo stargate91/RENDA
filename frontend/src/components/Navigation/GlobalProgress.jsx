@@ -12,7 +12,8 @@ const GlobalProgress = ({ progress, T }) => {
       case 'probing': return Math.round(10 + (subPercent * 20));
       case 'enriching': return Math.round(30 + (subPercent * 30));
       case 'resolving': return Math.round(60 + (subPercent * 40));
-      default: return 0;
+      case 'wiping': return Math.round(subPercent * 100);
+      default: return Math.round(subPercent * 100);
     }
   };
 

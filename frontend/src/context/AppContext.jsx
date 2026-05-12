@@ -55,8 +55,8 @@ const DEFAULT_SETTINGS = {
   min_video_size_mb: 300,
   naming_filename_casing: 'title',
   naming_word_separator: 'space',
-  naming_movie_template: '{{Title}} ({{Year}}) - {{Resolution}}',
-  naming_episode_template: '{{ShowTitle}} - S{{Season}}E{{Episode}} - {{EpisodeTitle}} - {{Resolution}}',
+  naming_movie_template: '{{Title}} ({{Year}}) {{Resolution}}',
+  naming_episode_template: '{{ShowTitle}} - S{{Season}}E{{Episode}} - {{EpisodeTitle}}',
   naming_part_keyword: 'Part',
   naming_numbering_style: '1, 2, 3..',
   naming_inner_separator: 'space',
@@ -68,7 +68,7 @@ const DEFAULT_SETTINGS = {
   folder_movies_name: 'Movies',
   folder_series_name: 'TV Shows',
   folder_create_movie_subdir: true,
-  folder_movie_template: '{{Title}} ({{Year}}) - {{Resolution}}',
+  folder_movie_template: '{{Title}} ({{Year}})',
   folder_create_collection_dir: true,
   folder_collection_template: '{{Collection}}',
   folder_create_show_dir: true,
@@ -83,14 +83,14 @@ const DEFAULT_SETTINGS = {
   extras_audio_exts: '.mka, .ac3, .dts, .mp3, .flac, .wav, .m4a',
   extras_img_exts: '.jpg, .jpeg, .png, .gif, .bmp, .webp',
   extras_meta_exts: '.nfo, .xml, .txt',
-  extras_video_action: 'delete',
-  extras_video_template: '{{ParentName}} - {{ExtraCategory}}',
+  extras_video_action: 'rename',
+  extras_video_template: '{{ParentName}}-{{SubCategory}}',
   extras_sub_action: 'rename',
-  extras_sub_template: '{{ParentName}} ({{Language}}) {{ExtraCategory}}',
+  extras_sub_template: '{{ParentName}}.{{Language}}',
   extras_audio_action: 'rename',
-  extras_audio_template: '{{ParentName}} ({{Language}}) {{ExtraCategory}}',
+  extras_audio_template: '{{ParentName}}.{{Language}}',
   extras_img_action: 'rename',
-  extras_img_template: '{{ExtraCategory}}',
+  extras_img_template: '{{SubCategory}}',
   extras_meta_action: 'rename',
   extras_meta_template: '{{ParentName}}',
   extras_folder_mode: 'subfolder',
@@ -112,7 +112,7 @@ export const AppProvider = ({ children }) => {
   const [imageStatus, setImageStatus] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]); // Array of IDs being selected for bulk actions
-  const [stats, setStats] = useState({ total_movies: 0, total_series: 0, total_episodes: 0, storage: '0 MB', unmatched: 0 });
+  const [stats, setStats] = useState({ total_movies: 0, total_series: 0, total_episodes: 0, storage: '0 MB', drive_count: 0, unmatched: 0 });
   const [fullMetadata, setFullMetadata] = useState(null);
   const [showMetadataModal, setShowMetadataModal] = useState(false);
   const [showResolverModal, setShowResolverModal] = useState(false);
@@ -223,6 +223,9 @@ export const AppProvider = ({ children }) => {
       setInitialSettings(JSON.parse(JSON.stringify(settings)));
       setIsSettingsDirty(false);
       setTimeout(() => setSaveStatus(''), 3000);
+      
+      // Dinamikusan újratöltjük a discovery elemeket a háttérben, hogy a formázás azonnal frissüljön
+      await fetchDiscovery();
     } catch (error) {
       console.error("Failed to save settings:", error);
       setSaveStatus('Error saving');
@@ -331,11 +334,30 @@ export const AppProvider = ({ children }) => {
       async () => {
         setSaveStatus(T('settings.status.saving'));
         try {
+          setProgress({ active: true, phase: 'wiping', current: 0, total: 100, start_time: Date.now() / 1000 });
+          
+          let currentProgress = 0;
+          const fakeProgress = setInterval(() => {
+            // Aszimptotikusan közelít 95%-hoz, így sosem akad meg teljesen, de hagy időt a valódi befejezésnek
+            const remaining = 95 - currentProgress;
+            currentProgress += Math.max(remaining * 0.15, 0.5); 
+            setProgress(p => p ? { ...p, current: Math.round(currentProgress) } : p);
+          }, 200);
+
           await api.clearDatabase();
-          setItems({ manual: [], movies: [], series: [], extras: [], collisions: [] });
-          setStats({ total_movies: 0, total_series: 0, total_episodes: 0, storage: '0 MB', unmatched: 0 });
-          setSaveStatus(T('settings.status.saved'));
+          
+          clearInterval(fakeProgress);
+          setProgress(p => p ? { ...p, current: 100 } : p);
+          
+          setTimeout(() => {
+            setProgress(null);
+            setItems({ manual: [], movies: [], series: [], extras: [], collisions: [] });
+            setStats({ total_movies: 0, total_series: 0, total_episodes: 0, storage: '0 MB', unmatched: 0 });
+            setSaveStatus(T('settings.status.saved'));
+          }, 500);
+
         } catch (e) {
+          setProgress(null);
           setSaveStatus(T('settings.status.error'));
         }
         setTimeout(() => setSaveStatus(''), 3000);

@@ -14,10 +14,10 @@ const ExtrasSettings = ({ settings, setSettings }) => {
   };
 
   const extraTypes = [
-    { label: 'Bonus Videos', id: 'video', vars: ['ParentName', 'ExtraCategory', 'Custom'] },
-    { label: 'Subtitles', id: 'sub', vars: ['ParentName', 'ExtraCategory', 'Language', 'Custom'] },
-    { label: 'Audio Tracks', id: 'audio', vars: ['ParentName', 'ExtraCategory', 'Language', 'Custom'] },
-    { label: 'Images', id: 'img', vars: ['ParentName', 'ExtraCategory', 'Custom'] },
+    { label: 'Bonus Videos', id: 'video', vars: ['ParentName', 'SubCategory', 'ExtraCategory', 'Custom'] },
+    { label: 'Subtitles', id: 'sub', vars: ['ParentName', 'SubCategory', 'ExtraCategory', 'Language', 'Custom'] },
+    { label: 'Audio Tracks', id: 'audio', vars: ['ParentName', 'SubCategory', 'ExtraCategory', 'Language', 'Custom'] },
+    { label: 'Images', id: 'img', vars: ['ParentName', 'SubCategory', 'ExtraCategory', 'Custom'] },
     { label: 'Metadatas', id: 'meta', vars: ['ParentName', 'Custom'] }
   ];
 

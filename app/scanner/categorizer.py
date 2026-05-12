@@ -105,6 +105,13 @@ class Categorizer:
         # Guard: DUBBED is audio-only, never applies to subtitles
         if category == ExtraCategory.SUBTITLE and subtype == ExtraSubtype.DUBBED:
             subtype = None
+            
+        # Context-aware Commentary assignment
+        if subtype == ExtraSubtype.COMMENTARY_SUB:
+            if category == ExtraCategory.AUDIO:
+                subtype = ExtraSubtype.COMMENTARY_AUDIO
+            elif category == ExtraCategory.VIDEO:
+                subtype = ExtraSubtype.FEATURETTE
 
         # Special case for Metadata files - they should prioritize their specific type
         if ext == '.nfo': subtype = ExtraSubtype.NFO

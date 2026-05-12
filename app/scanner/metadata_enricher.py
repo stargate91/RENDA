@@ -67,7 +67,10 @@ class MetadataEnricher:
             loc = active_match.localizations[0] if active_match.localizations else None
             if loc:
                 preview = formatter.format_item(item, active_match, loc)
-                item.planned_path = preview.target_name
+                if preview.target_subpath:
+                    item.planned_path = f"{preview.target_subpath}/{preview.target_name}".replace("\\", "/")
+                else:
+                    item.planned_path = preview.target_name
         except Exception as e:
             logger.error(f"Failed to update planned_path after enrichment: {e}")
 

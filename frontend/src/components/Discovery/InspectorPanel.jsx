@@ -11,13 +11,59 @@ const InspectorPanel = ({ selectedItem, fetchFullMetadata, openResolver, openOve
 
   if (!selectedItem) {
     return (
-      <div className="inspector-empty">
-        <div className="empty-icon-wrapper">
-          <div className="empty-pulse"></div>
-          <div className="empty-icon-inner">🔍</div>
+      <div className="inspector-empty" style={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        height: '100%',
+        padding: '40px',
+        textAlign: 'center'
+      }}>
+        <div className="empty-icon-wrapper" style={{ 
+          position: 'relative', 
+          width: '120px', 
+          height: '120px', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          marginBottom: '30px'
+        }}>
+          {/* Subtle glow behind the icon */}
+          <div style={{ 
+            position: 'absolute', 
+            inset: 0, 
+            background: 'var(--accent-blue)', 
+            borderRadius: '50%', 
+            opacity: 0.1, 
+            filter: 'blur(20px)',
+            animation: 'inspector-pulse 3s infinite'
+          }}></div>
+          
+          <div style={{ 
+            position: 'relative', 
+            width: '80px', 
+            height: '80px', 
+            background: 'rgba(255,255,255,0.03)', 
+            border: '1px solid var(--border-card)', 
+            borderRadius: '24px', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            backdropFilter: 'blur(10px)',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
+            transform: 'rotate(-5deg)'
+          }}>
+            <Search size={32} color="var(--accent-blue)" style={{ opacity: 0.8 }} />
+          </div>
         </div>
-        <h3>{T('inspector.details')}</h3>
-        <p>{T('inspector.select_item')}</p>
+
+        <h3 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '8px', color: '#fff' }}>
+          {T('inspector.details')}
+        </h3>
+        <p style={{ fontSize: '13px', color: 'var(--text-dim)', lineHeight: '1.6', opacity: 0.7 }}>
+          {T('inspector.select_item')}
+        </p>
       </div>
     );
   }
@@ -38,11 +84,6 @@ const InspectorPanel = ({ selectedItem, fetchFullMetadata, openResolver, openOve
               src={`${API_BASE}${selectedItem.images[imageIndex].path}`}
               alt={T('inspector.media_alt')}
             />
-            {selectedItem.images[imageIndex].type !== 'poster' && (
-              <div className="carousel-type-badge">
-                {selectedItem.images[imageIndex].type.toUpperCase()}
-              </div>
-            )}
             {selectedItem.images.length > 1 && (
               <div className="carousel-dots">
                 {selectedItem.images.map((_, i) => (
@@ -57,13 +98,21 @@ const InspectorPanel = ({ selectedItem, fetchFullMetadata, openResolver, openOve
       <div className="inspector-card">
         <div className="inspector-item">
           <div className="inspector-label">{T('inspector.path')}</div>
-          <div className="inspector-value code" style={{ color: '#ffffff' }}>
+          <div className="inspector-value code" style={{ color: '#ffffff', wordBreak: 'break-all', fontSize: '11px' }}>
             {selectedItem.path || `${selectedItem.folder}/${selectedItem.filename}`}
           </div>
         </div>
         <div className="inspector-item">
           <div className="inspector-label">{T('inspector.planned')}</div>
-          <div className="inspector-value" style={{ color: '#00ff64' }}>{selectedItem.planned_path || '-'}</div>
+          <div className="inspector-value" style={{ 
+            color: '#00ff64', 
+            wordBreak: 'break-all',
+            opacity: (selectedItem.status === 'matched' || selectedItem.status === 'renamed' || selectedItem.status === 'organized') ? 1 : 0.5
+          }}>
+            {(selectedItem.status === 'matched' || selectedItem.status === 'renamed' || selectedItem.status === 'organized') 
+              ? (selectedItem.planned_path || '-') 
+              : selectedItem.filename}
+          </div>
         </div>
       </div>
 
@@ -91,12 +140,9 @@ const InspectorPanel = ({ selectedItem, fetchFullMetadata, openResolver, openOve
         </div>
       )}
 
-      <div className="inspector-actions">
-        <button className="btn-secondary" style={{ flex: 1 }} onClick={() => fetchFullMetadata(selectedItem.id)}>
+      <div className="inspector-actions" style={{ display: 'flex', gap: '0' }}>
+        <button className="btn-secondary" style={{ width: '100%', fontWeight: '800' }} onClick={() => fetchFullMetadata(selectedItem.id)}>
           {T('inspector.check_metadata')}
-        </button>
-        <button className="btn-secondary" style={{ width: '45px', padding: '0', display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center' }} onClick={() => openOverride(selectedItem)} title={T('modal.override.action')}>
-          <Settings size={18} />
         </button>
       </div>
     </>

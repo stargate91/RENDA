@@ -16,22 +16,24 @@ const MetadataModal = ({ show, metadata, onClose, T }) => {
           </button>
         </div>
 
-        <div className="metadata-tabs">
-          {[
-            { id: 'technical', label: T('modal.metadata.tabs.technical') },
-            { id: 'guessit', label: T('modal.metadata.tabs.guessit') },
-            { id: 'overrides', label: T('modal.metadata.tabs.overrides') },
-            { id: 'matches', label: T('modal.metadata.tabs.matches', { count: metadata.matches?.length || 0 }) },
-            { id: 'api_raw', label: T('modal.metadata.tabs.api_raw') }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              className={`metadata-tab ${activeTab === tab.id ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              {tab.label}
-            </button>
-          ))}
+        <div className="metadata-pro-tabs-container">
+          <div className="metadata-pro-tabs">
+            {[
+              { id: 'technical', label: T('modal.metadata.tabs.technical') },
+              { id: 'guessit', label: T('modal.metadata.tabs.guessit') },
+              { id: 'overrides', label: T('modal.metadata.tabs.overrides') },
+              { id: 'matches', label: T('modal.metadata.tabs.matches', { count: metadata.matches?.length || 0 }) },
+              { id: 'api_raw', label: T('modal.metadata.tabs.api_raw') }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                className={`metadata-pro-tab ${activeTab === tab.id ? 'active' : ''}`}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
         
         <div className="metadata-scroll-container">
@@ -60,7 +62,7 @@ const MetadataModal = ({ show, metadata, onClose, T }) => {
             <div className="metadata-section">
               <div className="metadata-grid">
                 {Object.entries(metadata.guessit).map(([key, val]) => (
-                  <div key={key} className="metadata-grid-item">
+                  <div key={key} className={`metadata-grid-item ${key.toLowerCase().includes('title') ? 'full' : ''}`}>
                     <span className="metadata-key">{key.replace(/_/g, ' ')}</span>
                     <span className="metadata-val">{val !== null && val !== undefined && val !== '' ? String(val) : '—'}</span>
                   </div>
@@ -88,8 +90,9 @@ const MetadataModal = ({ show, metadata, onClose, T }) => {
                 metadata.matches.map((m, idx) => (
                   <div key={m.id} className="metadata-match-card">
                     <div className="metadata-match-header">
-                      {T('modal.metadata.match')} {idx + 1} — {m.type.toUpperCase()} — TMDB: {m.tmdb_id || T('modal.metadata.na')}
-                      {m.imdb_id ? ` — IMDb: ${m.imdb_id}` : ''}
+                      <span>{T('modal.metadata.match')} {idx + 1} — {m.type.toUpperCase()}</span>
+                      <span style={{ opacity: 0.5 }}>TMDB: {m.tmdb_id || T('modal.metadata.na')}</span>
+                      {m.imdb_id && <span style={{ opacity: 0.5 }}>IMDb: {m.imdb_id}</span>}
                       {m.is_active && <span className="metadata-active-badge">{T('modal.metadata.active')}</span>}
                     </div>
 

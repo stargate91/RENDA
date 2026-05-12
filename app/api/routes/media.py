@@ -95,6 +95,10 @@ def get_discovery_items():
     try:
         # Lekérjük az összes releváns médiaelemet a kapcsolódó adatokkal együtt
         from sqlalchemy.orm import joinedload
+        from app.formatter.formatter import Formatter, FormatterConfig
+        config = FormatterConfig.from_db(db)
+        formatter = Formatter(config)
+
         items = db.query(MediaItem).options(
             joinedload(MediaItem.matches).joinedload(MediaMatch.localizations)
         ).filter(
@@ -173,6 +177,21 @@ def get_discovery_items():
                     "confidence": m.confidence_score
                 })
 
+            # Dinamikus tervezett útvonal kiszámítása, ha matched
+            p_path = item.planned_path
+            if (item.status in [ItemStatus.MATCHED, ItemStatus.RENAMED, ItemStatus.ORGANIZED]) and active_matches:
+                try:
+                    am = active_matches[0]
+                    loc = am.localizations[0] if am.localizations else None
+                    if loc:
+                        preview = formatter.format_item(item, am, loc)
+                        if preview.target_subpath:
+                            p_path = f"{preview.target_subpath}/{preview.target_name}".replace("\\", "/")
+                        else:
+                            p_path = preview.target_name
+                except Exception as ex:
+                    logger.warning(f"Failed to calculate planned path for item {item.id}: {ex}")
+
             data = {
                 "id": item.id,
                 "filename": item.filename,
@@ -181,7 +200,8 @@ def get_discovery_items():
                 "type": item.item_type.value if item.item_type else "unknown",
                 "title": item.fn_title or item.fd_title or item.filename,
                 "year": item.fn_year or item.fd_year,
-                "planned_path": item.planned_path,
+                "planned_path": p_path,
+                "extension": item.extension,
                 "size_mb": round(item.size / (1024 * 1024), 2) if item.size else 0,
                 "group_hash": item.group_hash,
                 "images": all_images,
@@ -210,13 +230,11 @@ def get_discovery_items():
                 else:
                     groups["movies"].append(data) # Fallback
 
-        from app.formatter.formatter import Formatter
-        formatter = Formatter()
-
         # PASS 1: Kiszámoljuk az összes tervezett útvonalat
         extra_paths = []
         path_counts = {}
 
+        # Re-use the same formatter/config loaded above
         for ex, p_status, p_planned, p_filename in extras:
             # Ha matched, akkor a tervezett nevet használjuk, különben az eredetit
             raw_parent_name = p_planned if (p_status == ItemStatus.MATCHED and p_planned) else p_filename
