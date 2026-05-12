@@ -87,6 +87,7 @@ class MetadataEnricher:
 
         # 1. Globális adatok
         self._update_match_common(match, details)
+        match.is_adult = details.get("adult", False)
         match.release_status = details.get("status")  # Released, In Production, stb.
         match.budget = details.get("budget")
         match.revenue = details.get("revenue")
@@ -112,6 +113,7 @@ class MetadataEnricher:
         if not series_details: return
 
         self._update_match_common(match, series_details)
+        match.is_adult = series_details.get("adult", False)
         match.release_status = series_details.get("status")  # Ended, Returning Series, Canceled
         match.series_type = series_details.get("type")  # Scripted, Documentary, Miniseries, Reality
         match.number_of_seasons = series_details.get("number_of_seasons")

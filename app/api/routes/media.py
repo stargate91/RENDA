@@ -377,6 +377,61 @@ def update_media_item(payload: dict):
     finally:
         db.close()
 
+@router.get("/library")
+def get_library_items():
+    """Returns grouped organized items for the Library view."""
+    db = Session()
+    try:
+        from app.db.models import MediaItem, MediaMatch, ItemStatus, ItemType
+        from sqlalchemy.orm import joinedload
+
+        items = db.query(MediaItem).options(
+            joinedload(MediaItem.matches).joinedload(MediaMatch.localizations)
+        ).filter(
+            MediaItem.status.in_([ItemStatus.ORGANIZED, ItemStatus.RENAMED])
+        ).all()
+
+        library = {
+            "movies": [],
+            "series": [],
+            "adult": [],
+            "counts": {"movies": 0, "series": 0, "adult": 0}
+        }
+
+        for item in items:
+            active_match = next((m for m in item.matches if m.is_active), None)
+            loc = active_match.localizations[0] if active_match and active_match.localizations else None
+            
+            data = {
+                "id": item.id,
+                "title": loc.title if loc else (item.fn_title or item.fd_title or item.filename),
+                "year": active_match.release_date.year if active_match and active_match.release_date else (item.fn_year or item.fd_year),
+                "poster_path": loc.poster_path if loc else None,
+                "backdrop_path": loc.backdrop_path if loc else None,
+                "rating": active_match.rating_tmdb if active_match else 0,
+                "type": item.item_type.value,
+                "path": item.current_path
+            }
+
+            if active_match and active_match.is_adult:
+                library["adult"].append(data)
+                library["counts"]["adult"] += 1
+            elif item.item_type == ItemType.MOVIE:
+                library["movies"].append(data)
+                library["counts"]["movies"] += 1
+            elif item.item_type in [ItemType.SERIES, ItemType.EPISODE]:
+                library["series"].append(data)
+                library["counts"]["series"] += 1
+
+        return library
+    except Exception as e:
+        import traceback
+        logger.error(f"Error in get_library_items: {e}")
+        logger.error(traceback.format_exc())
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    finally:
+        db.close()
+
 @router.post("/reveal")
 def reveal_in_explorer(payload: dict):
     """Opens the file's parent folder and selects the file in the OS file explorer."""

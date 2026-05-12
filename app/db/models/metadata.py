@@ -30,6 +30,7 @@ class MediaMatch(Base):
     image_status: Mapped[ImageStatus] = mapped_column(SQLEnum(ImageStatus), default=ImageStatus.PENDING, index=True)
     backdrop_status: Mapped[ImageStatus] = mapped_column(SQLEnum(ImageStatus), default=ImageStatus.PENDING, index=True)
     confidence_score: Mapped[float] = mapped_column(Float, default=1.0)
+    is_adult: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     localizations: Mapped[List["MetadataLocalization"]] = relationship(back_populates="match", cascade="all, delete-orphan")
     media_item: Mapped[Optional["MediaItem"]] = relationship(back_populates="matches")

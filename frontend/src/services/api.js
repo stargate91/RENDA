@@ -26,6 +26,8 @@ export const api = {
 
   getDiscoveryItems: () => fetchJson('/discovery'),
 
+  getLibrary: () => fetchJson('/library'),
+
   getStats: () => fetchJson('/stats'),
 
   getScanStatus: () => fetchJson('/scan-status'),
