@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from ..db.models import MediaItem, MediaMatch, MetadataLocalization, ItemStatus, ItemType
@@ -72,7 +73,7 @@ class MetadataEnricher:
             if loc:
                 preview = formatter.format_item(item, active_match, loc)
                 if preview.target_subpath:
-                    item.planned_path = f"{preview.target_subpath}/{preview.target_name}".replace("\\", "/")
+                    item.planned_path = str(Path(preview.target_subpath) / preview.target_name).replace("\\", "/")
                 else:
                     item.planned_path = preview.target_name
         except Exception as e:
@@ -342,8 +343,8 @@ class MetadataEnricher:
                 self.db.flush() # Trigger uniqueness check NOW
             return person
         except IntegrityError:
-            # Rollback happened automatically. Fetch existing.
-            self.db.rollback()
+            # The nested transaction (SAVEPOINT) has already been rolled back by the context manager.
+            # We simply fetch the existing person created by another thread.
             return self.db.query(Person).filter(Person.id == tmdb_id).first()
 
     def _link_person(self, match: MediaMatch, person: "Person", job: str, character: str = None, order: int = 0):
@@ -369,7 +370,7 @@ class MetadataEnricher:
                     self.db.add(link)
                     self.db.flush()
             except IntegrityError:
-                self.db.rollback()
+                # Nested transaction rollback is automatic.
                 pass # Already linked by another thread/process
 
     def _get_or_create_loc(self, match: MediaMatch, language: str) -> MetadataLocalization:

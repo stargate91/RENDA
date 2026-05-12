@@ -218,12 +218,41 @@ class RenamerEngine:
             return False
 
     def _cleanup_empty_parent(self, path: Path):
-        """Eltávolítja az üres mappákat felfelé a hierarchiában."""
+        """
+        Recursively removes empty parent directories up the hierarchy.
+        Includes guards to prevent deleting drive roots or the library root.
+        """
         try:
-            # Csak ha üres
+            # 1. Stop if we reached the root of the filesystem
+            if not path or path.parent == path:
+                return
+
+            # 2. Stop if it's a drive root (Windows)
+            if len(path.parts) <= 1:
+                return
+
+            # 3. Check if this is a protected path (e.g. library root)
+            # We fetch this dynamically or can pass it in. For now, let's check settings if available.
+            protected_paths = set()
+            try:
+                from ..db.models import UserSetting
+                # Cache or fetch once? For simplicity in this method, we fetch if not already provided.
+                # However, it's better to protect common sensitive paths.
+                lib_path_setting = self.db.query(UserSetting).filter(UserSetting.key == "folder_library_path").first()
+                if lib_path_setting and lib_path_setting.value:
+                    protected_paths.add(Path(lib_path_setting.value).resolve())
+            except:
+                pass
+
+            if path.resolve() in protected_paths:
+                logger.debug(f"Cleanup stopped: {path} is a protected library root.")
+                return
+
+            # 4. Actual removal if empty
             if path.exists() and path.is_dir() and not any(path.iterdir()):
+                logger.info(f"Cleaning up empty directory: {path}")
                 path.rmdir()
-                # Próbáljuk meg a szülőt is (rekurzívan felfelé, amíg üres)
+                # Recurse upwards
                 self._cleanup_empty_parent(path.parent)
-        except:
-            pass
+        except Exception as e:
+            logger.debug(f"Cleanup failed for {path}: {e}")

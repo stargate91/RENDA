@@ -18,6 +18,7 @@ from ..utils.logger import logger
 
 import time
 import hashlib
+import threading
 
 # Global status for tracking progress across threads
 scan_status = {
@@ -27,6 +28,17 @@ scan_status = {
     "phase": "idle", # 'collecting', 'probing', 'enriching', 'idle'
     "start_time": 0,
 }
+scan_status_lock = threading.Lock()
+
+def update_scan_status(updates: Dict[str, Any]):
+    """Safely updates the global scan status."""
+    with scan_status_lock:
+        scan_status.update(updates)
+
+def increment_scan_status_current():
+    """Safely increments the current progress count."""
+    with scan_status_lock:
+        scan_status["current"] += 1
 
 class ScannerManager:
     """
@@ -51,8 +63,33 @@ class ScannerManager:
         Implements change-detection to skip files that haven't been modified.
         """
         global scan_status
-        scan_status.update({"active": True, "phase": "collecting", "current": 0, "total": 0, "start_time": time.time()})
+        update_scan_status({"active": True, "phase": "collecting", "current": 0, "total": 0, "start_time": time.time()})
         
+        # Start ImageWorker in a background loop to process images as soon as items are matched
+        from .image_worker import ImageWorker
+        def run_image_worker_loop():
+            logger.info("Background ImageWorker loop starting...")
+            while True:
+                local_db = DbSession()
+                try:
+                    iw = ImageWorker(local_db, "./data")
+                    iw.process_all()
+                except Exception as e:
+                    logger.error(f"ImageWorker loop error: {e}")
+                finally:
+                    local_db.close()
+                    DbSession.remove()
+                
+                # Check if scan is still active
+                with scan_status_lock:
+                    if not scan_status["active"]:
+                        break
+                
+                time.sleep(5) # Poll every 5 seconds for new matches
+            logger.info("Background ImageWorker loop stopped.")
+
+        threading.Thread(target=run_image_worker_loop, daemon=True).start()
+
         try:
             logger.info("Phase 1: Collecting files and establishing links...")
             files = self.collector.collect(paths)
@@ -63,11 +100,12 @@ class ScannerManager:
             
             # Load all existing items to cache for fast lookup
             existing_items = {item.original_path: item for item in self.db.query(MediaItem).all()}
+            existing_extras = {ex.original_path for ex in self.db.query(ExtraFile.original_path).all()}
             
             path_to_item = {}
             to_process = [] # Items that need probing and enrichment
 
-            scan_status["total"] = len(media_paths) + len(extra_paths)
+            update_scan_status({"total": len(media_paths) + len(extra_paths)})
 
             for p in media_paths:
                 stat = p.stat()
@@ -99,21 +137,20 @@ class ScannerManager:
                     path_to_item[p] = item
                     to_process.append(item)
                 
-                scan_status["current"] += 1
+                increment_scan_status_current()
 
             self.db.flush()
 
             # Handle extras
             for p in extra_paths:
                 p_str = str(p)
-                existing_extra = self.db.query(ExtraFile).filter(ExtraFile.original_path == p_str).first()
-                if existing_extra:
-                    scan_status["current"] += 1
+                if p_str in existing_extras:
+                    increment_scan_status_current()
                     continue
 
                 res = self.categorizer.categorize(p, self.db)
                 if res[0] is None:
-                    scan_status["current"] += 1
+                    increment_scan_status_current()
                     continue
                     
                 category, subtype = res
@@ -129,7 +166,7 @@ class ScannerManager:
                     )
                     self.db.add(extra)
                 
-                scan_status["current"] += 1
+                increment_scan_status_current()
 
             self.db.commit()
             
@@ -138,18 +175,6 @@ class ScannerManager:
                 logger.info(f"Scan complete. {len(to_process)} items need processing.")
                 self.enrich_all(to_process)
                 self.resolve_all(to_process)
-            
-            # ALWAYS trigger ImageWorker at the end of scan to handle pending/interrupted tasks
-            import threading
-            from .image_worker import ImageWorker
-            def run_image_worker():
-                local_db = DbSession()
-                try:
-                    iw = ImageWorker(local_db, "./data")
-                    iw.process_all()
-                finally:
-                    local_db.close()
-            threading.Thread(target=run_image_worker, daemon=True).start()
             
             self.db.expire_all()
             logger.info("Scan complete.")
@@ -160,8 +185,7 @@ class ScannerManager:
             raise
         finally:
             self.db.close()
-            scan_status["active"] = False
-            scan_status["phase"] = "idle"
+            update_scan_status({"active": False, "phase": "idle"})
 
 
     def enrich_all(self, items: List[MediaItem]):
@@ -175,7 +199,7 @@ class ScannerManager:
             return
 
         logger.info(f"Phase 2: Technical Probing for {len(items)} items...")
-        scan_status.update({"phase": "probing", "total": len(items), "current": 0})
+        update_scan_status({"phase": "probing", "total": len(items), "current": 0})
         
         # 1. Technical Probing (ProcessPool for FFprobe)
         paths = [item.original_path for item in items]
@@ -192,10 +216,10 @@ class ScannerManager:
                     logger.error(f"FFprobe failed for {path}: {e}")
                     probe_results[path] = None
                 finally:
-                    scan_status["current"] += 1
+                    increment_scan_status_current()
 
         logger.info(f"Phase 3: Metadata Enrichment for {len(items)} items...")
-        scan_status.update({"phase": "enriching", "total": len(items), "current": 0})
+        update_scan_status({"phase": "enriching", "total": len(items), "current": 0})
         
         # 2. Logical Enrichment (ThreadPool for Guessit and DB updates)
         item_ids = [item.id for item in items]
@@ -329,7 +353,7 @@ class ScannerManager:
                 logger.error(traceback.format_exc())
                 local_db.rollback()
             finally:
-                scan_status["current"] += 1
+                increment_scan_status_current()
                 DbSession.remove()
 
         with ThreadPoolExecutor(max_workers=10) as executor:
@@ -345,7 +369,7 @@ class ScannerManager:
             return
 
         logger.info(f"Phase 4: API Metadata Resolution for {len(items)} items...")
-        scan_status.update({"phase": "resolving", "total": len(items), "current": 0})
+        update_scan_status({"phase": "resolving", "total": len(items), "current": 0})
 
         # Deduplicate items by group_hash to avoid race conditions in propagate_match
         unique_items = []
@@ -395,7 +419,7 @@ class ScannerManager:
                 logger.error(f"Error resolving item ID {item_id}: {e}")
                 logger.error(traceback.format_exc())
             finally:
-                scan_status["current"] += 1
+                increment_scan_status_current()
                 DbSession.remove()
 
         # ThreadPool a hálózati kérésekhez (limitálva a rate limit elkerülésére)

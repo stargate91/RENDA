@@ -11,6 +11,7 @@ import os
 import logging
 import platform
 import subprocess
+from pathlib import Path
 logger = logging.getLogger(__name__)
 
 @router.get("/stats")
@@ -179,7 +180,7 @@ def get_discovery_items():
                     if loc:
                         preview = formatter.format_item(item, am, loc)
                         if preview.target_subpath:
-                            p_path = f"{preview.target_subpath}/{preview.target_name}".replace("\\", "/")
+                            p_path = str(Path(preview.target_subpath) / preview.target_name).replace("\\", "/")
                         else:
                             p_path = preview.target_name
                 except Exception as ex:
@@ -244,8 +245,7 @@ def get_discovery_items():
             extra_name = formatter.format_extra_filename(extra_ctx)
             extra_sub = formatter.get_extra_subpath(ex)
             
-            import pathlib
-            base_path = str(pathlib.Path(parent_dir) / extra_sub / extra_name).replace("\\", "/")
+            base_path = str(Path(parent_dir) / extra_sub / extra_name).replace("\\", "/")
             raw_planned_path = base_path
             
             path_key = raw_planned_path.lower()
@@ -330,16 +330,19 @@ def update_media_item(payload: dict):
                 return JSONResponse(status_code=404, content={"error": "Media item not found"})
             
             # Basic overrides
-            if "target_language" in updates: item.target_language = updates["target_language"]
-            if "edition" in updates: item.edition = MovieEdition(updates["edition"])
-            if "source" in updates: item.source = MediaSource(updates["source"])
-            if "audio_type" in updates: item.audio_type = MediaAudioType(updates["audio_type"])
-            if "item_type" in updates: item.item_type = ItemType(updates["item_type"])
-            
-            # Part management
-            if "part" in updates: item.part = int(updates["part"]) if updates["part"] else None
-            if "part_type" in updates: item.part_type = PartType(updates["part_type"])
-            if "part_style" in updates: item.part_style = PartStyle(updates["part_style"])
+            try:
+                if "target_language" in updates: item.target_language = updates["target_language"]
+                if "edition" in updates: item.edition = MovieEdition(updates["edition"])
+                if "source" in updates: item.source = MediaSource(updates["source"])
+                if "audio_type" in updates: item.audio_type = MediaAudioType(updates["audio_type"])
+                if "item_type" in updates: item.item_type = ItemType(updates["item_type"])
+                
+                # Part management
+                if "part" in updates: item.part = int(updates["part"]) if updates["part"] else None
+                if "part_type" in updates: item.part_type = PartType(updates["part_type"])
+                if "part_style" in updates: item.part_style = PartStyle(updates["part_style"])
+            except ValueError as ve:
+                return JSONResponse(status_code=400, content={"error": f"Invalid value for field: {ve}"})
 
             # Season/Episode management
             if "season" in updates or "episode" in updates:
@@ -353,9 +356,14 @@ def update_media_item(payload: dict):
             extra = db.query(ExtraFile).filter(ExtraFile.id == item_id).first()
             if not extra:
                 return JSONResponse(status_code=404, content={"error": "Extra file not found"})
-            if "subtype" in updates: extra.subtype = ExtraSubtype(updates["subtype"])
-            if "language" in updates: extra.language = updates["language"]
-            if "parent_id" in updates: extra.parent_item_id = int(updates["parent_id"]) if updates["parent_id"] else extra.parent_item_id
+            
+            try:
+                if "subtype" in updates: extra.subtype = ExtraSubtype(updates["subtype"])
+                if "language" in updates: extra.language = updates["language"]
+                if "parent_id" in updates: extra.parent_item_id = int(updates["parent_id"]) if updates["parent_id"] else extra.parent_item_id
+            except ValueError as ve:
+                return JSONResponse(status_code=400, content={"error": f"Invalid value for field: {ve}"})
+            
             item = extra.parent_item
 
         formatter = Formatter.from_db(db)
@@ -364,7 +372,12 @@ def update_media_item(payload: dict):
             from app.scanner.metadata_enricher import MetadataEnricher
             enricher = MetadataEnricher(db)
             preview = formatter.plan_rename(active_match, "")
-            item.planned_path = preview.target_subpath + "/" + preview.target_name
+            
+            # Safe path joining
+            if preview.target_subpath:
+                item.planned_path = str(Path(preview.target_subpath) / preview.target_name).replace("\\", "/")
+            else:
+                item.planned_path = preview.target_name
             
         db.commit()
         return {"status": "success"}
