@@ -212,6 +212,7 @@ class RenamePreview:
     target_subpath: str   # Kategória/Sorozat/Szezon mappa struktúra
     item_type: str        # 'movie', 'series', 'episode', 'extra'
     destination_root: str = ""
+    action: str = "rename" # 'rename', 'delete', 'ignore'
     extra_id: Optional[int] = None # Csak extráknál
     has_collision: bool = False
     collision_group_id: Optional[str] = None # Azonos ID az ütköző fájloknak
@@ -266,8 +267,13 @@ class Formatter:
             folder_name = self.format_movie_foldername(context)
             
             # Build subpath carefully to avoid empty parts or '.'
-            parts = [p for p in [cat_folder, folder_name] if p and str(p).strip() and str(p) != "."]
-            target_subpath = "/".join(parts) if parts else ""
+            # Use Path for robust joining, then convert back to forward slashes for DB consistency
+            sub_path_obj = Path()
+            for p in [cat_folder, folder_name]:
+                if p and str(p).strip() and str(p) != ".":
+                    sub_path_obj = sub_path_obj / p
+            
+            target_subpath = str(sub_path_obj).replace("\\", "/")
             
         elif match.item_type in [ItemType.SERIES, ItemType.SEASON, ItemType.EPISODE]:
             context = self.build_tv_context(item, match, loc)
@@ -282,8 +288,12 @@ class Formatter:
             season_folder = self.format_season_foldername(context)
             
             # Build subpath carefully
-            parts = [p for p in [cat_folder, series_folder, season_folder] if p and str(p).strip() and str(p) != "."]
-            target_subpath = "/".join(parts) if parts else ""
+            sub_path_obj = Path()
+            for p in [cat_folder, series_folder, season_folder]:
+                if p and str(p).strip() and str(p) != ".":
+                    sub_path_obj = sub_path_obj / p
+            
+            target_subpath = str(sub_path_obj).replace("\\", "/")
         else:
             target_name = item.filename
             target_subpath = ""
@@ -376,6 +386,7 @@ class Formatter:
                         target_subpath="",
                         item_type="extra",
                         destination_root="",
+                        action="delete",
                         extra_id=extra.id,
                         warnings=["File will be deleted according to extras settings."]
                     ))

@@ -132,9 +132,13 @@ const DiscoveryTable = ({
                 <div className="original-name" title={item.filename}>{item.filename}</div>
               </td>
               <td>
-                <div className="planned-name" title={item.planned_path}>
+                <div className={`planned-name ${item.action === 'delete' ? 'delete-action' : ''}`} title={item.planned_path}>
                   <span className="arrow">➔</span>
-                  {item.planned_path ? (
+                  {item.action === 'delete' ? (
+                    <span className="delete-indicator" style={{ color: '#ff4d4d', fontWeight: 'bold', fontSize: '11px', letterSpacing: '0.5px' }}>
+                      {T('discovery.table.will_delete')}
+                    </span>
+                  ) : item.planned_path ? (
                     <span className="planned-name-text" title={item.planned_path}>
                       {(() => {
                         const fullPath = item.planned_path;

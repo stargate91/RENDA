@@ -228,6 +228,14 @@ def get_discovery_items():
         path_counts = {}
 
         for ex, p_status, p_planned, p_filename in extras:
+            # Respect "delete" action from settings
+            cat = ex.category.value if hasattr(ex.category, 'value') else str(ex.category)
+            action = getattr(formatter.config, f"extra_{cat}_action", "rename")
+            
+            if action == "delete":
+                extra_paths.append((ex, "-", "", "delete"))
+                continue
+
             # Use dynamically calculated parent path if available
             parent_p_path = parent_planned_paths.get(ex.parent_item_id) or p_planned
             
@@ -250,13 +258,13 @@ def get_discovery_items():
             
             path_key = raw_planned_path.lower()
             path_counts[path_key] = path_counts.get(path_key, 0) + 1
-            extra_paths.append((ex, raw_planned_path, parent_name))
+            extra_paths.append((ex, raw_planned_path, parent_name, "rename"))
 
         # PASS 2: Collision handling és JSON összeállítás
         current_counts = {}
-        for ex, raw_planned_path, parent_name in extra_paths:
+        for ex, raw_planned_path, parent_name, action in extra_paths:
             planned_path = raw_planned_path
-            if planned_path != "-":
+            if action == "rename" and planned_path != "-":
                 path_key = raw_planned_path.lower()
                 if path_counts[path_key] > 1:
                     current_counts[path_key] = current_counts.get(path_key, 0) + 1
@@ -278,7 +286,8 @@ def get_discovery_items():
                 "language": ex.language,
                 "path": ex.original_path,
                 "current_path": ex.original_path,
-                "planned_path": planned_path
+                "planned_path": planned_path,
+                "action": action
             })
             
         return JSONResponse(content=groups, media_type="application/json; charset=utf-8")

@@ -105,13 +105,16 @@ const InspectorPanel = ({ selectedItem, fetchFullMetadata, openResolver, openOve
         <div className="inspector-item">
           <div className="inspector-label">{T('inspector.planned')}</div>
           <div className="inspector-value" style={{ 
-            color: '#00ff64', 
+            color: selectedItem.action === 'delete' ? '#ff4d4d' : '#00ff64', 
+            fontWeight: selectedItem.action === 'delete' ? 'bold' : 'normal',
             wordBreak: 'break-all',
-            opacity: (selectedItem.planned_path && selectedItem.planned_path !== selectedItem.filename) || (selectedItem.status === 'matched' || selectedItem.status === 'renamed' || selectedItem.status === 'organized') ? 1 : 0.5
+            opacity: (selectedItem.planned_path && selectedItem.planned_path !== selectedItem.filename) || (selectedItem.status === 'matched' || selectedItem.status === 'renamed' || selectedItem.status === 'organized') || selectedItem.action === 'delete' ? 1 : 0.5
           }}>
-            {(selectedItem.planned_path && selectedItem.planned_path !== selectedItem.filename) 
-              ? selectedItem.planned_path 
-              : selectedItem.filename}
+            {selectedItem.action === 'delete' 
+              ? T('discovery.table.will_delete')
+              : (selectedItem.planned_path && selectedItem.planned_path !== selectedItem.filename) 
+                ? selectedItem.planned_path 
+                : selectedItem.filename}
           </div>
         </div>
       </div>

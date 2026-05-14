@@ -17,6 +17,7 @@ const en = {
     "probing": "Technical probing",
     "enriching": "Gathering metadata",
     "resolving": "Finalizing matches",
+    "wiping": "Clearing library",
     "idle": "Idle"
   },
   "sidebar": {
@@ -25,6 +26,9 @@ const en = {
     "library": "Library",
     "history": "History",
     "settings": "Settings"
+  },
+  "navigation": {
+    "library": "Media Library"
   },
   "dashboard": {
     "welcome": "Welcome back, {{name}}",
@@ -77,7 +81,8 @@ const en = {
       "language": "Language",
       "unknown": "UNKNOWN",
       "enriching": "Enriching...",
-      "pending_match": "Identify Media"
+      "pending_match": "Identify Media",
+      "will_delete": "WILL BE DELETED"
     },
     "tabs": {
       "manual": "Manual Review",

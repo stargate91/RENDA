@@ -27,6 +27,12 @@ def run_organize_task():
             scan_status["active"] = False
             return
 
+        # Create a batch for this operation
+        from app.db.models import ActionBatch
+        batch = ActionBatch(name=f"Organize {len(items)} items")
+        db.add(batch)
+        db.commit()
+
         scan_status.update({
             "active": True,
             "phase": "organizing",
@@ -47,7 +53,7 @@ def run_organize_task():
             
             # Execute physical move
             # execute_single handles the DB update and extras too
-            success = engine.execute_single(preview)
+            success = engine.execute_single(preview, batch.id)
             
             scan_status["current"] += 1
             if not success:

@@ -93,7 +93,7 @@ def resolve_metadata(request: ResolveRequest):
         # 1. Deactivate existing matches
         db.query(MediaMatch).filter(MediaMatch.media_item_id == item.id).update({"is_active": False})
         
-        # 2. Process targets
+        # 2. Process targets (Grouping episodes for the same series/season)
         targets = request.targets
         if not targets and request.tmdb_id:
             # Fallback for legacy requests
@@ -108,40 +108,48 @@ def resolve_metadata(request: ResolveRequest):
         if not targets:
             return JSONResponse(status_code=400, content={"error": "No targets provided"})
 
-        final_item_type = ItemType.MOVIE
-        
+        # Group TV targets by (tmdb_id, season) to support multi-episode files
+        tv_groups = {} # (tmdb_id, season) -> list of episode numbers
+        movie_targets = []
+
         for target in targets:
-            # Prepare episode data
-            target_episode = target.episode
-            if target.episodes and len(target.episodes) > 0:
-                target_episode = target.episodes if len(target.episodes) > 1 else target.episodes[0]
+            if target.item_type in ["tv", "series", "episode"] and target.season is not None:
+                key = (target.tmdb_id, target.season)
+                if key not in tv_groups:
+                    tv_groups[key] = []
+                
+                eps = target.episodes if (hasattr(target, 'episodes') and target.episodes) else []
+                if target.episode is not None:
+                    eps.append(target.episode)
+                
+                tv_groups[key].extend(eps)
+            else:
+                movie_targets.append(target)
 
-            # Determine Match ItemType
-            m_type = ItemType.MOVIE
-            if target.item_type == "tv" or target.item_type == "series":
-                if target_episode is not None: m_type = ItemType.EPISODE
-                elif target.season is not None: m_type = ItemType.SEASON
-                else: m_type = ItemType.SERIES
-            elif target.item_type == "season": m_type = ItemType.SEASON
-            elif target.item_type == "episode": m_type = ItemType.EPISODE
+        final_item_type = ItemType.MOVIE
+        active_match = None
 
-            # Use last target type as item's primary type (or logic can be smarter)
+        # Process TV Groups
+        for (tmdb_id, season), episodes in tv_groups.items():
+            # Deduplicate and sort episodes
+            episodes = sorted(list(set(episodes)))
+            target_episode = episodes if len(episodes) > 1 else (episodes[0] if episodes else None)
+            
+            m_type = ItemType.EPISODE if target_episode is not None else ItemType.SEASON
             final_item_type = m_type
 
-            # Check for existing
             match = db.query(MediaMatch).filter(
                 MediaMatch.media_item_id == item.id,
-                MediaMatch.tmdb_id == target.tmdb_id,
-                MediaMatch.season_number == target.season,
-                MediaMatch.episode_number == target_episode
+                MediaMatch.tmdb_id == tmdb_id,
+                MediaMatch.season_number == season
             ).first()
 
             if not match:
                 match = MediaMatch(
                     media_item_id=item.id,
-                    tmdb_id=target.tmdb_id,
+                    tmdb_id=tmdb_id,
                     item_type=m_type,
-                    season_number=target.season,
+                    season_number=season,
                     episode_number=target_episode,
                     is_active=True,
                     confidence_score=1.0
@@ -151,7 +159,34 @@ def resolve_metadata(request: ResolveRequest):
                 match.is_active = True
                 match.item_type = m_type
                 match.episode_number = target_episode
-                match.season_number = target.season
+                match.season_number = season
+            
+            active_match = match
+
+        # Process Movie Targets
+        for target in movie_targets:
+            m_type = ItemType.MOVIE
+            final_item_type = m_type
+
+            match = db.query(MediaMatch).filter(
+                MediaMatch.media_item_id == item.id,
+                MediaMatch.tmdb_id == target.tmdb_id,
+                MediaMatch.item_type == m_type
+            ).first()
+
+            if not match:
+                match = MediaMatch(
+                    media_item_id=item.id,
+                    tmdb_id=target.tmdb_id,
+                    item_type=m_type,
+                    is_active=True,
+                    confidence_score=1.0
+                )
+                db.add(match)
+            else:
+                match.is_active = True
+            
+            active_match = match
 
         # Update item status: matched ONLY if we have at least one high-specificity match
         # (Simplified logic: use the last target's type)

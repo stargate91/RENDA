@@ -13,17 +13,18 @@ export const SEPARATOR_OPTIONS = [
 ];
 
 export const PART_OPTIONS = [
+  { value: 'none', label: 'None (Global)' },
   { value: 'Part', label: 'Part' },
   { value: 'CD', label: 'CD' },
   { value: 'Disc', label: 'Disc' },
   { value: 'Volume', label: 'Volume' },
-  { value: 'Book', label: 'Book' },
 ];
 
 export const NUMBERING_OPTIONS = [
-  { value: '1, 2, 3..', label: '1, 2, 3..' },
-  { value: 'I, II, III..', label: 'I, II, III..' },
-  { value: 'A, B, C..', label: 'A, B, C..' },
+  { value: 'none', label: 'Follow Global' },
+  { value: 'arabic', label: '1, 2, 3..' },
+  { value: 'roman', label: 'I, II, III..' },
+  { value: 'alpha', label: 'A, B, C..' },
 ];
 
 export const METADATA_LANGUAGES = [

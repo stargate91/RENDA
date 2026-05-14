@@ -28,6 +28,7 @@ class PartType(enum.Enum):
 
 class PartStyle(enum.Enum):
     """A résszám formázási stílusa."""
+    NONE = "none"        # Use global default
     ARABIC = "arabic"    # 1, 2, 3
     ALPHA = "alpha"      # A, B, C
     ROMAN = "roman"      # I, II, III

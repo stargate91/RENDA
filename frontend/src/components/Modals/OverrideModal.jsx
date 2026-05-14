@@ -114,8 +114,8 @@ const OverrideModal = ({ show, item, onClose, onSave, T }) => {
           season: item.season || '',
           episode: item.episode || '',
           part: item.part || '',
-          part_type: item.part_type || 'Part',
-          part_style: item.part_style || 'arabic',
+          part_type: item.part_type || 'none',
+          part_style: item.part_style || 'none',
           main_type: item.type || 'movie'
         });
       } else {

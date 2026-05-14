@@ -37,7 +37,7 @@ class MediaItem(Base):
     audio_type: Mapped[MediaAudioType] = mapped_column(SQLEnum(MediaAudioType), default=MediaAudioType.NONE)
     part: Mapped[Optional[int]] = mapped_column(Integer)
     part_type: Mapped[PartType] = mapped_column(SQLEnum(PartType), default=PartType.PART)
-    part_style: Mapped[PartStyle] = mapped_column(SQLEnum(PartStyle), default=PartStyle.ARABIC)
+    part_style: Mapped[PartStyle] = mapped_column(SQLEnum(PartStyle), default=PartStyle.NONE)
     is_manual: Mapped[bool] = mapped_column(Boolean, default=False); status: Mapped[ItemStatus] = mapped_column(SQLEnum(ItemStatus), default=ItemStatus.NEW, index=True)
     planned_path: Mapped[Optional[str]] = mapped_column(String) # The path proposed by the Formatter
     category: Mapped[str] = mapped_column(String, default="video", index=True); created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
