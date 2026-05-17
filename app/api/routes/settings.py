@@ -29,9 +29,15 @@ def update_settings(settings: dict):
                 db.add(setting)
         db.commit()
         
-        # If naming settings changed, we should ideally refresh planned paths.
-        # For simplicity, we'll check if any 'naming_' key was in the update.
-        if any(k.startswith(("naming_", "folder_", "extras_")) for k in settings.keys()):
+        # Update is_primary flags in database if language setting changed
+        if "primary_metadata_language" in settings:
+            target_lang = settings["primary_metadata_language"]
+            db.query(MetadataLocalization).filter(MetadataLocalization.target_language == target_lang).update({"is_primary": True})
+            db.query(MetadataLocalization).filter(MetadataLocalization.target_language != target_lang).update({"is_primary": False})
+            db.commit()
+        
+        # If naming settings OR language settings changed, we should refresh planned paths.
+        if any(k.startswith(("naming_", "folder_", "extras_")) for k in settings.keys()) or "primary_metadata_language" in settings:
             try:
                 from app.formatter.formatter import Formatter, FormatterConfig
                 from app.db.models import MediaItem, ItemStatus
@@ -49,6 +55,7 @@ def update_settings(settings: dict):
                     # Find active match to format against
                     active_match = next((m for m in item.matches if m.is_active), None)
                     if active_match:
+                        # Fetch freshly committed is_primary localization
                         loc = next((l for l in active_match.localizations if l.is_primary), 
                                   active_match.localizations[0] if active_match.localizations else None)
                         if loc:
@@ -68,16 +75,30 @@ def update_settings(settings: dict):
 
 @router.post("/database/clear")
 def clear_database():
-    """Wipes the entire database except for the user_settings table."""
+    """Wipes the entire database except for the user_settings table, including the cache."""
     db = Session()
     try:
+        from app.db.base import cache_engine
+        import logging
+        logger = logging.getLogger(__name__)
+
+        # Clear main database tables
         for table in reversed(Base.metadata.sorted_tables):
             if table.name != "user_settings":
                 db.execute(table.delete())
+                
+        # Clear cache database tables using the cache engine directly
+        from app.db.base import CacheBase
+        with cache_engine.begin() as conn:
+            for table in reversed(CacheBase.metadata.sorted_tables):
+                conn.execute(table.delete())
+                
         db.commit()
         return {"status": "success"}
     except Exception as e:
         db.rollback()
+        import logging
+        logging.getLogger(__name__).error(f"Database clear failed: {e}")
         return {"status": "error", "message": str(e)}
     finally:
         db.close()

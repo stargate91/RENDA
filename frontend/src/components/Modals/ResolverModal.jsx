@@ -4,6 +4,7 @@ import { api } from '../../services/api';
 import { useAppContext } from '../../context/AppContext';
 
 const ResolverModal = ({ show, item, onClose, onResolve, T }) => {
+  const { settings } = useAppContext();
   const [query, setQuery] = useState('');
   const [year, setYear] = useState('');
   const [type, setType] = useState('movie');
@@ -68,6 +69,7 @@ const ResolverModal = ({ show, item, onClose, onResolve, T }) => {
     const q = overrideQuery !== undefined ? overrideQuery : query;
     const y = overrideYear !== undefined ? overrideYear : year;
     const t = overrideType !== undefined ? overrideType : type;
+    const lang = settings?.primary_metadata_language || 'en';
 
     if (!q) return;
     setSearching(true);
@@ -78,7 +80,7 @@ const ResolverModal = ({ show, item, onClose, onResolve, T }) => {
     setBasket([]);
     
     try {
-      const data = await api.searchMetadata(q, t, y);
+      const data = await api.searchMetadata(q, t, y, lang);
       setResults(data.map(r => ({ ...r, is_proposed: false })) || []);
     } catch (e) {
       console.error('Search failed:', e);
@@ -99,7 +101,7 @@ const ResolverModal = ({ show, item, onClose, onResolve, T }) => {
     setViewMode('seasons');
 
     try {
-      const seasons = await api.getTVSeasons(series.id);
+      const seasons = await api.getTVSeasons(series.id, settings?.primary_metadata_language || 'en');
       setDrillDownItems(seasons || []);
       
       // If we have a manual season, try to find it
@@ -123,7 +125,7 @@ const ResolverModal = ({ show, item, onClose, onResolve, T }) => {
     setViewMode('episodes');
 
     try {
-      const episodes = await api.getTVSeasonEpisodes(selectedSeries.id, season.season_number);
+      const episodes = await api.getTVSeasonEpisodes(selectedSeries.id, season.season_number, settings?.primary_metadata_language || 'en');
       setDrillDownItems(episodes || []);
 
       // If we have a manual episode, try to find it
@@ -458,7 +460,7 @@ const ResolverModal = ({ show, item, onClose, onResolve, T }) => {
                       {basket.length > 0 ? `Resolve ${basket.length} Targets` :
                        selectedEpisode ? T('modal.resolver.confirm') : 
                        selectedSeason ? 'Assign as Season (Uncertain)' : 
-                       selectedSeries ? 'Assign as Series (Uncertain)' : T('modal.resolver.confirm')}
+                       selectedSeries ? (type === 'movie' ? 'Assign as Movie' : 'Assign as Series (Uncertain)') : T('modal.resolver.confirm')}
                     </button>
                     
                     {type === 'tv' && viewMode === 'results' && (

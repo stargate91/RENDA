@@ -18,7 +18,6 @@ class ImageWorker:
         self.db = db_session
         self.storage_path = Path(storage_path) / "media" / "images"
         self._ensure_folders()
-        self._reset_stale_tasks()
         
         # Central session with retries
         self.session = requests.Session()
@@ -26,16 +25,17 @@ class ImageWorker:
         self.session.mount("https://", adapter)
         self.session.mount("http://", adapter)
 
-    def _reset_stale_tasks(self):
+    @staticmethod
+    def reset_stale_tasks(db: Session):
         """Resets any stuck 'DOWNLOADING' tasks back to 'PENDING' on startup."""
         try:
-            self.db.query(MediaMatch).filter(MediaMatch.image_status == ImageStatus.DOWNLOADING).update({"image_status": ImageStatus.PENDING})
-            self.db.query(MediaMatch).filter(MediaMatch.backdrop_status == ImageStatus.DOWNLOADING).update({"backdrop_status": ImageStatus.PENDING})
-            self.db.query(Person).filter(Person.image_status == ImageStatus.DOWNLOADING).update({"image_status": ImageStatus.PENDING})
-            self.db.commit()
+            db.query(MediaMatch).filter(MediaMatch.image_status == ImageStatus.DOWNLOADING).update({"image_status": ImageStatus.PENDING})
+            db.query(MediaMatch).filter(MediaMatch.backdrop_status == ImageStatus.DOWNLOADING).update({"backdrop_status": ImageStatus.PENDING})
+            db.query(Person).filter(Person.image_status == ImageStatus.DOWNLOADING).update({"image_status": ImageStatus.PENDING})
+            db.commit()
         except Exception as e:
             logger.error(f"Failed to reset stale image tasks: {e}")
-            self.db.rollback()
+            db.rollback()
 
     def _ensure_folders(self):
         """Creates the necessary subdirectories for different image types and thumbnails."""

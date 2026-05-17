@@ -222,12 +222,31 @@ export const AppProvider = ({ children }) => {
       setSaveStatus('Saving...');
       await api.updateSettings(settings);
       setSaveStatus('Saved successfully!');
+      
+      const langChanged = initialSettings.primary_metadata_language !== settings.primary_metadata_language || 
+                          initialSettings.fallback_metadata_language !== settings.fallback_metadata_language;
+      
       setInitialSettings(JSON.parse(JSON.stringify(settings)));
       setIsSettingsDirty(false);
       setTimeout(() => setSaveStatus(''), 3000);
       
       // Dinamikusan újratöltjük a discovery elemeket a háttérben, hogy a formázás azonnal frissüljön
       await fetchDiscovery();
+
+      if (langChanged) {
+        setConfirmDialog({
+          isOpen: true,
+          type: 'info',
+          title: "Sync Missing Metadata?",
+          message: "Language settings have changed. Do you want to download missing metadata and images for the newly selected language(s)?",
+          confirmText: "Sync Now",
+          cancelText: "Skip",
+          onConfirm: () => {
+            api.syncMetadataLanguage().catch(console.error);
+          }
+        });
+      }
+      
     } catch (error) {
       console.error("Failed to save settings:", error);
       setSaveStatus('Error saving');
@@ -358,7 +377,10 @@ export const AppProvider = ({ children }) => {
             setProgress(p => p ? { ...p, current: displayProgress } : p);
           }, 200);
 
-          await api.clearDatabase();
+          const res = await api.clearDatabase();
+          if (res && res.status === "error") {
+            throw new Error(res.message || "Wipe failed");
+          }
           
           clearInterval(fakeProgress);
           setProgress(p => p ? { ...p, current: 100 } : p);

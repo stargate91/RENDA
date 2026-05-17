@@ -46,6 +46,10 @@ class MediaLibraryService:
 
     def get_grouped_library(self) -> LibraryGroupedDTO:
         """Categorizes organized items for the Library UI."""
+        from ..db.models import UserSetting
+        ui_lang_setting = self.db.query(UserSetting).filter(UserSetting.key == "fallback_metadata_language").first()
+        ui_lang = ui_lang_setting.value if ui_lang_setting and ui_lang_setting.value != "none" else None
+
         items = self.repository.get_library_items()
         library = {
             "movies": [], "series": [], "adult": [],
@@ -54,7 +58,12 @@ class MediaLibraryService:
 
         for item in items:
             active_match = next((m for m in item.matches if m.is_active), None)
-            loc = active_match.localizations[0] if active_match and active_match.localizations else None
+            loc = None
+            if active_match and active_match.localizations:
+                if ui_lang:
+                    loc = next((l for l in active_match.localizations if l.target_language == ui_lang), None)
+                if not loc:
+                    loc = next((l for l in active_match.localizations if l.is_primary), active_match.localizations[0])
             
             dto = LibraryItemDTO(
                 id=item.id,
@@ -66,18 +75,39 @@ class MediaLibraryService:
                 type=item.item_type.value,
                 path=item.current_path
             )
+            # DTO doesn't have series_title, etc. Wait, we need to return extra fields!
+            # Let's return a raw dictionary instead of DTO if DTO doesn't match the frontend expectations.
+            
+            data = {
+                "id": item.id,
+                "title": loc.title if loc else (item.fn_title or item.fd_title or item.filename),
+                "year": active_match.release_date.year if active_match and active_match.release_date else (item.fn_year or item.fd_year),
+                "poster_path": loc.poster_path if loc else None,
+                "backdrop_path": loc.backdrop_path if loc else None,
+                "still_path": loc.still_path if loc else None,
+                "series_poster_path": loc.series_poster_path if loc else None,
+                "rating": active_match.rating_tmdb if active_match else 0,
+                "type": item.item_type.value,
+                "path": item.current_path,
+                "season_number": active_match.season_number if active_match else None,
+                "episode_number": active_match.episode_number if active_match else None,
+                "series_tmdb_id": active_match.series_tmdb_id if active_match else None,
+                "series_title": loc.series_title if loc else None,
+                "season_title": loc.season_title if loc else None,
+                "episode_title": loc.episode_title if loc else None
+            }
 
             if active_match and active_match.is_adult:
-                library["adult"].append(dto)
+                library["adult"].append(data)
                 library["counts"]["adult"] += 1
             elif item.item_type == ItemType.MOVIE:
-                library["movies"].append(dto)
+                library["movies"].append(data)
                 library["counts"]["movies"] += 1
             elif item.item_type in [ItemType.SERIES, ItemType.EPISODE]:
-                library["series"].append(dto)
+                library["series"].append(data)
                 library["counts"]["series"] += 1
 
-        return LibraryGroupedDTO(**library)
+        return library
 
     def _format_size(self, size_bytes: int) -> str:
         if size_bytes >= 1024 ** 4: return f"{size_bytes / (1024 ** 4):.1f} TB"

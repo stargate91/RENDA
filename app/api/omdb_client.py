@@ -2,7 +2,7 @@ import requests
 import logging
 from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
-from ..db.models import UserSetting
+from ..db.models import UserSetting, OMDBCache
 
 logger = logging.getLogger(__name__)
 
@@ -22,11 +22,24 @@ class OMDBClient:
 
     def get_ratings(self, imdb_id: str) -> Dict[str, Any]:
         """
-        Lekéri az értékeléseket IMDb ID alapján.
+        Lekéri az értékeléseket IMDb ID alapján, Cache támogatással.
         """
         if not self._api_key or not imdb_id:
             return {}
 
+        from datetime import datetime, timedelta
+        
+        # 1. Cache ellenőrzése
+        cache_item = self.db.query(OMDBCache).filter(OMDBCache.imdb_id == imdb_id).first()
+        if cache_item:
+            if datetime.utcnow() - cache_item.updated_at < timedelta(days=30):
+                return cache_item.raw_data
+            else:
+                # Elévült, töröljük és újra lekérjük
+                self.db.delete(cache_item)
+                self.db.commit()
+
+        # 2. Hálózati lekérdezés
         params = {
             "apikey": self._api_key,
             "i": imdb_id,
@@ -40,8 +53,8 @@ class OMDBClient:
             if data.get("Response") == "False":
                 logger.warning(f"OMDb hiba: {data.get('Error')}")
                 return {}
-
-            # Értékelések kinyerése
+                
+            # Értékelések kinyerése a mentendő adathoz
             ratings = {
                 "imdb_rating": data.get("imdbRating"),
                 "imdb_votes": data.get("imdbVotes"),
@@ -53,6 +66,12 @@ class OMDBClient:
             for r in data.get("Ratings", []):
                 if r["Source"] == "Rotten Tomatoes":
                     ratings["rotten_tomatoes"] = r["Value"]
+                    
+            # Mentés a Cache-be (nem a teljes nyers választ mentjük, csak ami kell, vagy a nyers is jó)
+            # De a formátum amit várnak a 'ratings' dict. Úgyhogy azt mentjük.
+            new_cache = OMDBCache(imdb_id=imdb_id, raw_data=ratings)
+            self.db.add(new_cache)
+            self.db.commit()
             
             return ratings
         except Exception as e:

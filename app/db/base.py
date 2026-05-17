@@ -17,6 +17,10 @@ class Base(DeclarativeBase):
     """Base class for all SQLAlchemy models in the application."""
     pass
 
+class CacheBase(DeclarativeBase):
+    """Base class for caching models, stored in a separate database."""
+    pass
+
 # Engine initialization
 engine = create_engine(
     DATABASE_URL, 
@@ -26,8 +30,16 @@ engine = create_engine(
     } # Required for multi-threaded SQLite usage
 )
 
+CACHE_DATABASE_URL = f"sqlite:///{DATA_DIR / 'cache.db'}"
+cache_engine = create_engine(
+    CACHE_DATABASE_URL,
+    connect_args={
+        "check_same_thread": False,
+        "timeout": 30
+    }
+)
+
 # SQLite Optimization: Enable WAL (Write-Ahead Logging) mode
-# This allows concurrent reads and writes, preventing "database is locked" errors during background operations.
 @event.listens_for(engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
     cursor = dbapi_connection.cursor()
@@ -35,9 +47,20 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
     cursor.execute("PRAGMA synchronous=NORMAL")
     cursor.close()
 
+@event.listens_for(cache_engine, "connect")
+def set_sqlite_pragma_cache(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.close()
+
 # Thread-safe Session factory using scoped_session
-# Ensures each thread gets its own unique session instance.
-session_factory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+session_factory = sessionmaker(
+    autocommit=False, 
+    autoflush=False, 
+    bind=engine,
+    binds={CacheBase: cache_engine}
+)
 Session = scoped_session(session_factory)
 
 def get_db():

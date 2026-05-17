@@ -136,7 +136,7 @@ def run_undo_task(batch_id: int):
     try:
         scan_status.update({
             "active": True,
-            "phase": "wiping", # We use wiping for undoing logic
+            "phase": "undoing", # Changed from wiping to undoing to avoid frontend fake progress conflicts
             "current": 0,
             "total": 1,
             "start_time": time.time()
@@ -164,7 +164,7 @@ def undo_rename(batch_id: int, background_tasks: BackgroundTasks):
             raise HTTPException(status_code=400, detail=f"Task already in progress: {scan_status.get('phase', 'unknown')}")
         scan_status.update({
             "active": True,
-            "phase": "wiping",
+            "phase": "undoing",
             "current": 0,
             "total": 1,
             "start_time": time.time()

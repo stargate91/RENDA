@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.db.base import Session, Base, engine
+from app.db.base import Session, Base, engine, CacheBase, cache_engine
 from app.db.models import *
 
 # Import routers
@@ -10,12 +10,21 @@ from app.api.routes import scanner, settings, media, metadata, renamer
 
 # Automatically create tables if they don't exist
 Base.metadata.create_all(bind=engine)
+CacheBase.metadata.create_all(bind=cache_engine)
 
 from contextlib import asynccontextmanager
 from app.services.background_tasks import start_background_workers, stop_background_workers
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from app.scanner.image_worker import ImageWorker
+    from app.db.base import Session
+    db = Session()
+    try:
+        ImageWorker.reset_stale_tasks(db)
+    finally:
+        db.close()
+        
     # Start background workers (e.g. ImageWorker)
     start_background_workers()
     yield

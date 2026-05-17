@@ -9,42 +9,6 @@ import { useAppContext } from '../../context/AppContext';
 const GeneralSettings = ({ settings, setSettings, T, availableLocales }) => {
   const { setConfirmDialog } = useAppContext();
 
-  const handleNamingLanguageChange = (val) => {
-    const updates = { ...settings, primary_metadata_language: val };
-    if (settings.fallback_metadata_language === val) updates.fallback_metadata_language = 'none';
-    setSettings(updates);
-    
-    setConfirmDialog({
-      isOpen: true,
-      type: 'info',
-      title: "Sync Missing Metadata?",
-      message: `Do you want to download missing metadata and images for the new Naming Language (${val})?`,
-      confirmText: "Sync Now",
-      cancelText: "Cancel",
-      onConfirm: () => {
-        api.syncMetadataLanguage().then(() => alert("Background sync started!")).catch(console.error);
-      }
-    });
-  };
-
-  const handleLibraryLanguageChange = (val) => {
-    setSettings({ ...settings, fallback_metadata_language: val });
-    
-    if (val !== 'none') {
-      setConfirmDialog({
-        isOpen: true,
-        type: 'info',
-        title: "Sync Missing Metadata?",
-        message: `Do you want to download missing metadata and images for the new Library Language (${val})?`,
-        confirmText: "Sync Now",
-        cancelText: "Cancel",
-        onConfirm: () => {
-          api.syncMetadataLanguage().then(() => alert("Background sync started!")).catch(console.error);
-        }
-      });
-    }
-  };
-
   return (
     <div className="settings-card">
 
@@ -92,7 +56,11 @@ const GeneralSettings = ({ settings, setSettings, T, availableLocales }) => {
             <div style={{ fontSize: '11px', color: '#666', marginBottom: '8px', fontWeight: 600 }}>Naming Language (Target)</div>
             <CustomSelect 
               value={settings.primary_metadata_language || 'en'} 
-              onChange={handleNamingLanguageChange}
+              onChange={val => {
+                const updates = { ...settings, primary_metadata_language: val };
+                if (settings.fallback_metadata_language === val) updates.fallback_metadata_language = 'none';
+                setSettings(updates);
+              }}
               options={METADATA_LANGUAGES}
             />
           </div>
@@ -100,7 +68,7 @@ const GeneralSettings = ({ settings, setSettings, T, availableLocales }) => {
             <div style={{ fontSize: '11px', color: '#666', marginBottom: '8px', fontWeight: 600 }}>Library (UI) Language</div>
             <CustomSelect 
               value={settings.fallback_metadata_language || 'none'} 
-              onChange={handleLibraryLanguageChange}
+              onChange={val => setSettings({ ...settings, fallback_metadata_language: val })}
               options={[
                 { value: 'none', label: 'Match Naming' },
                 ...METADATA_LANGUAGES.filter(l => l.value !== (settings.primary_metadata_language || 'en'))

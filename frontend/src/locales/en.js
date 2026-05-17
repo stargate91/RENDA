@@ -18,6 +18,7 @@ const en = {
     "enriching": "Gathering metadata",
     "resolving": "Finalizing matches",
     "wiping": "Clearing library",
+    "undoing": "Undoing Operations",
     "organizing": "Organizing Library",
     "idle": "Idle"
   },

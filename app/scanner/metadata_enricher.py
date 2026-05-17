@@ -5,8 +5,7 @@ from sqlalchemy.orm import Session
 from ..db.models import MediaItem, MediaMatch, MetadataLocalization, ItemStatus, ItemType
 from ..api.tmdb_client import TMDBClient
 from ..api.omdb_client import OMDBClient
-
-logger = logging.getLogger(__name__)
+from ..utils.logger import logger
 
 class MetadataEnricher:
     """
@@ -67,9 +66,17 @@ class MetadataEnricher:
         # --- TERVEZETT ÚTVONAL FRISSÍTÉSE (HIVATALOS ADATOKKAL) ---
         try:
             from ..formatter.formatter import Formatter, FormatterConfig
+            from ..db.models import UserSetting
             config = FormatterConfig.from_db(self.db)
             formatter = Formatter(config)
-            loc = active_match.localizations[0] if active_match.localizations else None
+            
+            primary_lang = self.db.query(UserSetting).filter(UserSetting.key == "primary_metadata_language").first()
+            primary_lang_val = primary_lang.value if primary_lang else "en"
+            
+            loc = next((l for l in active_match.localizations if l.target_language == primary_lang_val), None)
+            if not loc and active_match.localizations:
+                loc = active_match.localizations[0]
+                
             if loc:
                 preview = formatter.format_item(item, active_match, loc)
                 item.planned_path = preview.target_path

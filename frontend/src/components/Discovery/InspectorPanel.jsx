@@ -70,6 +70,10 @@ const InspectorPanel = ({ selectedItem, fetchFullMetadata, openResolver, openOve
 
   const hasTechnicalData = selectedItem.resolution || selectedItem.duration || selectedItem.video_codec || selectedItem.audio_codec;
 
+  const safeImageIndex = selectedItem.images && selectedItem.images.length > 0
+    ? (imageIndex < selectedItem.images.length ? imageIndex : 0)
+    : 0;
+
   return (
     <>
       <div className="inspector-header">
@@ -78,24 +82,24 @@ const InspectorPanel = ({ selectedItem, fetchFullMetadata, openResolver, openOve
 
       {selectedItem.images && selectedItem.images.length > 0 && selectedItem.status?.toLowerCase() !== 'multiple' && selectedItem.status?.toLowerCase() !== 'no_match' && (
         <div className="inspector-carousel">
-          <div className="carousel-container" onClick={() => setImageIndex((imageIndex + 1) % selectedItem.images.length)}>
+          <div className="carousel-container" onClick={() => setImageIndex((safeImageIndex + 1) % selectedItem.images.length)}>
             <img
-              key={imageIndex}
+              key={safeImageIndex}
               className="inspector-poster"
-              src={`${API_BASE}${selectedItem.images[imageIndex].path}`}
+              src={`${API_BASE}${selectedItem.images[safeImageIndex].path}`}
               alt={T('inspector.media_alt')}
               style={{ animation: 'fadeIn 0.3s ease' }}
             />
             {selectedItem.images.length > 1 && (
               <>
                 <div className="carousel-counter">
-                  {imageIndex + 1} / {selectedItem.images.length}
+                  {safeImageIndex + 1} / {selectedItem.images.length}
                 </div>
                 <div className="carousel-dots">
                   {selectedItem.images.map((_, i) => (
                     <div
                       key={i}
-                      className={`dot ${i === imageIndex ? 'active' : ''}`}
+                      className={`dot ${i === safeImageIndex ? 'active' : ''}`}
                       onClick={(e) => { e.stopPropagation(); setImageIndex(i); }}
                     />
                   ))}

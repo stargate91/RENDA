@@ -188,10 +188,8 @@ class Resolver:
                 vote_count_tmdb=data.get("vote_count")
             )
             
-            # Első találat (legnépszerűbb) lesz az aktív
+            # Első találat (legnépszerűbb) lesz az aktív (alapból)
             if i == 0:
-                match.is_active = True
-                
                 target_year = item.fn_year or item.fd_year or item.it_year
                 match_year = release_date.year if release_date else None
                 
@@ -207,27 +205,34 @@ class Resolver:
                 # 1. Kritérium: Ha sorozat, de hiányzik a szezon VAGY epizód szám -> UNCERTAIN
                 if item.item_type in (ItemType.SERIES, ItemType.EPISODE) and (not has_season or not has_episode_num):
                     item.status = ItemStatus.UNCERTAIN
+                    match.is_active = True
                     
                 # Új kritérium: Ha sorozat/epizód, a cím PONTOSAN megegyezik, és van S/E -> MATCHED
                 # Ezzel elkerüljük, hogy évszámnak tűnő epizódcímek (pl. "1969") miatt UNCERTAIN legyen
                 elif item.item_type in (ItemType.SERIES, ItemType.EPISODE) and is_exact_title and has_season and has_episode_num:
                     item.status = ItemStatus.MATCHED
+                    match.is_active = True
                     
                 # 2. Van évszámunk, és az első találat évszáma is megegyezik (+- 1 év)
                 elif target_year and match_year and abs(target_year - match_year) <= 1:
                     item.status = ItemStatus.MATCHED
+                    match.is_active = True
                 
                 # 3. Van évszámunk, de az első találat évszáma eltér
                 elif target_year and match_year and abs(target_year - match_year) > 1:
                     item.status = ItemStatus.UNCERTAIN
+                    match.is_active = True
                     
                 # 4. Nincs évszámunk, de a TMDB több találatot is adott
                 elif not target_year and match_count > 1:
                     item.status = ItemStatus.MULTIPLE
+                    match.is_active = False  # NO active match for multiple
+                    item.planned_path = None # Clear any planned path
                     
                 # 5. Nincs évszám, de csak 1 találat jött vissza (egyértelmű match)
                 else:
                     item.status = ItemStatus.MATCHED
+                    match.is_active = True
             
             self.db.add(match)
             self.db.flush()

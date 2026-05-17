@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import List, Optional, Any
 from sqlalchemy import String, Integer, Float, DateTime, Enum as SQLEnum, JSON, Boolean, BigInteger, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship, backref
-from app.db.base import Base
+from app.db.base import Base, CacheBase
 from .enums import ItemType, ImageStatus
 
 class MediaMatch(Base):
@@ -66,7 +66,7 @@ class MetadataLocalization(Base):
     match: Mapped["MediaMatch"] = relationship(back_populates="localizations")
 
 
-class TMDBCache(Base):
+class TMDBCache(CacheBase):
     """Persistent storage for raw TMDB API responses."""
     __tablename__ = "tmdb_cache"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -74,5 +74,13 @@ class TMDBCache(Base):
     tmdb_id: Mapped[Optional[int]] = mapped_column(Integer, index=True)
     item_type: Mapped[Optional[ItemType]] = mapped_column(SQLEnum(ItemType))
     target_language: Mapped[str] = mapped_column(String, index=True)
+    raw_data: Mapped[dict[str, Any]] = mapped_column(JSON)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class OMDBCache(CacheBase):
+    """Persistent storage for raw OMDb API responses."""
+    __tablename__ = "omdb_cache"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    imdb_id: Mapped[str] = mapped_column(String, unique=True, index=True)
     raw_data: Mapped[dict[str, Any]] = mapped_column(JSON)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

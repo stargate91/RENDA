@@ -47,6 +47,7 @@ class ExtraFileDTO(BaseModel):
     language: Optional[str] = None
     path: str
     planned_path: Optional[str] = None
+    action: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

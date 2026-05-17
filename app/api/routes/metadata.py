@@ -210,17 +210,9 @@ def resolve_metadata(request: ResolveRequest):
             fallback_language=fallback.value if fallback and fallback.value != "none" else None
         )
         
-        # 4. Trigger image download
-        import threading
-        from app.scanner.image_worker import ImageWorker
-        def run_image_worker():
-            local_db = Session()
-            try:
-                iw = ImageWorker(local_db, "./data")
-                iw.process_all()
-            finally:
-                local_db.close()
-        threading.Thread(target=run_image_worker, daemon=True).start()
+        # 4. A képek letöltését a globális háttérfolyamat (background_tasks.py)
+        #    automatikusan fel fogja szedni a következő 10 másodpercben,
+        #    így elkerüljük az adatbázis lock-okat!
         
         return {"status": "success", "match_id": match.id}
     except Exception as e:
@@ -246,14 +238,29 @@ def sync_metadata_language():
         target_lang = lang.value if lang else "en"
         fallback_lang = fallback.value if fallback and fallback.value != "none" else None
 
+        from app.formatter.formatter import Formatter, FormatterConfig
+        from app.db.models import MediaMatch, ImageStatus
+
         items = db.query(MediaItem).filter(MediaItem.status.in_([
-            ItemStatus.MATCHED, ItemStatus.RENAMED, ItemStatus.ORGANIZED
+            ItemStatus.MATCHED, ItemStatus.RENAMED, ItemStatus.ORGANIZED,
+            ItemStatus.UNCERTAIN, ItemStatus.MULTIPLE
         ])).all()
 
         enricher = MetadataEnricher(db)
+        
         for item in items:
             enricher.enrich_matched_item(item, language=target_lang, fallback_language=fallback_lang)
             
+            # Reset image statuses so ImageWorker fetches new localized posters
+            for match in item.matches:
+                if match.is_active:
+                    match.image_status = ImageStatus.PENDING
+                    match.backdrop_status = ImageStatus.PENDING
+        # Update is_primary status on all MetadataLocalization objects to align with the new target language
+        from app.db.models import MetadataLocalization
+        db.query(MetadataLocalization).filter(MetadataLocalization.target_language == target_lang).update({"is_primary": True})
+        db.query(MetadataLocalization).filter(MetadataLocalization.target_language != target_lang).update({"is_primary": False})
+        
         db.commit()
 
         # Start image worker
