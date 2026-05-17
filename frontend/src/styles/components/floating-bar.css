@@ -30,18 +30,23 @@
 .save-bar-pill {
   display: flex;
   align-items: center;
-  gap: 16px;
-  background: rgba(18, 18, 24, 0.9);
-  padding: 12px 24px;
+  gap: 30px;
+  background: linear-gradient(180deg, rgba(40, 40, 45, 0.35), rgba(20, 20, 25, 0.55));
+  backdrop-filter: blur(35px);
+  -webkit-backdrop-filter: blur(35px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top-color: rgba(255, 255, 255, 0.15);
+  padding: 10px 10px 10px 30px;
   border-radius: 100px;
-  border: 1px solid var(--border-glass);
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 30px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,0,0,0.5);
 }
 
 .floating-save-bar.saved .save-bar-pill {
   border-color: var(--success);
-  box-shadow: 0 0 20px var(--success-bg);
+  box-shadow: 0 0 20px var(--success-bg), 0 30px 60px rgba(0,0,0,0.6);
   background: rgba(0, 255, 100, 0.1);
+  padding: 10px 24px;
+  gap: 12px;
 }
 
 .save-bar-icon {
@@ -66,6 +71,7 @@
   background: var(--warning);
   box-shadow: 0 0 12px var(--warning-bg);
   animation: saveDotPulse 2s ease-in-out infinite;
+  margin-right: -14px; /* Adjust spacing nicely next to text */
 }
 
 @keyframes saveDotPulse {
@@ -73,7 +79,12 @@
   50% { opacity: 0.5; transform: scale(0.8); }
 }
 
-.save-bar-text { font-size: 14px; font-weight: 600; color: #fff; }
+.save-bar-text { 
+  font-size: 14px; 
+  font-weight: 800; 
+  color: #fff; 
+  letter-spacing: 0.5px;
+}
 
 .save-bar-actions {
   display: flex;
@@ -88,10 +99,12 @@
   justify-content: center;
   gap: 8px;
   height: 40px; /* Force same height */
-  padding: 0 24px;
+  padding: 0 26px;
   border-radius: 100px;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
   cursor: pointer;
   border: 1px solid transparent;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -108,19 +121,20 @@
   background: rgba(255, 255, 255, 0.1); 
   color: #fff; 
   border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
 }
 
 .save-bar-btn.save { 
   background: var(--accent-gradient); 
   color: white; 
-  box-shadow: 0 4px 15px rgba(0, 136, 255, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: none;
+  border: 1px solid rgba(0, 136, 255, 0.3);
 }
 
 .save-bar-btn.save:hover:not(:disabled) {
   filter: brightness(1.1);
   transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(0, 136, 255, 0.4);
+  box-shadow: 0 8px 20px rgba(0, 136, 255, 0.3);
 }
 
 .save-bar-btn:active {

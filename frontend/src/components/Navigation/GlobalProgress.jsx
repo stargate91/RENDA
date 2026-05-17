@@ -1,6 +1,13 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 const GlobalProgress = ({ progress, T }) => {
+  const [nowSeconds, setNowSeconds] = useState(() => Date.now() / 1000);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNowSeconds(Date.now() / 1000), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   if (!progress || !progress.active) return null;
 
   const getWeightedPercent = () => {
@@ -19,7 +26,7 @@ const GlobalProgress = ({ progress, T }) => {
 
   const calculateETA = () => {
     if (progress.current < 2) return T('progress.estimating');
-    const elapsed = (Date.now() / 1000) - progress.start_time;
+    const elapsed = nowSeconds - progress.start_time;
     const itemsPerSec = progress.current / elapsed;
     const remainingItems = progress.total - progress.current;
     const remainingSecs = remainingItems / itemsPerSec;

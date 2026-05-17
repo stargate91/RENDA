@@ -41,7 +41,7 @@ export const useGlobalDragDrop = () => {
       
       const files = e.dataTransfer.files;
       if (files && files.length > 0) {
-        let paths = [];
+        let paths;
         try {
           // Modern Electron approach
           const electron = window.require('electron');

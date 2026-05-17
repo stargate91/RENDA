@@ -372,7 +372,13 @@ class Formatter:
             for extra in item.extras:
                 # Meghatározzuk az akciót a típus alapján
                 cat = extra.category.value if hasattr(extra.category, 'value') else str(extra.category)
-                action = getattr(self.config, f"extra_{cat}_action", "rename")
+                
+                short_cat = cat
+                if cat == "subtitle": short_cat = "sub"
+                elif cat == "image": short_cat = "img"
+                elif cat == "metadata": short_cat = "meta"
+                
+                action = getattr(self.config, f"extra_{short_cat}_action", "rename")
                 
                 if action == "ignore":
                     continue

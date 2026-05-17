@@ -65,31 +65,6 @@ class ScannerManager:
         global scan_status
         update_scan_status({"active": True, "phase": "collecting", "current": 0, "total": 0, "start_time": time.time()})
         
-        # Start ImageWorker in a background loop to process images as soon as items are matched
-        from .image_worker import ImageWorker
-        def run_image_worker_loop():
-            logger.info("Background ImageWorker loop starting...")
-            while True:
-                local_db = DbSession()
-                try:
-                    iw = ImageWorker(local_db, "./data")
-                    iw.process_all()
-                except Exception as e:
-                    logger.error(f"ImageWorker loop error: {e}")
-                finally:
-                    local_db.close()
-                    DbSession.remove()
-                
-                # Check if scan is still active
-                with scan_status_lock:
-                    if not scan_status["active"]:
-                        break
-                
-                time.sleep(5) # Poll every 5 seconds for new matches
-            logger.info("Background ImageWorker loop stopped.")
-
-        threading.Thread(target=run_image_worker_loop, daemon=True).start()
-
         try:
             logger.info("Phase 1: Collecting files and establishing links...")
             files = self.collector.collect(paths)

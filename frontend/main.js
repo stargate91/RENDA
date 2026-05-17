@@ -19,6 +19,15 @@ ipcMain.handle('select-folder', async (event, defaultPath) => {
   }
 });
 
+ipcMain.on('app-restart', () => {
+  app.relaunch();
+  app.exit(0);
+});
+
+ipcMain.on('app-quit', () => {
+  app.quit();
+});
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1200,

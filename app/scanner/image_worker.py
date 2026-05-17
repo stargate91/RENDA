@@ -121,25 +121,37 @@ class ImageWorker:
 
     def process_all(self, max_workers: int = 5):
         """Executes all pending downloads and processing in parallel."""
+        # Check if there is any pending work before starting the heavy executors
+        has_media = self.db.query(MediaMatch.id).filter(MediaMatch.image_status == ImageStatus.PENDING).first() is not None
+        has_backdrops = self.db.query(MediaMatch.id).filter(MediaMatch.backdrop_status == ImageStatus.PENDING).first() is not None
+        has_persons = self.db.query(Person.id).filter(Person.image_status == ImageStatus.PENDING).first() is not None
+        
+        if not (has_media or has_backdrops or has_persons):
+            return
+
         from concurrent.futures import ThreadPoolExecutor
         
         logger.info(f"ImageWorker: Starting download process ({max_workers} threads)...")
         
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # 1. Media assets (Posters, Stills)
-            self.process_pending_media(executor)
-            
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # 2. People primary profiles (Top 20 + Creators)
-            self.process_pending_persons(executor)
-            
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # 3. Backdrops (Large images)
-            self.process_pending_backdrops(executor)
-            
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # 4. People alternate profiles (Remaining images for top actors)
-            self.process_person_alternate_images(executor)
+        if has_media:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                # 1. Media assets (Posters, Stills)
+                self.process_pending_media(executor)
+                
+        if has_persons:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                # 2. People primary profiles (Top 20 + Creators)
+                self.process_pending_persons(executor)
+                
+        if has_backdrops:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                # 3. Backdrops (Large images)
+                self.process_pending_backdrops(executor)
+                
+        if has_persons:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                # 4. People alternate profiles (Remaining images for top actors)
+                self.process_person_alternate_images(executor)
         
         logger.info("ImageWorker: All pending tasks completed.")
 
@@ -245,6 +257,13 @@ class ImageWorker:
         except Exception as e:
             logger.error(f"Error downloading images for match ID {match_id}: {e}")
             local_db.rollback()
+            try:
+                match = local_db.query(MediaMatch).filter(MediaMatch.id == match_id).first()
+                if match:
+                    match.image_status = ImageStatus.FAILED
+                    local_db.commit()
+            except:
+                pass
         finally:
             local_db.close()
 
@@ -298,6 +317,13 @@ class ImageWorker:
         except Exception as e:
             logger.error(f"Error downloading backdrops for match ID {match_id}: {e}")
             local_db.rollback()
+            try:
+                match = local_db.query(MediaMatch).filter(MediaMatch.id == match_id).first()
+                if match:
+                    match.backdrop_status = ImageStatus.FAILED
+                    local_db.commit()
+            except:
+                pass
         finally:
             local_db.close()
 
@@ -330,9 +356,9 @@ class ImageWorker:
         """Processes alternate images for persons."""
         from ..db.models import Person
         while True:
-            # Persons that have primary image completed, but alt images not fetched yet (images == None)
+            # Persons that have primary image processed, but alt images not fetched yet (images == None)
             persons = self.db.query(Person.id).filter(
-                Person.image_status == ImageStatus.COMPLETED,
+                Person.image_status.in_([ImageStatus.COMPLETED, ImageStatus.FAILED]),
                 Person.images == None
             ).limit(50).all()
             
@@ -388,6 +414,13 @@ class ImageWorker:
         except Exception as e:
             logger.error(f"Error downloading alternate person images (ID: {person_id}): {e}")
             local_db.rollback()
+            try:
+                person = local_db.query(Person).filter(Person.id == person_id).first()
+                if person:
+                    person.images = []
+                    local_db.commit()
+            except:
+                pass
         finally:
             local_db.close()
     def _download_person_image(self, person_id: int):
@@ -413,5 +446,12 @@ class ImageWorker:
         except Exception as e:
             logger.error(f"Error downloading person image (ID: {person_id}): {e}")
             local_db.rollback()
+            try:
+                person = local_db.query(Person).filter(Person.id == person_id).first()
+                if person:
+                    person.image_status = ImageStatus.FAILED
+                    local_db.commit()
+            except:
+                pass
         finally:
             local_db.close()

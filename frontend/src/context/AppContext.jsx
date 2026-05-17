@@ -243,7 +243,14 @@ export const AppProvider = ({ children }) => {
   const fetchProgress = React.useCallback(async () => {
     try {
       const data = await api.getScanStatus();
-      setProgress(data);
+      
+      setProgress(prev => {
+        // Prevent overwriting local fake progress (like wiping) with inactive backend status
+        if (prev?.phase === 'wiping' && !data.active) {
+          return prev;
+        }
+        return data;
+      });
 
       if (data.active) {
         setLoading(true);
@@ -347,7 +354,8 @@ export const AppProvider = ({ children }) => {
             // Aszimptotikusan közelít 95%-hoz, így sosem akad meg teljesen, de hagy időt a valódi befejezésnek
             const remaining = 95 - currentProgress;
             currentProgress += Math.max(remaining * 0.15, 0.5); 
-            setProgress(p => p ? { ...p, current: Math.round(currentProgress) } : p);
+            const displayProgress = Math.min(Math.round(currentProgress), 99);
+            setProgress(p => p ? { ...p, current: displayProgress } : p);
           }, 200);
 
           await api.clearDatabase();

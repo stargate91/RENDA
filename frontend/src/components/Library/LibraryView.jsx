@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Film, Tv, ShieldAlert, Loader2, PlayCircle } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Search, Film, Tv, ShieldAlert, Loader2 } from 'lucide-react';
 import { api } from '../../services/api';
 
 const LibraryView = ({ T }) => {
@@ -7,12 +7,17 @@ const LibraryView = ({ T }) => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('movies');
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentSeriesId, setCurrentSeriesId] = useState(null);
+  const [currentSeason, setCurrentSeason] = useState(null);
 
-  useEffect(() => {
-    fetchLibrary();
-  }, []);
+  const handleTabChange = (id) => {
+    setActiveTab(id);
+    setCurrentSeriesId(null);
+    setCurrentSeason(null);
+    setSearchQuery('');
+  };
 
-  const fetchLibrary = async () => {
+  const fetchLibrary = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.getLibrary();
@@ -27,7 +32,11 @@ const LibraryView = ({ T }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchLibrary();
+  }, [fetchLibrary]);
 
   const visibleTabs = [
     { id: 'movies', label: T('discovery.tabs.movies'), icon: <Film size={18} />, count: data.counts.movies },
@@ -36,9 +45,79 @@ const LibraryView = ({ T }) => {
   ].filter(tab => tab.count > 0);
 
   const currentItems = data[activeTab] || [];
-  const filteredItems = currentItems.filter(item => 
-    item.title.toLowerCase().includes(searchQuery.toLowerCase())
+  let filteredItems = currentItems.filter(item => 
+    item.title && item.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  let renderItems = filteredItems;
+  let viewMode = 'grid'; // grid (posters) or list (episodes)
+  
+  if (activeTab === 'series') {
+    if (!currentSeriesId) {
+      // Show unique series
+      const seriesMap = new Map();
+      filteredItems.forEach(item => {
+        // Fallback to title if series_tmdb_id is missing
+        const sid = item.series_tmdb_id || item.series_title || item.title || `unknown_${item.id}`;
+        if (!seriesMap.has(sid)) {
+          seriesMap.set(sid, {
+            ...item,
+            id: `series_${sid}`,
+            displayTitle: item.series_title || item.title,
+            displayPoster: item.series_poster_path || item.poster_path,
+            displayPosterFolder: 'posters',
+            isSeriesNode: true,
+            series_id_key: sid // Store the computed key
+          });
+        }
+      });
+      renderItems = Array.from(seriesMap.values());
+    } else if (currentSeason === null) {
+      // Show seasons for the selected series
+      const seasonMap = new Map();
+      filteredItems.forEach(item => {
+        const itemSid = item.series_tmdb_id || item.series_title || item.title || `unknown_${item.id}`;
+        if (itemSid === currentSeriesId) {
+          const snum = item.season_number != null ? item.season_number : 1;
+          if (!seasonMap.has(snum)) {
+            seasonMap.set(snum, {
+              ...item,
+              id: `season_${snum}`,
+              displayTitle: item.season_title || `Season ${snum}`,
+              displayPoster: item.poster_path,
+              displayPosterFolder: 'posters',
+              isSeasonNode: true,
+              season_num_key: snum
+            });
+          }
+        }
+      });
+      // Sort seasons
+      renderItems = Array.from(seasonMap.values()).sort((a, b) => a.season_num_key - b.season_num_key);
+    } else {
+      // Show episodes for selected season
+      renderItems = filteredItems.filter(item => {
+        const itemSid = item.series_tmdb_id || item.series_title || item.title || `unknown_${item.id}`;
+        const snum = item.season_number != null ? item.season_number : 1;
+        return itemSid === currentSeriesId && snum === currentSeason;
+      }).map(item => ({
+        ...item,
+        displayTitle: item.episode_title || item.title,
+        displayPoster: item.still_path || item.backdrop_path,
+        displayPosterFolder: item.still_path ? 'stills' : 'backdrops',
+        isEpisodeNode: true
+      })).sort((a, b) => (a.episode_number || 0) - (b.episode_number || 0));
+      viewMode = 'episodes';
+    }
+  } else {
+    // Movies / Adult flat map
+    renderItems = filteredItems.map(item => ({
+      ...item,
+      displayTitle: item.title,
+      displayPoster: item.poster_path,
+      displayPosterFolder: 'posters'
+    }));
+  }
 
   if (loading) {
     return (
@@ -97,7 +176,7 @@ const LibraryView = ({ T }) => {
           {visibleTabs.map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleTabChange(tab.id)}
               className={`lib-tab-btn ${activeTab === tab.id ? 'active' : ''}`}
               style={{
                 display: 'flex',
@@ -129,22 +208,43 @@ const LibraryView = ({ T }) => {
         </div>
       )}
 
-      {filteredItems.length > 0 ? (
+      {activeTab === 'series' && currentSeriesId && (
+        <div style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
+          <button onClick={() => { setCurrentSeason(null); setCurrentSeriesId(null); }} className="btn-secondary" style={{ padding: '8px 16px', borderRadius: '8px' }}>
+            ← All Series
+          </button>
+          {currentSeason !== null && (
+            <button onClick={() => setCurrentSeason(null)} className="btn-secondary" style={{ padding: '8px 16px', borderRadius: '8px' }}>
+              ← All Seasons
+            </button>
+          )}
+        </div>
+      )}
+
+      {renderItems.length > 0 ? (
         <div className="library-grid" style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+          gridTemplateColumns: viewMode === 'episodes' ? 'repeat(auto-fill, minmax(250px, 1fr))' : 'repeat(auto-fill, minmax(180px, 1fr))',
           gap: '30px'
         }}>
-          {filteredItems.map(item => (
+          {renderItems.map(item => (
             <div key={item.id} className="poster-card" style={{
               position: 'relative',
               borderRadius: '20px',
               overflow: 'hidden',
               background: 'var(--bg-card)',
               border: '1px solid var(--border-card)',
-              aspectRatio: '2/3',
+              aspectRatio: viewMode === 'episodes' ? '16/9' : '2/3',
               cursor: 'pointer',
               transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease',
+            }}
+            onClick={() => {
+              if (item.isSeriesNode) setCurrentSeriesId(item.series_id_key);
+              else if (item.isSeasonNode) setCurrentSeason(item.season_num_key);
+              else {
+                // Handle episode click or movie click (play or details)
+                api.revealFile(item.path);
+              }
             }}
             onMouseOver={e => {
               e.currentTarget.style.transform = 'translateY(-10px) scale(1.02)';
@@ -157,10 +257,10 @@ const LibraryView = ({ T }) => {
               e.currentTarget.querySelector('.poster-overlay').style.opacity = 0;
             }}
             >
-              {item.poster_path ? (
+              {item.displayPoster ? (
                 <img 
-                  src={`http://localhost:8000/media/images/posters${item.poster_path}`} 
-                  alt={item.title}
+                  src={`http://localhost:8000/media/images/${item.displayPosterFolder || 'posters'}${item.displayPoster}`} 
+                  alt={item.displayTitle}
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
               ) : (
@@ -171,7 +271,7 @@ const LibraryView = ({ T }) => {
                   padding: '20px', textAlign: 'center'
                 }}>
                   <Film size={40} color="var(--text-dim)" style={{ marginBottom: '15px' }} />
-                  <div style={{ fontSize: '14px', fontWeight: '700' }}>{item.title}</div>
+                  <div style={{ fontSize: '14px', fontWeight: '700' }}>{item.displayTitle}</div>
                 </div>
               )}
 
@@ -186,9 +286,12 @@ const LibraryView = ({ T }) => {
                 opacity: 0,
                 transition: 'opacity 0.3s ease'
               }}>
-                <div style={{ fontSize: '16px', fontWeight: '800', marginBottom: '5px' }}>{item.title}</div>
+                <div style={{ fontSize: '16px', fontWeight: '800', marginBottom: '5px' }}>
+                  {item.isEpisodeNode && <span style={{ opacity: 0.6, marginRight: '5px' }}>{item.episode_number}.</span>}
+                  {item.displayTitle}
+                </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '13px', color: 'var(--text-dim)' }}>{item.year}</span>
+                  <span style={{ fontSize: '13px', color: 'var(--text-dim)' }}>{item.isSeasonNode ? `${item.year || ''}` : item.year}</span>
                   {item.rating > 0 && (
                     <span style={{ 
                       fontSize: '11px', 

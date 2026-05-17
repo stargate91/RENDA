@@ -1,4 +1,5 @@
 import React from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 
 const ConfirmModal = () => {
@@ -16,13 +17,45 @@ const ConfirmModal = () => {
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content danger-modal" style={{ textAlign: 'center' }}>
-        <h2 style={{ color: '#ff3c3c', marginBottom: '15px' }}>{confirmDialog.title}</h2>
-        <p style={{ marginBottom: '25px', lineHeight: '1.5', color: '#ccc' }}>{confirmDialog.message}</p>
+    <div className="modal-overlay" style={{ animation: 'fade-in 0.3s ease' }}>
+      <div className="modal-content" style={{ 
+        textAlign: 'center', 
+        background: 'linear-gradient(180deg, rgba(30, 30, 35, 0.95), rgba(15, 15, 20, 0.98))',
+        backdropFilter: 'blur(30px)',
+        border: '1px solid rgba(255, 60, 60, 0.2)',
+        borderTop: '1px solid rgba(255, 60, 60, 0.4)',
+        boxShadow: '0 30px 60px rgba(0,0,0,0.8), 0 0 0 1px rgba(0,0,0,0.5), 0 0 40px rgba(255, 60, 60, 0.1) inset',
+        borderRadius: '24px',
+        padding: '40px',
+        maxWidth: '450px',
+        animation: 'slide-up 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+      }}>
+        <div style={{
+          width: '64px',
+          height: '64px',
+          borderRadius: '50%',
+          background: 'rgba(255, 60, 60, 0.1)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          margin: '0 auto 20px auto',
+          border: '1px solid rgba(255, 60, 60, 0.2)'
+        }}>
+          <AlertTriangle size={32} color="var(--danger)" />
+        </div>
+        <h2 style={{ color: '#fff', marginBottom: '15px', fontSize: '24px', fontWeight: '800', letterSpacing: '0.5px' }}>
+          {confirmDialog.title}
+        </h2>
+        <p style={{ marginBottom: '35px', lineHeight: '1.6', color: 'var(--text-dim)', fontSize: '15px' }}>
+          {confirmDialog.message}
+        </p>
         <div className="modal-actions" style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
-          <button className="btn-secondary" onClick={handleCancel}>{T('modal.confirm.cancel')}</button>
-          <button className="btn-danger" onClick={handleConfirm}>{T('modal.confirm.yes')}</button>
+          <button className="btn-secondary" style={{ flex: 1, padding: '14px', borderRadius: '12px' }} onClick={handleCancel}>
+            {T('modal.confirm.cancel')}
+          </button>
+          <button className="btn-danger" style={{ flex: 1, padding: '14px', borderRadius: '12px', background: 'rgba(255, 60, 60, 0.15)', border: '1px solid rgba(255, 60, 60, 0.3)', color: 'var(--danger)', boxShadow: 'none' }} onClick={handleConfirm}>
+            {T('modal.confirm.yes')}
+          </button>
         </div>
       </div>
     </div>

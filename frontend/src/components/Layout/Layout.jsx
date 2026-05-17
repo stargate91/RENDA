@@ -37,41 +37,7 @@ const Layout = ({ view, setView, isDragging, progress, imageStatus, hasInspector
       <FloatingActionBar />
 
 
-      {imageStatus && imageStatus.active && (
-        <div className="bg-process-indicator">
-          <div className="progress-circle-wrapper">
-            <svg className="progress-circle" viewBox="0 0 36 36">
-              <path className="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-              <path className="circle" strokeDasharray={`${Math.max(0, Math.min(100, imageStatus.progress || 0))}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-            </svg>
-            <div className="percentage">{Math.round(imageStatus.progress || 0)}%</div>
-          </div>
-          <div className="bg-process-info">
-            <div className="bg-process-label">{T('discovery.background_images')}</div>
-            <div className="bg-process-sub" title={imageStatus.current_item}>
-              {imageStatus.current_item || T('discovery.processing')}
-            </div>
-          </div>
-          <button 
-            className="btn-close-bg-process" 
-            onClick={handleResetImageStatus}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--text-dim)',
-              padding: '4px',
-              cursor: 'pointer',
-              marginLeft: '10px',
-              opacity: 0.5,
-              transition: 'opacity 0.2s'
-            }}
-            onMouseOver={e => e.currentTarget.style.opacity = 1}
-            onMouseOut={e => e.currentTarget.style.opacity = 0.5}
-          >
-            <X size={16} />
-          </button>
-        </div>
-      )}
+
     </div>
   );
 };

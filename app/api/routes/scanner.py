@@ -6,8 +6,8 @@ router = APIRouter()
 
 from pydantic import BaseModel
 from typing import List
-from fastapi import BackgroundTasks
-from app.scanner.scanner_manager import ScannerManager, scan_status
+from fastapi import BackgroundTasks, HTTPException
+from app.scanner.scanner_manager import ScannerManager, scan_status, scan_status_lock
 
 class ScanRequest(BaseModel):
     paths: List[str]
@@ -72,13 +72,16 @@ def start_scan(request: ScanRequest, background_tasks: BackgroundTasks):
     logger.info(f"Received scan request for paths: {request.paths}")
     
     import time
-    scan_status.update({
-        "active": True,
-        "phase": "collecting",
-        "current": 0,
-        "total": 0,
-        "start_time": time.time()
-    })
+    with scan_status_lock:
+        if scan_status.get("active"):
+            raise HTTPException(status_code=400, detail=f"Task already in progress: {scan_status.get('phase', 'unknown')}")
+        scan_status.update({
+            "active": True,
+            "phase": "collecting",
+            "current": 0,
+            "total": 0,
+            "start_time": time.time()
+        })
     
     def run_scan():
         logger.info("Background scan task starting...")

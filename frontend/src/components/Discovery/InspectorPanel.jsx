@@ -80,16 +80,27 @@ const InspectorPanel = ({ selectedItem, fetchFullMetadata, openResolver, openOve
         <div className="inspector-carousel">
           <div className="carousel-container" onClick={() => setImageIndex((imageIndex + 1) % selectedItem.images.length)}>
             <img
+              key={imageIndex}
               className="inspector-poster"
               src={`${API_BASE}${selectedItem.images[imageIndex].path}`}
               alt={T('inspector.media_alt')}
+              style={{ animation: 'fadeIn 0.3s ease' }}
             />
             {selectedItem.images.length > 1 && (
-              <div className="carousel-dots">
-                {selectedItem.images.map((_, i) => (
-                  <div key={i} className={`dot ${i === imageIndex ? 'active' : ''}`} />
-                ))}
-              </div>
+              <>
+                <div className="carousel-counter">
+                  {imageIndex + 1} / {selectedItem.images.length}
+                </div>
+                <div className="carousel-dots">
+                  {selectedItem.images.map((_, i) => (
+                    <div
+                      key={i}
+                      className={`dot ${i === imageIndex ? 'active' : ''}`}
+                      onClick={(e) => { e.stopPropagation(); setImageIndex(i); }}
+                    />
+                  ))}
+                </div>
+              </>
             )}
           </div>
         </div>

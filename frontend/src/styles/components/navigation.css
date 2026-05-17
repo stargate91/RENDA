@@ -52,6 +52,11 @@
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s;
+  outline: none;
+}
+
+.sidebar-toggle-btn:focus {
+  outline: none;
 }
 
 .sidebar-toggle-btn:hover {

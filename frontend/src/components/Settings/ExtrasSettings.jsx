@@ -75,7 +75,11 @@ const ExtrasSettings = ({ settings, setSettings }) => {
                   disabled={settings[`extras_${type.id}_action`] !== 'rename'}
                   placeholder="{{ParentName}} - {{ExtraCategory}}"
                 />
-                <button className="template-btn" onClick={() => setActiveVarMenu(activeVarMenu === `e_${type.id}` ? null : `e_${type.id}`)}>
+                <button 
+                  className="template-btn" 
+                  onClick={() => setActiveVarMenu(activeVarMenu === `e_${type.id}` ? null : `e_${type.id}`)}
+                  disabled={settings[`extras_${type.id}_action`] !== 'rename'}
+                >
                   <Plus size={14} /> <span>Var</span>
                 </button>
                 {activeVarMenu === `e_${type.id}` && (

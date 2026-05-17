@@ -24,6 +24,12 @@
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.form-input:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: rgba(0, 0, 0, 0.1);
+}
+
 .form-input:focus {
   outline: none;
   border-color: var(--accent-blue);
@@ -92,11 +98,13 @@
   top: calc(100% + 8px);
   left: 0;
   right: 0;
-  background: rgba(20, 20, 25, 0.85);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(15, 15, 20, 0.95);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top-color: rgba(255, 255, 255, 0.15);
   border-radius: var(--radius-lg);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(0,0,0,0.6);
   z-index: 1000;
   overflow: hidden;
   animation: select-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);

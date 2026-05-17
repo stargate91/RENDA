@@ -230,7 +230,13 @@ def get_discovery_items():
         for ex, p_status, p_planned, p_filename in extras:
             # Respect "delete" action from settings
             cat = ex.category.value if hasattr(ex.category, 'value') else str(ex.category)
-            action = getattr(formatter.config, f"extra_{cat}_action", "rename")
+            
+            short_cat = cat
+            if cat == "subtitle": short_cat = "sub"
+            elif cat == "image": short_cat = "img"
+            elif cat == "metadata": short_cat = "meta"
+            
+            action = getattr(formatter.config, f"extra_{short_cat}_action", "rename")
             
             if action == "delete":
                 extra_paths.append((ex, "-", "", "delete"))
@@ -430,9 +436,17 @@ def get_library_items():
                 "year": active_match.release_date.year if active_match and active_match.release_date else (item.fn_year or item.fd_year),
                 "poster_path": loc.poster_path if loc else None,
                 "backdrop_path": loc.backdrop_path if loc else None,
+                "still_path": loc.still_path if loc else None,
+                "series_poster_path": loc.series_poster_path if loc else None,
                 "rating": active_match.rating_tmdb if active_match else 0,
                 "type": item.item_type.value,
-                "path": item.current_path
+                "path": item.current_path,
+                "season_number": active_match.season_number if active_match else None,
+                "episode_number": active_match.episode_number if active_match else None,
+                "series_tmdb_id": active_match.series_tmdb_id if active_match else None,
+                "series_title": loc.series_title if loc else None,
+                "season_title": loc.season_title if loc else None,
+                "episode_title": loc.episode_title if loc else None
             }
 
             if active_match and active_match.is_adult:

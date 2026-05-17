@@ -11,7 +11,18 @@ from app.api.routes import scanner, settings, media, metadata, renamer
 # Automatically create tables if they don't exist
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="RENDA API")
+from contextlib import asynccontextmanager
+from app.services.background_tasks import start_background_workers, stop_background_workers
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Start background workers (e.g. ImageWorker)
+    start_background_workers()
+    yield
+    # Stop them gracefully
+    stop_background_workers()
+
+app = FastAPI(title="RENDA API", lifespan=lifespan)
 
 # Mount media folder
 app.mount("/media", StaticFiles(directory="data/media"), name="media")

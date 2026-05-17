@@ -103,16 +103,19 @@ const DiscoveryTable = ({
             </th>
             <th className="cell-center sortable-th metadata-col">
               {activeTab === 'extras' ? (
-                (extraSubTab === 'subtitle' || extraSubTab === 'audio') ? T('discovery.table.language') : T('discovery.table.subcategory')
+                extraSubTab === 'metadata' ? '' : T('discovery.table.subcategory')
               ) : T('discovery.table.type')}
             </th>
             <th className="cell-center sortable-th status-col" onClick={() => { 
-              const key = activeTab === 'extras' ? 'extension' : 'status';
+              const key = activeTab === 'extras' ? (extraSubTab === 'subtitle' || extraSubTab === 'audio' ? 'language' : 'extension') : 'status';
               setSortKey(key); 
               setSortDir(sortKey === key && sortDir === 'asc' ? 'desc' : 'asc'); 
             }}>
-              {activeTab === 'extras' ? T('discovery.table.subtype') : T('discovery.table.status')} 
-              {(sortKey === 'status' || sortKey === 'extension') && (sortDir === 'asc' ? ' ▲' : ' ▼')}
+              {activeTab === 'extras' ? (
+                (extraSubTab === 'subtitle' || extraSubTab === 'audio') ? T('discovery.table.language') : 
+                T('discovery.table.subtype')
+              ) : T('discovery.table.status')} 
+              {(sortKey === 'status' || sortKey === 'extension' || sortKey === 'language') && (sortDir === 'asc' ? ' ▲' : ' ▼')}
             </th>
           </tr>
         </thead>
@@ -161,15 +164,13 @@ const DiscoveryTable = ({
               </td>
               <td className="cell-center metadata-col">
                 {activeTab === 'extras' ? (
-                  (extraSubTab === 'subtitle' || extraSubTab === 'audio') ? (
-                    <span className="language-badge hide-on-hover">
-                      {item.language ? item.language.toUpperCase() : '-'}
-                    </span>
+                  extraSubTab === 'metadata' ? (
+                    <span className="hide-on-hover">-</span>
                   ) : (
                     <span className="subtype-badge hide-on-hover">
                       {item.subtype && item.subtype.toLowerCase() !== 'other'
                         ? (item.subtype.charAt(0).toUpperCase() + item.subtype.slice(1).replace(/_/g, ' '))
-                        : (item.extension || '-')}
+                        : '-'}
                     </span>
                   )
                 ) : (
@@ -183,11 +184,15 @@ const DiscoveryTable = ({
                       {item.status || T('discovery.table.unknown')}
                     </span>
                   ) : (
-                    <span className="status-badge extras">
-                      {item.subtype && item.subtype.toLowerCase() !== 'other' && item.subtype.toLowerCase() !== 'none'
-                        ? (item.subtype.charAt(0).toUpperCase() + item.subtype.slice(1).replace(/_/g, ' '))
-                        : '-'}
-                    </span>
+                    (extraSubTab === 'subtitle' || extraSubTab === 'audio') ? (
+                      <span className="language-badge">
+                        {item.language ? item.language.toUpperCase() : '-'}
+                      </span>
+                    ) : (
+                      <span className="status-badge extras" style={{ textTransform: 'lowercase', fontFamily: 'Consolas, monospace', letterSpacing: '1px' }}>
+                        {item.extension || '-'}
+                      </span>
+                    )
                   )}
                 </div>
                 

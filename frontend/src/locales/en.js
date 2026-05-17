@@ -18,6 +18,7 @@ const en = {
     "enriching": "Gathering metadata",
     "resolving": "Finalizing matches",
     "wiping": "Clearing library",
+    "organizing": "Organizing Library",
     "idle": "Idle"
   },
   "sidebar": {
@@ -102,7 +103,8 @@ const en = {
     "subtitle": "Track and manage past library organization tasks. Revert any batch with a single click.",
     "empty": "No history records found. Start organizing your library to see past activity here.",
     "items_count": "{{count}} items processed",
-    "undo_action": "Undo This Batch"
+    "undo_action": "Undo This Batch",
+    "undone": "Undone"
   },
   "progress": {
     "estimating": "Estimating time...",

@@ -198,9 +198,20 @@ class Resolver:
                 has_season = bool(item.fn_season or item.fd_season or item.it_season)
                 has_episode_num = bool(item.fn_episode or item.fd_episode or item.it_episode)
                 
+                tmdb_title = data.get("title") or data.get("name")
+                parsed_title = item.fn_title or item.fd_title or item.it_title
+                is_exact_title = False
+                if tmdb_title and parsed_title and tmdb_title.lower().strip() == parsed_title.lower().strip():
+                    is_exact_title = True
+                
                 # 1. Kritérium: Ha sorozat, de hiányzik a szezon VAGY epizód szám -> UNCERTAIN
                 if item.item_type in (ItemType.SERIES, ItemType.EPISODE) and (not has_season or not has_episode_num):
                     item.status = ItemStatus.UNCERTAIN
+                    
+                # Új kritérium: Ha sorozat/epizód, a cím PONTOSAN megegyezik, és van S/E -> MATCHED
+                # Ezzel elkerüljük, hogy évszámnak tűnő epizódcímek (pl. "1969") miatt UNCERTAIN legyen
+                elif item.item_type in (ItemType.SERIES, ItemType.EPISODE) and is_exact_title and has_season and has_episode_num:
+                    item.status = ItemStatus.MATCHED
                     
                 # 2. Van évszámunk, és az első találat évszáma is megegyezik (+- 1 év)
                 elif target_year and match_year and abs(target_year - match_year) <= 1:

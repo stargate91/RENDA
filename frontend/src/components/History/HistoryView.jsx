@@ -39,20 +39,23 @@ const HistoryView = ({ history, fetchHistory, handleUndo, loading, T }) => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              transition: 'all 0.3s ease'
+              transition: 'all 0.3s ease',
+              opacity: batch.status === 'undone' ? 0.4 : 1
             }}>
               <div className="batch-main" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                 <div className="status-icon" style={{
                   width: '48px',
                   height: '48px',
                   borderRadius: '14px',
-                  background: batch.status === 'completed' ? 'rgba(46, 213, 115, 0.1)' : 'rgba(255, 159, 64, 0.1)',
+                  background: batch.status === 'completed' ? 'rgba(46, 213, 115, 0.1)' : batch.status === 'undone' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 159, 64, 0.1)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}>
                   {batch.status === 'completed' ? (
                     <CheckCircle2 size={24} color="var(--success)" />
+                  ) : batch.status === 'undone' ? (
+                    <RotateCcw size={24} color="var(--text-dim)" />
                   ) : (
                     <AlertCircle size={24} color="#ff9f40" />
                   )}
@@ -79,11 +82,11 @@ const HistoryView = ({ history, fetchHistory, handleUndo, loading, T }) => {
                 <button 
                   className="btn-undo" 
                   onClick={() => handleUndo(batch.id)}
-                  disabled={loading}
+                  disabled={loading || batch.status === 'undone'}
                   style={{
                     background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid var(--border-card)',
-                    color: '#fff',
+                    color: batch.status === 'undone' ? 'var(--text-dim)' : '#fff',
                     padding: '10px 20px',
                     borderRadius: '12px',
                     fontSize: '13px',
@@ -91,12 +94,13 @@ const HistoryView = ({ history, fetchHistory, handleUndo, loading, T }) => {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
+                    cursor: batch.status === 'undone' ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s ease',
+                    opacity: batch.status === 'undone' ? 0.5 : 1
                   }}
                 >
                   <RotateCcw size={16} />
-                  {T('history.undo_action')}
+                  {batch.status === 'undone' ? (T('history.undone') || 'Undone') : T('history.undo_action')}
                 </button>
               </div>
             </div>

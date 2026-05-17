@@ -2,7 +2,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from app.db.base import Session
 from app.db.models import MediaItem, ItemStatus, ExtraFile
 from app.renamer.renamer_engine import RenamerEngine
-from app.scanner.scanner_manager import scan_status
+from app.scanner.scanner_manager import scan_status, scan_status_lock
 from app.formatter.formatter import Formatter, FormatterConfig
 import time
 import logging
@@ -48,8 +48,9 @@ def run_organize_task():
                 scan_status["current"] += 1
                 continue
             
-            loc = active_match.localizations[0] if active_match.localizations else None
-            preview = formatter.format_item(item, active_match, loc)
+            import os
+            dest_root = formatter.config.library_path if formatter.config.move_to_library and formatter.config.library_path else os.path.dirname(item.current_path)
+            preview = formatter.plan_rename(active_match, dest_root)
             
             # Execute physical move
             # execute_single handles the DB update and extras too
@@ -74,14 +75,20 @@ def start_rename(background_tasks: BackgroundTasks):
     """Triggers the organization process for all matched items."""
     db = Session()
     try:
-        # Check if already running
-        if scan_status.get("active") and scan_status.get("phase") == "organizing":
-            raise HTTPException(status_code=400, detail="Organization already in progress")
-            
-        # Check for items
         matched_count = db.query(MediaItem).filter(MediaItem.status == ItemStatus.MATCHED).count()
         if matched_count == 0:
             return {"status": "error", "message": "No matched items to organize"}
+
+        with scan_status_lock:
+            if scan_status.get("active"):
+                raise HTTPException(status_code=400, detail=f"Task already in progress: {scan_status.get('phase', 'unknown')}")
+            scan_status.update({
+                "active": True,
+                "phase": "organizing",
+                "current": 0,
+                "total": matched_count,
+                "start_time": time.time()
+            })
 
         background_tasks.add_task(run_organize_task)
         return {"status": "success", "message": f"Organizing {matched_count} items"}
@@ -116,23 +123,52 @@ def get_history():
                 "created_at": b.created_at.isoformat(),
                 "success_count": success_count,
                 "failed_count": failed_count,
-                "status": "completed" if failed_count == 0 else "partial"
+                "status": "undone" if (success_count == 0 and failed_count == 0) else "completed" if failed_count == 0 else "partial"
             })
             
         return result
     finally:
         db.close()
 
-@router.post("/rename/undo/{batch_id}")
-def undo_rename(batch_id: int):
-    """Reverts a past organization batch."""
+def run_undo_task(batch_id: int):
     db = Session()
+    global scan_status
     try:
+        scan_status.update({
+            "active": True,
+            "phase": "wiping", # We use wiping for undoing logic
+            "current": 0,
+            "total": 1,
+            "start_time": time.time()
+        })
         engine = RenamerEngine(db)
-        undo_count = engine.undo_batch(batch_id)
-        return {"status": "success", "message": f"Successfully reverted {undo_count} operations"}
+        
+        def progress_cb(current, total):
+            scan_status["current"] = current
+            scan_status["total"] = total
+            
+        undo_count = engine.undo_batch(batch_id, progress_callback=progress_cb)
+        logger.info(f"Undo complete. Reverted {undo_count} items.")
     except Exception as e:
-        logger.error(f"Undo failed: {e}")
-        return {"status": "error", "message": str(e)}
+        logger.error(f"Undo task failed: {e}")
     finally:
+        scan_status["active"] = False
+        scan_status["phase"] = "idle"
         db.close()
+
+@router.post("/rename/undo/{batch_id}")
+def undo_rename(batch_id: int, background_tasks: BackgroundTasks):
+    """Reverts a past organization batch in the background."""
+    with scan_status_lock:
+        if scan_status.get("active"):
+            raise HTTPException(status_code=400, detail=f"Task already in progress: {scan_status.get('phase', 'unknown')}")
+        scan_status.update({
+            "active": True,
+            "phase": "wiping",
+            "current": 0,
+            "total": 1,
+            "start_time": time.time()
+        })
+        
+    background_tasks.add_task(run_undo_task, batch_id)
+    return {"status": "success", "message": "Reverting batch in background"}

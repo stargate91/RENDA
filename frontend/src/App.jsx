@@ -44,7 +44,6 @@ function App() {
       setView={setView} 
       isDragging={isDragging} 
       progress={progress} 
-      imageStatus={imageStatus}
       hasInspector={showInspector}
       T={T}
       inspector={

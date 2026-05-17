@@ -67,20 +67,26 @@ class RenamerEngine:
             shutil.move(str(old_path), str(target_path))
             successful_moves.append((old_path, target_path))
             
-            # 3. EXTRÁK MOZGATÁSA
+            # 3. EXTRÁK MOZGATÁSA VAGY TÖRLÉSE
             for extra_preview in preview.extra_previews:
                 extra = self.db.query(ExtraFile).get(extra_preview.extra_id)
                 if not extra: continue
 
                 e_old = Path(extra.current_path)
-                e_target = Path(extra_preview.target_path)
-
+                
                 if not e_old.exists():
                     raise FileNotFoundError(f"Extra source not found: {e_old}")
-                
-                e_target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.move(str(e_old), str(e_target))
-                successful_moves.append((e_old, e_target))
+
+                if getattr(extra_preview, "action", "RENAME") == "DELETE":
+                    # Törlés
+                    e_old.unlink()
+                    successful_moves.append((e_old, None)) # None jelzi, hogy törölve lett
+                else:
+                    # Mozgatás
+                    e_target = Path(extra_preview.target_path)
+                    e_target.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.move(str(e_old), str(e_target))
+                    successful_moves.append((e_old, e_target))
 
             # --- SIKERES MOZGATÁSOK UTÁN: ADATBÁZIS FRISSÍTÉS ---
 
@@ -96,9 +102,14 @@ class RenamerEngine:
                 extra = self.db.query(ExtraFile).get(extra_preview.extra_id)
                 if extra:
                     old_e_path = extra.current_path
-                    extra.current_path = extra_preview.target_path
-                    self._log_action(batch_id, extra_id=extra.id, action_type=ActionType.RENAME, 
-                                    status=ActionStatus.SUCCESS, old_val=old_e_path, new_val=extra_preview.target_path)
+                    if getattr(extra_preview, "action", "RENAME") == "DELETE":
+                        self.db.delete(extra)
+                        self._log_action(batch_id, extra_id=None, action_type=ActionType.DELETE, 
+                                        status=ActionStatus.SUCCESS, old_val=old_e_path, new_val=None)
+                    else:
+                        extra.current_path = extra_preview.target_path
+                        self._log_action(batch_id, extra_id=extra.id, action_type=ActionType.RENAME, 
+                                        status=ActionStatus.SUCCESS, old_val=old_e_path, new_val=extra_preview.target_path)
 
             self.db.commit()
             
@@ -115,7 +126,10 @@ class RenamerEngine:
                 logger.info(f"Rolling back {len(successful_moves)} files...")
                 for orig_p, curr_p in reversed(successful_moves):
                     try:
-                        if curr_p.exists():
+                        if curr_p is None:
+                            # Törölt fájl - ezt sajnos nem tudjuk egyszerűen visszagörgetni (hacsak nincs lomtárba rakva)
+                            logger.warning(f"Cannot rollback deleted file: {orig_p}")
+                        elif curr_p.exists():
                             shutil.move(str(curr_p), str(orig_p))
                     except Exception as re:
                         logger.critical(f"CRITICAL: Rollback failed ({curr_p} -> {orig_p}): {re}")
@@ -156,7 +170,7 @@ class RenamerEngine:
         )
         self.db.add(log)
 
-    def undo_batch(self, batch_id: int) -> int:
+    def undo_batch(self, batch_id: int, progress_callback=None) -> int:
         """
         Visszavonja egy adott batch összes műveletét.
         Visszaadja a sikeresen visszavont műveletek számát.
@@ -167,9 +181,12 @@ class RenamerEngine:
         ).order_by(ActionLog.id.desc()).all() # FORDÍTOTT SORREND!
 
         undo_count = 0
-        for log in logs:
+        total = len(logs)
+        for i, log in enumerate(logs):
             if self._undo_single(log):
                 undo_count += 1
+            if progress_callback:
+                progress_callback(i + 1, total)
         
         return undo_count
 
