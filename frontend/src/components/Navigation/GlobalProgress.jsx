@@ -25,9 +25,11 @@ const GlobalProgress = ({ progress, T }) => {
   };
 
   const calculateETA = () => {
-    if (progress.current < 2) return T('progress.estimating');
+    if (progress.current < 2 || !progress.start_time || progress.start_time <= 0) return T('progress.estimating');
     const elapsed = nowSeconds - progress.start_time;
+    if (elapsed <= 0) return T('progress.estimating');
     const itemsPerSec = progress.current / elapsed;
+    if (itemsPerSec <= 0) return T('progress.estimating');
     const remainingItems = progress.total - progress.current;
     const remainingSecs = remainingItems / itemsPerSec;
 

@@ -33,6 +33,8 @@ class MediaItemDTO(BaseModel):
     images: List[MediaImageDTO] = []
     matches: List[MediaMatchDTO] = []
     current_path: Optional[str] = None
+    has_collision: Optional[bool] = False
+    collision_group_id: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -60,24 +60,12 @@ const ConfirmModal = () => {
         <p style={{ marginBottom: '35px', lineHeight: '1.6', color: 'var(--text-dim)', fontSize: '15px' }}>
           {confirmDialog.message}
         </p>
-        <div className="modal-actions" style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
-          <button className="btn-secondary" style={{ flex: 1, padding: '14px', borderRadius: '12px' }} onClick={handleCancel}>
+        <div className="modal-actions" style={{ display: 'flex', gap: '15px', justifyContent: 'center', marginTop: '30px' }}>
+          <button className="modal-cancel-btn" onClick={handleCancel}>
             {confirmDialog.cancelText || T('modal.confirm.cancel')}
           </button>
           <button 
-            className={isInfo ? "btn-primary" : "btn-danger"} 
-            style={{ 
-              flex: 1, 
-              padding: '14px', 
-              borderRadius: '12px', 
-              background: `rgba(${colorBase}, 0.18)`, 
-              border: `1px solid rgba(${colorBase}, 0.35)`, 
-              color: '#fff', 
-              fontWeight: '700',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              boxShadow: `0 4px 12px rgba(${colorBase}, 0.15)`
-            }} 
+            className={`modal-confirm-btn ${isInfo ? "info" : "danger"}`} 
             onClick={handleConfirm}
           >
             {confirmDialog.confirmText || T('modal.confirm.yes')}

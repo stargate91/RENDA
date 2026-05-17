@@ -53,15 +53,15 @@ class MediaDiscoveryService:
         for item, p_path in item_data:
             dto = self._serialize_item(item, p_path)
             
-            is_collision = False
-            if p_path and path_counts[p_path.lower()] > 1:
-                is_collision = True
-            elif item.group_hash:
-                hash_match_count = sum(1 for i in items if i.group_hash == item.group_hash)
-                if hash_match_count > 1:
-                    is_collision = True
+            dto.has_collision = False
+            dto.collision_group_id = None
+            
+            if item.status == ItemStatus.MATCHED:
+                if p_path and path_counts[p_path.lower()] > 1:
+                    dto.has_collision = True
+                    dto.collision_group_id = f"path_{p_path.lower()}"
 
-            if is_collision:
+            if dto.has_collision:
                 groups["collisions"].append(dto)
             elif item.status in [ItemStatus.NEW, ItemStatus.UNCERTAIN, ItemStatus.NO_MATCH, ItemStatus.MULTIPLE, ItemStatus.ERROR]:
                 groups["manual"].append(dto)

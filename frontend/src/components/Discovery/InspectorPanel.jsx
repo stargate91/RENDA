@@ -114,7 +114,7 @@ const InspectorPanel = ({ selectedItem, fetchFullMetadata, openResolver, openOve
         <div className="inspector-item">
           <div className="inspector-label">{T('inspector.path')}</div>
           <div className="inspector-value code" style={{ color: '#ffffff', wordBreak: 'break-all', fontSize: '11px' }}>
-            {selectedItem.path || `${selectedItem.folder}/${selectedItem.filename}`}
+            {selectedItem.current_path || selectedItem.path || selectedItem.filename}
           </div>
         </div>
         <div className="inspector-item">

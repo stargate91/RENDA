@@ -33,6 +33,13 @@ class DecisionEngine:
         if (fn.get('season') or fn.get('episode') or fd.get('season') or fd.get('episode')) and fn_type != 'movie':
             is_forced_series = True
             
+        # Exception: Movie sequels often have fractions or numbers that Guessit mistakes for episodes (e.g. Naked Gun 2 12 (1991))
+        # If we have an episode but absolutely no season info, and we have a valid year, and no standard S/E markers:
+        if is_forced_series and fn.get('episode') and not fn.get('season') and not fd.get('season') and (fn.get('year') or fd.get('year')):
+            import re
+            if not re.search(r'\bs\d+e\d+\b|\bseason\b|\bepizod\b|\bresz\b', raw_fn_lower):
+                is_forced_series = False
+            
         series_kw = ['mini-series', 'miniseries', 'complete series', 'complete.series']
         if any(kw in raw_fn_lower or kw in raw_fd_lower for kw in series_kw):
             is_forced_series = True

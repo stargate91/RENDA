@@ -51,6 +51,15 @@ class Analyzer:
         Reconstructs the movie title by putting back trimmed numbers to their original positions.
         """
         title = data.get('title')
+        if not title:
+            return None
+            
+        alt_title = data.get('alternative_title')
+        is_tv = data.get('type') in ['episode', 'series']
+        if alt_title and is_tv:
+            if alt_title.lower() not in title.lower():
+                title = f"{title} {alt_title}"
+                
         is_movie = data.get('type') == 'movie'
         is_lonely_episode = data.get('type') == 'episode' and not data.get('season')
         

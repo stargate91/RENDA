@@ -227,64 +227,93 @@ def resolve_metadata(request: ResolveRequest):
 @router.post("/metadata/sync-language")
 def sync_metadata_language():
     """Background task to fetch metadata for the active languages."""
-    db = Session()
-    try:
-        from app.db.models import MediaItem, ItemStatus, UserSetting
-        from app.scanner.metadata_enricher import MetadataEnricher
-        
-        lang = db.query(UserSetting).filter(UserSetting.key == "primary_metadata_language").first()
-        fallback = db.query(UserSetting).filter(UserSetting.key == "fallback_metadata_language").first()
-        
-        target_lang = lang.value if lang else "en"
-        fallback_lang = fallback.value if fallback and fallback.value != "none" else None
-
-        from app.formatter.formatter import Formatter, FormatterConfig
-        from app.db.models import MediaMatch, ImageStatus
-
-        items = db.query(MediaItem).filter(MediaItem.status.in_([
-            ItemStatus.MATCHED, ItemStatus.RENAMED, ItemStatus.ORGANIZED,
-            ItemStatus.UNCERTAIN, ItemStatus.MULTIPLE
-        ])).all()
-
-        enricher = MetadataEnricher(db)
-        
-        for item in items:
-            enricher.enrich_matched_item(item, language=target_lang, fallback_language=fallback_lang)
+    import threading
+    from app.scanner.scanner_manager import update_scan_status
+    
+    def run_sync():
+        db = Session()
+        try:
+            from app.db.models import MediaItem, ItemStatus, UserSetting, MediaMatch, ImageStatus, MetadataLocalization
+            from app.scanner.metadata_enricher import MetadataEnricher
+            from app.scanner.image_worker import ImageWorker
             
-            # Reset image statuses so ImageWorker fetches new localized posters
-            for match in item.matches:
-                if match.is_active:
-                    match.image_status = ImageStatus.PENDING
-                    match.backdrop_status = ImageStatus.PENDING
-        # Update is_primary status on all MetadataLocalization objects to align with the new target language
-        from app.db.models import MetadataLocalization
-        db.query(MetadataLocalization).filter(MetadataLocalization.target_language == target_lang).update({"is_primary": True})
-        db.query(MetadataLocalization).filter(MetadataLocalization.target_language != target_lang).update({"is_primary": False})
-        
-        db.commit()
+            lang = db.query(UserSetting).filter(UserSetting.key == "primary_metadata_language").first()
+            fallback = db.query(UserSetting).filter(UserSetting.key == "fallback_metadata_language").first()
+            
+            target_lang = lang.value if lang else "en"
+            fallback_lang = fallback.value if fallback and fallback.value != "none" else None
 
-        # Start image worker
-        import threading
-        from app.scanner.image_worker import ImageWorker
-        def run_image_worker():
-            local_db = Session()
+            items = db.query(MediaItem).filter(MediaItem.status.in_([
+                ItemStatus.MATCHED, ItemStatus.RENAMED, ItemStatus.ORGANIZED,
+                ItemStatus.UNCERTAIN, ItemStatus.MULTIPLE
+            ])).all()
+
+            # Initialize scan status for progress bar
+            import time
+            update_scan_status({
+                "active": True,
+                "phase": "resolving",
+                "total": len(items),
+                "current": 0,
+                "start_time": time.time(),
+                "message": "Syncing metadata language..."
+            })
+
+            enricher = MetadataEnricher(db)
+            
+            for index, item in enumerate(items):
+                try:
+                    enricher.enrich_matched_item(item, language=target_lang, fallback_language=fallback_lang)
+                    
+                    # Reset image statuses so ImageWorker fetches new localized posters
+                    for match in item.matches:
+                        if match.is_active:
+                            match.image_status = ImageStatus.PENDING
+                            match.backdrop_status = ImageStatus.PENDING
+                except Exception as item_ex:
+                    logger.error(f"Error enriching item {item.id} during lang sync: {item_ex}")
+                
+                # Update progress in real-time
+                update_scan_status({
+                    "current": index + 1,
+                    "message": f"Syncing {index + 1}/{len(items)} items..."
+                })
+
+            # Update is_primary status on all MetadataLocalization objects to align with the new target language
+            db.query(MetadataLocalization).filter(MetadataLocalization.target_language == target_lang).update({"is_primary": True})
+            db.query(MetadataLocalization).filter(MetadataLocalization.target_language != target_lang).update({"is_primary": False})
+            
+            db.commit()
+
+            # Process images synchronously in the background thread after metadata is done
+            update_scan_status({
+                "message": "Downloading localized posters and backdrops..."
+            })
             try:
-                iw = ImageWorker(local_db, "./data")
+                iw = ImageWorker(db, "./data")
                 iw.process_all()
-            finally:
-                local_db.close()
-        threading.Thread(target=run_image_worker, daemon=True).start()
+            except Exception as iw_ex:
+                logger.error(f"Image worker error: {iw_ex}")
 
-        return {"status": "success"}
-    except Exception as e:
-        db.rollback()
-        import traceback
-        logger.error(f"Error syncing language: {e}")
-        logger.error(traceback.format_exc())
-        from fastapi.responses import JSONResponse
-        return JSONResponse(status_code=500, content={"error": str(e)})
-    finally:
-        db.close()
+        except Exception as e:
+            db.rollback()
+            import traceback
+            logger.error(f"Error syncing language: {e}")
+            logger.error(traceback.format_exc())
+        finally:
+            # Clear scan status so progress bar closes and UI auto-refreshes
+            update_scan_status({
+                "active": False,
+                "phase": "idle",
+                "total": 0,
+                "current": 0,
+                "message": ""
+            })
+            db.close()
+
+    # Start the synchronization and image download in a non-blocking background thread
+    threading.Thread(target=run_sync, daemon=True).start()
+    return {"status": "success"}
 
 @router.get("/item/{item_id}/full-metadata")
 def get_full_metadata(item_id: int):

@@ -126,9 +126,18 @@ class Resolver:
                 tmdb_type = "tv" if item.item_type in (ItemType.SERIES, ItemType.EPISODE) else "movie"
                 results = self.api.search(clean_title, item_type=tmdb_type, year=year, language=language)
                 
-                # FALLBACK: Ha évszámmal nem volt találat, próbáljuk meg anélkül
+                # FALLBACK 1: Ha évszámmal nem volt találat, próbáljuk meg anélkül
                 if not results and year:
                     results = self.api.search(clean_title, item_type=tmdb_type, year=None, language=language)
+                
+                # FALLBACK 2: Ha még mindig nincs találat, és a cím végén gyanús, törtből származó számcsoport van (pl. '2 12' -> '2')
+                if not results:
+                    fallback_match = re.search(r'^(.*\b\d+)\s+\d+$', clean_title)
+                    if fallback_match:
+                        fallback_title = fallback_match.group(1).strip()
+                        results = self.api.search(fallback_title, item_type=tmdb_type, year=year, language=language)
+                        if not results and year:
+                            results = self.api.search(fallback_title, item_type=tmdb_type, year=None, language=language)
                 
                 for res in results:
                     res["item_type"] = tmdb_type
@@ -150,11 +159,27 @@ class Resolver:
         
         if not candidates:
             item.status = ItemStatus.NO_MATCH
+            item.planned_path = None
             self.db.commit()
             return
 
-        # Sorbarendezzük népszerűség szerint (ha van ilyen adatunk a keresésből)
-        sorted_candidates = sorted(candidates.values(), key=lambda x: x.get('popularity', 0), reverse=True)
+        target_year = item.fn_year or item.fd_year or item.it_year
+        
+        def get_candidate_score(x):
+            popularity = x.get('popularity', 0) or 0
+            date_str = x.get("release_date") or x.get("first_air_date")
+            year_match = 0
+            if target_year and date_str:
+                try:
+                    c_year = int(date_str.split("-")[0])
+                    if abs(c_year - target_year) <= 1:
+                        year_match = 1
+                except:
+                    pass
+            return (year_match, popularity)
+
+        # Sorbarendezzük: elsődlegesen évszám egyezése szerint (+-1 év), másodlagosan népszerűség szerint
+        sorted_candidates = sorted(candidates.values(), key=get_candidate_score, reverse=True)
         
         # Limitálás 15-re
         limited_candidates = sorted_candidates[:15]
@@ -196,20 +221,37 @@ class Resolver:
                 has_season = bool(item.fn_season or item.fd_season or item.it_season)
                 has_episode_num = bool(item.fn_episode or item.fd_episode or item.it_episode)
                 
-                tmdb_title = data.get("title") or data.get("name")
                 parsed_title = item.fn_title or item.fd_title or item.it_title
+                
+                # Összegyűjtjük a TMDB találat lehetséges nyelvi címeit közvetlenül a keresési találatból (alap és eredeti címek)
+                all_titles = []
+                if data.get("title"): all_titles.append(data.get("title"))
+                if data.get("name"): all_titles.append(data.get("name"))
+                if data.get("original_title"): all_titles.append(data.get("original_title"))
+                if data.get("original_name"): all_titles.append(data.get("original_name"))
+                
+                def clean_title(t: str) -> str:
+                    if not t: return ""
+                    return re.sub(r'[^a-z0-9]', '', t.lower())
+                
                 is_exact_title = False
-                if tmdb_title and parsed_title and tmdb_title.lower().strip() == parsed_title.lower().strip():
-                    is_exact_title = True
+                cleaned_parsed = clean_title(parsed_title)
+                if cleaned_parsed:
+                    for title in all_titles:
+                        if clean_title(title) == cleaned_parsed:
+                            is_exact_title = True
+                            break
                 
                 # 1. Kritérium: Ha sorozat, de hiányzik a szezon VAGY epizód szám -> UNCERTAIN
                 if item.item_type in (ItemType.SERIES, ItemType.EPISODE) and (not has_season or not has_episode_num):
                     item.status = ItemStatus.UNCERTAIN
                     match.is_active = True
+                    item.planned_path = None
                     
-                # Új kritérium: Ha sorozat/epizód, a cím PONTOSAN megegyezik, és van S/E -> MATCHED
-                # Ezzel elkerüljük, hogy évszámnak tűnő epizódcímek (pl. "1969") miatt UNCERTAIN legyen
-                elif item.item_type in (ItemType.SERIES, ItemType.EPISODE) and is_exact_title and has_season and has_episode_num:
+                # Új kritérium: Ha a cím PONTOSAN megegyezik (írásjelektől eltekintve)
+                # Sorozat esetén: ha van S/E -> MATCHED (elkerüli a hamis évszám és a többes találat miatti bizonytalanságot)
+                # Film esetén: ha a cím pontosan egyezik, akkor is MATCHED!
+                elif is_exact_title and (item.item_type not in (ItemType.SERIES, ItemType.EPISODE) or (has_season and has_episode_num)):
                     item.status = ItemStatus.MATCHED
                     match.is_active = True
                     
@@ -222,6 +264,7 @@ class Resolver:
                 elif target_year and match_year and abs(target_year - match_year) > 1:
                     item.status = ItemStatus.UNCERTAIN
                     match.is_active = True
+                    item.planned_path = None
                     
                 # 4. Nincs évszámunk, de a TMDB több találatot is adott
                 elif not target_year and match_count > 1:

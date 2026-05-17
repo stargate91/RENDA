@@ -92,7 +92,7 @@ class ScannerManager:
                 
                 if existing and existing.size == size and existing.mtime == mtime:
                     path_to_item[p] = existing
-                    if existing.status == ItemStatus.NEW:
+                    if existing.status in [ItemStatus.NEW, ItemStatus.UNCERTAIN, ItemStatus.MULTIPLE, ItemStatus.NO_MATCH, ItemStatus.ERROR]:
                         to_process.append(existing)
                 else:
                     if existing:
@@ -357,45 +357,66 @@ class ScannerManager:
                 seen_hashes.add(item.group_hash)
         
         item_ids = [item.id for item in unique_items]
+        db_lock = threading.Lock()
 
         def resolve_task(item_id: int):
-            local_db = DbSession()
-            try:
-                item = local_db.query(MediaItem).filter(MediaItem.id == item_id).first()
-                if not item:
-                    return
-                
-                # Futtassuk a Resolvert
-                resolver = Resolver(local_db)
-                resolver.resolve_item(item)
-                resolver.propagate_match(item)
-                
-                # Ha sikeres a találat (automatikus egyezés), rögtön töltsük le a mély metaadatokat
-                if item.status == ItemStatus.MATCHED:
-                    from .metadata_enricher import MetadataEnricher
+            with db_lock:
+                local_db = DbSession()
+                try:
+                    item = local_db.query(MediaItem).filter(MediaItem.id == item_id).first()
+                    if not item:
+                        return
+                    
+                    # Load primary metadata language setting for resolution
                     from ..db.models import UserSetting
-                    
-                    # Load language preferences from settings
                     primary_lang = "en"
-                    fallback_lang = None
-                    try:
-                        pl = local_db.query(UserSetting).filter(UserSetting.key == "primary_metadata_language").first()
-                        fl = local_db.query(UserSetting).filter(UserSetting.key == "fallback_metadata_language").first()
-                        if pl and pl.value: primary_lang = pl.value
-                        if fl and fl.value and fl.value != "none": fallback_lang = fl.value
-                    except: pass
+                    lang_setting = local_db.query(UserSetting).filter(UserSetting.key == "primary_metadata_language").first()
+                    if lang_setting:
+                        primary_lang = lang_setting.value
                     
-                    enricher = MetadataEnricher(local_db)
-                    enricher.enrich_matched_item(item, language=primary_lang, fallback_language=fallback_lang)
-
-                
-            except Exception as e:
-                import traceback
-                logger.error(f"Error resolving item ID {item_id}: {e}")
-                logger.error(traceback.format_exc())
-            finally:
-                increment_scan_status_current()
-                DbSession.remove()
+                    # Run the Resolver with target language
+                    resolver = Resolver(local_db)
+                    resolver.resolve_item(item, language=primary_lang)
+                    resolver.propagate_match(item)
+                    
+                    # If matched successfully, enrich metadata immediately
+                    if item.status == ItemStatus.MATCHED:
+                        from .metadata_enricher import MetadataEnricher
+                        from ..db.models import UserSetting
+                        
+                        # Load language preferences from settings
+                        primary_lang = "en"
+                        fallback_lang = None
+                        try:
+                            pl = local_db.query(UserSetting).filter(UserSetting.key == "primary_metadata_language").first()
+                            fl = local_db.query(UserSetting).filter(UserSetting.key == "fallback_metadata_language").first()
+                            if pl and pl.value: primary_lang = pl.value
+                            if fl and fl.value and fl.value != "none": fallback_lang = fl.value
+                        except: pass
+                        
+                        enricher = MetadataEnricher(local_db)
+                        enricher.enrich_matched_item(item, language=primary_lang, fallback_language=fallback_lang)
+                        
+                        # Enrich all siblings that got matched via propagate_match as well
+                        if item.group_hash:
+                            siblings = local_db.query(MediaItem).filter(
+                                MediaItem.group_hash == item.group_hash,
+                                MediaItem.id != item.id,
+                                MediaItem.status == ItemStatus.MATCHED
+                            ).all()
+                            for sib in siblings:
+                                try:
+                                    enricher.enrich_matched_item(sib, language=primary_lang, fallback_language=fallback_lang)
+                                except Exception as sib_ex:
+                                    logger.warning(f"Failed to enrich sibling item {sib.id}: {sib_ex}")
+                    
+                except Exception as e:
+                    import traceback
+                    logger.error(f"Error resolving item ID {item_id}: {e}")
+                    logger.error(traceback.format_exc())
+                finally:
+                    increment_scan_status_current()
+                    DbSession.remove()
 
         # ThreadPool a hálózati kérésekhez (limitálva a rate limit elkerülésére)
         with ThreadPoolExecutor(max_workers=5) as executor:

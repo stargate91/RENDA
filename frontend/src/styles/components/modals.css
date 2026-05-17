@@ -1166,3 +1166,89 @@
   justify-content: flex-end;
   gap: 15px;
 }
+
+/* Confirm Modal Action Buttons */
+.modal-confirm-btn {
+  flex: 1;
+  padding: 14px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* Danger Confirm Button (Delete, Revert, Undo) */
+.modal-confirm-btn.danger {
+  background: rgba(255, 60, 60, 0.18);
+  border: 1px solid rgba(255, 60, 60, 0.35);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(255, 60, 60, 0.15);
+}
+
+.modal-confirm-btn.danger:hover {
+  background: rgba(255, 60, 60, 0.3);
+  border-color: rgba(255, 60, 60, 0.5);
+  box-shadow: 
+    0 6px 20px rgba(255, 60, 60, 0.25),
+    0 0 15px rgba(255, 60, 60, 0.1);
+  transform: translateY(-2px);
+}
+
+.modal-confirm-btn.danger:active {
+  transform: translateY(1px);
+  filter: brightness(0.9);
+}
+
+/* Info Confirm Button */
+.modal-confirm-btn.info {
+  background: rgba(52, 152, 219, 0.18);
+  border: 1px solid rgba(52, 152, 219, 0.35);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
+}
+
+.modal-confirm-btn.info:hover {
+  background: rgba(52, 152, 219, 0.3);
+  border-color: rgba(52, 152, 219, 0.5);
+  box-shadow: 
+    0 6px 20px rgba(52, 152, 219, 0.25),
+    0 0 15px rgba(52, 152, 219, 0.1);
+  transform: translateY(-2px);
+}
+
+.modal-confirm-btn.info:active {
+  transform: translateY(1px);
+  filter: brightness(0.9);
+}
+
+/* Cancel Button in Confirm Dialog */
+.modal-cancel-btn {
+  flex: 1;
+  padding: 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-dim);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: center;
+}
+
+.modal-cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  transform: translateY(-2px);
+}
+
+.modal-cancel-btn:active {
+  transform: translateY(1px);
+}

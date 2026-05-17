@@ -554,6 +554,63 @@
   border-left-width: 4px;
 }
 
+/* Collision Groups and Highlight Visuals */
+
+/* Group odd: halvány, prémium sötét-pirosas izzás/háttér */
+.data-table tbody tr.collision-row.collision-group-odd td {
+  background: rgba(255, 77, 77, 0.03) !important;
+  border-top-color: rgba(255, 77, 77, 0.15) !important;
+  border-bottom-color: rgba(255, 77, 77, 0.15) !important;
+}
+
+.data-table tbody tr.collision-row.collision-group-odd td:first-child {
+  border-left: 3px solid rgba(255, 77, 77, 0.65) !important;
+}
+
+.data-table tbody tr.collision-row.collision-group-odd td:last-child {
+  border-right-color: rgba(255, 77, 77, 0.15) !important;
+}
+
+/* Group even: halvány, prémium sötét-narancssárgás izzás/háttér */
+.data-table tbody tr.collision-row.collision-group-even td {
+  background: rgba(255, 140, 0, 0.03) !important;
+  border-top-color: rgba(255, 140, 0, 0.15) !important;
+  border-bottom-color: rgba(255, 140, 0, 0.15) !important;
+}
+
+.data-table tbody tr.collision-row.collision-group-even td:first-child {
+  border-left: 3px solid rgba(255, 140, 0, 0.65) !important;
+}
+
+.data-table tbody tr.collision-row.collision-group-even td:last-child {
+  border-right-color: rgba(255, 140, 0, 0.15) !important;
+}
+
+/* Hovering over collision rows */
+.data-table tbody tr.collision-row.collision-group-odd:hover td {
+  background: rgba(255, 77, 77, 0.08) !important;
+  border-top-color: rgba(255, 77, 77, 0.3) !important;
+  border-bottom-color: rgba(255, 77, 77, 0.3) !important;
+}
+
+.data-table tbody tr.collision-row.collision-group-even:hover td {
+  background: rgba(255, 140, 0, 0.08) !important;
+  border-top-color: rgba(255, 140, 0, 0.3) !important;
+  border-bottom-color: rgba(255, 140, 0, 0.3) !important;
+}
+
+/* Collision Separator Line */
+.data-table tr.collision-group-separator {
+  height: 12px;
+  pointer-events: none;
+}
+
+.data-table tr.collision-group-separator td {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+}
+
 /* Cell Specific Styles */
 .original-name {
   font-family: 'Consolas', monospace;
