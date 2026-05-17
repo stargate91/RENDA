@@ -74,7 +74,9 @@ class LibraryGroupedDTO(BaseModel):
     movies: List[LibraryItemDTO] = []
     series: List[LibraryItemDTO] = []
     adult: List[LibraryItemDTO] = []
-    counts: Dict[str, int] = {"movies": 0, "series": 0, "adult": 0}
+    actors: List[LibraryItemDTO] = []
+    directors: List[LibraryItemDTO] = []
+    counts: Dict[str, int] = {"movies": 0, "series": 0, "adult": 0, "actors": 0, "directors": 0}
 
 class LibraryStatsDTO(BaseModel):
     total_movies: int

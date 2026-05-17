@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Film, Tv, ShieldAlert, Loader2 } from 'lucide-react';
+import { Search, Film, Tv, ShieldAlert, Loader2, User, Clapperboard } from 'lucide-react';
 import { api } from '../../services/api';
 
 const LibraryView = ({ T }) => {
@@ -41,7 +41,9 @@ const LibraryView = ({ T }) => {
   const visibleTabs = [
     { id: 'movies', label: T('discovery.tabs.movies'), icon: <Film size={18} />, count: data.counts.movies },
     { id: 'series', label: T('discovery.tabs.series'), icon: <Tv size={18} />, count: data.counts.series },
-    { id: 'adult', label: 'Adult', icon: <ShieldAlert size={18} />, count: data.counts.adult }
+    { id: 'adult', label: 'Adult', icon: <ShieldAlert size={18} />, count: data.counts.adult },
+    { id: 'actors', label: 'Actors', icon: <User size={18} />, count: data.counts.actors || 0 },
+    { id: 'directors', label: 'Directors', icon: <Clapperboard size={18} />, count: data.counts.directors || 0 }
   ].filter(tab => tab.count > 0);
 
   const currentItems = data[activeTab] || [];
@@ -110,12 +112,12 @@ const LibraryView = ({ T }) => {
       viewMode = 'episodes';
     }
   } else {
-    // Movies / Adult flat map
+    // Movies / Adult / Actors / Directors flat map
     renderItems = filteredItems.map(item => ({
       ...item,
       displayTitle: item.title,
-      displayPoster: item.poster_path,
-      displayPosterFolder: 'posters'
+      displayPoster: item.displayPoster || item.poster_path,
+      displayPosterFolder: item.displayPosterFolder || 'posters'
     }));
   }
 
@@ -241,7 +243,7 @@ const LibraryView = ({ T }) => {
             onClick={() => {
               if (item.isSeriesNode) setCurrentSeriesId(item.series_id_key);
               else if (item.isSeasonNode) setCurrentSeason(item.season_num_key);
-              else {
+              else if (item.type !== 'actor' && item.type !== 'director') {
                 // Handle episode click or movie click (play or details)
                 api.revealFile(item.path);
               }
@@ -270,7 +272,11 @@ const LibraryView = ({ T }) => {
                   background: 'linear-gradient(135deg, #222, #111)',
                   padding: '20px', textAlign: 'center'
                 }}>
-                  <Film size={40} color="var(--text-dim)" style={{ marginBottom: '15px' }} />
+                  {item.type === 'actor' || item.type === 'director' ? (
+                    <User size={40} color="var(--text-dim)" style={{ marginBottom: '15px' }} />
+                  ) : (
+                    <Film size={40} color="var(--text-dim)" style={{ marginBottom: '15px' }} />
+                  )}
                   <div style={{ fontSize: '14px', fontWeight: '700' }}>{item.displayTitle}</div>
                 </div>
               )}

@@ -107,6 +107,70 @@ class MediaLibraryService:
                 library["series"].append(data)
                 library["counts"]["series"] += 1
 
+        # --- Actors & Directors logic ---
+        from ..db.models import Person, MediaPersonLink, MediaMatch, ItemStatus, MediaItem
+        
+        # 1. MATCHED aktív matchek ID-jai
+        matched_match_ids = [
+            m.id for m in self.db.query(MediaMatch).join(MediaItem).filter(
+                MediaItem.status.in_([ItemStatus.MATCHED, ItemStatus.RENAMED, ItemStatus.ORGANIZED])
+            ).filter(MediaMatch.is_active == True).all()
+        ]
+        
+        library["actors"] = []
+        library["directors"] = []
+        library["counts"]["actors"] = 0
+        library["counts"]["directors"] = 0
+        
+        if matched_match_ids:
+            # Színészek lekérdezése
+            db_actors = self.db.query(Person).join(
+                MediaPersonLink, MediaPersonLink.person_id == Person.id
+            ).filter(
+                MediaPersonLink.media_match_id.in_(matched_match_ids),
+                MediaPersonLink.job == "Actor"
+            ).distinct().all()
+            
+            # Rendezők / Készítők lekérdezése
+            db_directors = self.db.query(Person).join(
+                MediaPersonLink, MediaPersonLink.person_id == Person.id
+            ).filter(
+                MediaPersonLink.media_match_id.in_(matched_match_ids),
+                MediaPersonLink.job.in_(["Director", "Creator"])
+            ).distinct().all()
+            
+            for p in db_actors:
+                loc = p.localizations[0] if p.localizations else None
+                name = loc.name if loc else "Unknown Actor"
+                
+                library["actors"].append({
+                    "id": p.id,
+                    "title": name,
+                    "year": None,
+                    "poster_path": p.profile_path,
+                    "backdrop_path": None,
+                    "rating": p.popularity or 0.0,
+                    "type": "actor",
+                    "path": None
+                })
+                library["counts"]["actors"] += 1
+                
+            for p in db_directors:
+                loc = p.localizations[0] if p.localizations else None
+                name = loc.name if loc else "Unknown Director"
+                
+                library["directors"].append({
+                    "id": p.id,
+                    "title": name,
+                    "year": None,
+                    "poster_path": p.profile_path,
+                    "backdrop_path": None,
+                    "rating": p.popularity or 0.0,
+                    "type": "director",
+                    "path": None
+                })
+                library["counts"]["directors"] += 1
+
         return library
 
     def _format_size(self, size_bytes: int) -> str:
