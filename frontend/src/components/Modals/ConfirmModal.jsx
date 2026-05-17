@@ -25,26 +25,32 @@ const ConfirmModal = () => {
     <div className="modal-overlay" style={{ animation: 'fade-in 0.3s ease' }}>
       <div className="modal-content" style={{ 
         textAlign: 'center', 
-        background: 'linear-gradient(180deg, rgba(30, 30, 35, 0.95), rgba(15, 15, 20, 0.98))',
-        backdropFilter: 'blur(30px)',
-        border: `1px solid rgba(${colorBase}, 0.2)`,
-        borderTop: `1px solid rgba(${colorBase}, 0.4)`,
-        boxShadow: `0 30px 60px rgba(0,0,0,0.8), 0 0 0 1px rgba(0,0,0,0.5), 0 0 40px rgba(${colorBase}, 0.1) inset`,
-        borderRadius: '24px',
-        padding: '40px',
-        maxWidth: '450px',
+        background: 'rgba(22, 22, 28, 0.55)',
+        backdropFilter: 'blur(25px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(25px) saturate(180%)',
+        border: `1px solid rgba(${colorBase}, 0.18)`,
+        borderTop: `1px solid rgba(${colorBase}, 0.35)`,
+        boxShadow: `
+          0 30px 60px rgba(0, 0, 0, 0.7),
+          inset 0 1px 0 rgba(255, 255, 255, 0.08),
+          0 0 40px rgba(${colorBase}, 0.06)
+        `,
+        borderRadius: '28px',
+        padding: '45px 40px 40px 40px',
+        maxWidth: '460px',
         animation: 'slide-up 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
       }}>
         <div style={{
           width: '64px',
           height: '64px',
           borderRadius: '50%',
-          background: `rgba(${colorBase}, 0.1)`,
+          background: `rgba(${colorBase}, 0.12)`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          margin: '0 auto 20px auto',
-          border: `1px solid rgba(${colorBase}, 0.2)`
+          margin: '0 auto 25px auto',
+          border: `1px solid rgba(${colorBase}, 0.25)`,
+          boxShadow: `0 0 20px rgba(${colorBase}, 0.15)`
         }}>
           <Icon size={32} color={iconColor} />
         </div>
@@ -64,10 +70,13 @@ const ConfirmModal = () => {
               flex: 1, 
               padding: '14px', 
               borderRadius: '12px', 
-              background: `rgba(${colorBase}, 0.15)`, 
-              border: `1px solid rgba(${colorBase}, 0.3)`, 
-              color: iconColor, 
-              boxShadow: 'none' 
+              background: `rgba(${colorBase}, 0.18)`, 
+              border: `1px solid rgba(${colorBase}, 0.35)`, 
+              color: '#fff', 
+              fontWeight: '700',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              boxShadow: `0 4px 12px rgba(${colorBase}, 0.15)`
             }} 
             onClick={handleConfirm}
           >
