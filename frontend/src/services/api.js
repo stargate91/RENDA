@@ -24,6 +24,8 @@ export const api = {
     body: JSON.stringify(settings),
   }),
 
+  syncMetadataLanguage: () => fetchJson('/metadata/sync-language', { method: 'POST' }),
+
   getDiscoveryItems: () => fetchJson('/discovery'),
 
   getLibrary: () => fetchJson('/library'),

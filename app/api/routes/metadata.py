@@ -232,6 +232,53 @@ def resolve_metadata(request: ResolveRequest):
     finally:
         db.close()
 
+@router.post("/metadata/sync-language")
+def sync_metadata_language():
+    """Background task to fetch metadata for the active languages."""
+    db = Session()
+    try:
+        from app.db.models import MediaItem, ItemStatus, UserSetting
+        from app.scanner.metadata_enricher import MetadataEnricher
+        
+        lang = db.query(UserSetting).filter(UserSetting.key == "primary_metadata_language").first()
+        fallback = db.query(UserSetting).filter(UserSetting.key == "fallback_metadata_language").first()
+        
+        target_lang = lang.value if lang else "en"
+        fallback_lang = fallback.value if fallback and fallback.value != "none" else None
+
+        items = db.query(MediaItem).filter(MediaItem.status.in_([
+            ItemStatus.MATCHED, ItemStatus.RENAMED, ItemStatus.ORGANIZED
+        ])).all()
+
+        enricher = MetadataEnricher(db)
+        for item in items:
+            enricher.enrich_matched_item(item, language=target_lang, fallback_language=fallback_lang)
+            
+        db.commit()
+
+        # Start image worker
+        import threading
+        from app.scanner.image_worker import ImageWorker
+        def run_image_worker():
+            local_db = Session()
+            try:
+                iw = ImageWorker(local_db, "./data")
+                iw.process_all()
+            finally:
+                local_db.close()
+        threading.Thread(target=run_image_worker, daemon=True).start()
+
+        return {"status": "success"}
+    except Exception as e:
+        db.rollback()
+        import traceback
+        logger.error(f"Error syncing language: {e}")
+        logger.error(traceback.format_exc())
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    finally:
+        db.close()
+
 @router.get("/item/{item_id}/full-metadata")
 def get_full_metadata(item_id: int):
     db = Session()

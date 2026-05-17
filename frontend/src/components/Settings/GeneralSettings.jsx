@@ -3,8 +3,44 @@ import { User, Globe, Search, Library, HardDrive } from 'lucide-react';
 import CustomSelect from '../Forms/CustomSelect';
 import { METADATA_LANGUAGES } from '../../constants/settings';
 import Switch from './Switch';
+import { api } from '../../services/api';
+import { useAppContext } from '../../context/AppContext';
 
 const GeneralSettings = ({ settings, setSettings, T, availableLocales }) => {
+  const { setConfirmDialog } = useAppContext();
+
+  const handleNamingLanguageChange = (val) => {
+    const updates = { ...settings, primary_metadata_language: val };
+    if (settings.fallback_metadata_language === val) updates.fallback_metadata_language = 'none';
+    setSettings(updates);
+    
+    setConfirmDialog({
+      isOpen: true,
+      type: 'info',
+      title: "Sync Missing Metadata?",
+      message: `Do you want to download missing metadata and images for the new Naming Language (${val})?`,
+      onConfirm: () => {
+        api.syncMetadataLanguage().then(() => alert("Background sync started!")).catch(console.error);
+      }
+    });
+  };
+
+  const handleLibraryLanguageChange = (val) => {
+    setSettings({ ...settings, fallback_metadata_language: val });
+    
+    if (val !== 'none') {
+      setConfirmDialog({
+        isOpen: true,
+        type: 'info',
+        title: "Sync Missing Metadata?",
+        message: `Do you want to download missing metadata and images for the new Library Language (${val})?`,
+        onConfirm: () => {
+          api.syncMetadataLanguage().then(() => alert("Background sync started!")).catch(console.error);
+        }
+      });
+    }
+  };
+
   return (
     <div className="settings-card">
 
@@ -44,29 +80,25 @@ const GeneralSettings = ({ settings, setSettings, T, availableLocales }) => {
 
       <div className="form-group split">
         <div className="form-group-info">
-          <label>{T('settings.general.meta_lang_label')}</label>
-          <div className="input-hint">{T('settings.general.meta_lang_hint')}</div>
+          <label>Metadata Languages</label>
+          <div className="input-hint">Configure the languages used for file renaming and app display.</div>
         </div>
         <div className="form-group-input" style={{ display: 'flex', flexDirection: 'row', gap: '15px' }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '11px', color: '#666', marginBottom: '8px', fontWeight: 600 }}>{T('settings.general.primary')}</div>
+            <div style={{ fontSize: '11px', color: '#666', marginBottom: '8px', fontWeight: 600 }}>Naming Language (Target)</div>
             <CustomSelect 
               value={settings.primary_metadata_language || 'en'} 
-              onChange={val => {
-                const updates = { ...settings, primary_metadata_language: val };
-                if (settings.fallback_metadata_language === val) updates.fallback_metadata_language = 'none';
-                setSettings(updates);
-              }}
+              onChange={handleNamingLanguageChange}
               options={METADATA_LANGUAGES}
             />
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '11px', color: '#666', marginBottom: '8px', marginTop: '4px', fontWeight: 600 }}>Fallback</div>
+            <div style={{ fontSize: '11px', color: '#666', marginBottom: '8px', fontWeight: 600 }}>Library (UI) Language</div>
             <CustomSelect 
               value={settings.fallback_metadata_language || 'none'} 
-              onChange={val => setSettings({ ...settings, fallback_metadata_language: val })}
+              onChange={handleLibraryLanguageChange}
               options={[
-                { value: 'none', label: 'None (Disable)' },
+                { value: 'none', label: 'Match Naming' },
                 ...METADATA_LANGUAGES.filter(l => l.value !== (settings.primary_metadata_language || 'en'))
               ]}
             />

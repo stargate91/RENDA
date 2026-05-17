@@ -426,9 +426,18 @@ def get_library_items():
             "counts": {"movies": 0, "series": 0, "adult": 0}
         }
 
+        from app.db.models import UserSetting
+        ui_lang_setting = db.query(UserSetting).filter(UserSetting.key == "fallback_metadata_language").first()
+        ui_lang = ui_lang_setting.value if ui_lang_setting and ui_lang_setting.value != "none" else None
+
         for item in items:
             active_match = next((m for m in item.matches if m.is_active), None)
-            loc = active_match.localizations[0] if active_match and active_match.localizations else None
+            loc = None
+            if active_match and active_match.localizations:
+                if ui_lang:
+                    loc = next((l for l in active_match.localizations if l.target_language == ui_lang), None)
+                if not loc:
+                    loc = next((l for l in active_match.localizations if l.is_primary), active_match.localizations[0])
             
             data = {
                 "id": item.id,
