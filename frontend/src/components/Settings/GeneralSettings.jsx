@@ -19,6 +19,8 @@ const GeneralSettings = ({ settings, setSettings, T, availableLocales }) => {
       type: 'info',
       title: "Sync Missing Metadata?",
       message: `Do you want to download missing metadata and images for the new Naming Language (${val})?`,
+      confirmText: "Sync Now",
+      cancelText: "Cancel",
       onConfirm: () => {
         api.syncMetadataLanguage().then(() => alert("Background sync started!")).catch(console.error);
       }
@@ -34,6 +36,8 @@ const GeneralSettings = ({ settings, setSettings, T, availableLocales }) => {
         type: 'info',
         title: "Sync Missing Metadata?",
         message: `Do you want to download missing metadata and images for the new Library Language (${val})?`,
+        confirmText: "Sync Now",
+        cancelText: "Cancel",
         onConfirm: () => {
           api.syncMetadataLanguage().then(() => alert("Background sync started!")).catch(console.error);
         }

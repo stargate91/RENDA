@@ -56,7 +56,7 @@ const ConfirmModal = () => {
         </p>
         <div className="modal-actions" style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
           <button className="btn-secondary" style={{ flex: 1, padding: '14px', borderRadius: '12px' }} onClick={handleCancel}>
-            {T('modal.confirm.cancel')}
+            {confirmDialog.cancelText || T('modal.confirm.cancel')}
           </button>
           <button 
             className={isInfo ? "btn-primary" : "btn-danger"} 
@@ -71,7 +71,7 @@ const ConfirmModal = () => {
             }} 
             onClick={handleConfirm}
           >
-            {T('modal.confirm.yes')}
+            {confirmDialog.confirmText || T('modal.confirm.yes')}
           </button>
         </div>
       </div>
