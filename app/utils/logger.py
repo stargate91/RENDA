@@ -42,6 +42,10 @@ def setup_logger(name="RENDA"):
     file_handler.setLevel(logging.DEBUG)
 
     # 2. Console (Stdout) Handler
+    try:
+        sys.stdout.reconfigure(errors="backslashreplace")
+    except Exception:
+        pass
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(formatter)
     console_handler.setLevel(logging.INFO) # Default console level is INFO
