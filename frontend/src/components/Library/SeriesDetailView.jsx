@@ -1,12 +1,177 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Monitor, Play, Clapperboard, Users, User, ChevronDown, ChevronUp, FolderOpen, ExternalLink, Star, RefreshCcw } from 'lucide-react';
+import { ArrowLeft, Monitor, Play, Clapperboard, Users, User, ChevronDown, ChevronUp, FolderOpen, ExternalLink, Star, Heart, RefreshCcw, Tag, Check, Plus, X } from 'lucide-react';
 import { api, API_BASE } from '../../services/api';
 
-const SeriesDetailView = ({ seriesTmdbId, onBack }) => {
+const CustomTagsList = ({ tags, onAddTag, onRemoveTag }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [newTag, setNewTag] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const trimmed = newTag.trim();
+    if (trimmed && !tags.includes(trimmed)) {
+      onAddTag(trimmed);
+      setNewTag('');
+    }
+    setIsEditing(false);
+  };
+
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', marginTop: '15px' }}>
+      {tags.map((tag) => (
+        <span
+          key={tag}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '12px',
+            fontWeight: '600',
+            color: '#fff',
+            background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(59, 130, 246, 0.2) 100%)',
+            border: '1px solid rgba(139, 92, 246, 0.35)',
+            padding: '4px 10px',
+            borderRadius: '12px',
+            transition: 'all 0.2s ease',
+            boxShadow: '0 4px 10px rgba(0, 0, 0, 0.1)',
+          }}
+        >
+          <Tag size={12} color="#a78bfa" />
+          {tag}
+          <button
+            onClick={() => onRemoveTag(tag)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'rgba(255, 255, 255, 0.4)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 0,
+              marginLeft: '2px',
+              transition: 'color 0.15s ease',
+            }}
+            onMouseOver={e => e.currentTarget.style.color = '#ef4444'}
+            onMouseOut={e => e.currentTarget.style.color = 'rgba(255, 255, 255, 0.4)'}
+          >
+            <X size={12} />
+          </button>
+        </span>
+      ))}
+
+      {isEditing ? (
+        <form onSubmit={handleSubmit} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <input
+            type="text"
+            placeholder="Add tag..."
+            value={newTag}
+            onChange={(e) => setNewTag(e.target.value)}
+            autoFocus
+            onBlur={() => setTimeout(() => setIsEditing(false), 200)}
+            onKeyDown={(e) => { if (e.key === 'Escape') setIsEditing(false); }}
+            style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              borderRadius: '10px',
+              padding: '4px 8px',
+              color: '#fff',
+              fontSize: '12px',
+              outline: 'none',
+              width: '100px',
+              transition: 'all 0.2s',
+            }}
+          />
+          <button
+            type="submit"
+            style={{
+              background: 'rgba(59, 130, 246, 0.2)',
+              border: '1px solid rgba(59, 130, 246, 0.4)',
+              color: '#3b82f6',
+              borderRadius: '6px',
+              width: '24px',
+              height: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+            }}
+          >
+            <Check size={12} />
+          </button>
+        </form>
+      ) : (
+        <button
+          onClick={() => setIsEditing(true)}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            fontSize: '11px',
+            fontWeight: '700',
+            color: 'rgba(255, 255, 255, 0.6)',
+            background: 'rgba(255, 255, 255, 0.03)',
+            border: '1px dashed rgba(255, 255, 255, 0.2)',
+            padding: '4px 10px',
+            borderRadius: '12px',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+          }}
+          onMouseOver={e => {
+            e.currentTarget.style.color = '#fff';
+            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.4)';
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+          }}
+          onMouseOut={e => {
+            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.6)';
+            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+          }}
+        >
+          <Plus size={12} />
+          Add Tag
+        </button>
+      )}
+    </div>
+  );
+};
+
+const SeriesDetailView = ({ seriesTmdbId, onBack, onPersonClick }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeSeasonNum, setActiveSeasonNum] = useState(1);
   const [expandedEpisodeId, setExpandedEpisodeId] = useState(null);
+  const [hoverRating, setHoverRating] = useState(0);
+
+  const handleToggleFavorite = async () => {
+    if (!data) return;
+    const currentFav = data.is_favorite;
+    const newFav = !currentFav;
+    
+    setData(prev => ({ ...prev, is_favorite: newFav }));
+    
+    try {
+      await api.updateItemStatus(data.id, { is_favorite: newFav });
+    } catch (e) {
+      console.error("Failed to toggle favorite:", e);
+      setData(prev => ({ ...prev, is_favorite: currentFav }));
+    }
+  };
+
+  const handleSetRating = async (ratingValue) => {
+    if (!data) return;
+    const currentRating = data.user_rating;
+    const newRating = currentRating === ratingValue ? null : ratingValue;
+    
+    setData(prev => ({ ...prev, user_rating: newRating }));
+    
+    try {
+      await api.updateItemStatus(data.id, { user_rating: newRating });
+    } catch (e) {
+      console.error("Failed to update rating:", e);
+      setData(prev => ({ ...prev, user_rating: currentRating }));
+    }
+  };
 
   useEffect(() => {
     const fetchDetail = async () => {
@@ -62,6 +227,10 @@ const SeriesDetailView = ({ seriesTmdbId, onBack }) => {
     <div className="movie-detail series-detail">
       {/* ===== HERO ===== */}
       <div className="detail-hero">
+        <button className="detail-back-btn" onClick={onBack}>
+          <ArrowLeft size={14} /> Back to Library
+        </button>
+
         {backdropUrl && (
           <img className="detail-hero-backdrop" src={backdropUrl} alt="" />
         )}
@@ -79,11 +248,85 @@ const SeriesDetailView = ({ seriesTmdbId, onBack }) => {
           </div>
 
           <div className="detail-info">
-            <button className="detail-back-btn" onClick={onBack}>
-              <ArrowLeft size={14} /> Back to Library
-            </button>
-
             <h1 className="detail-title">{data.title}</h1>
+
+            {/* Premium Glassmorphic User Interaction Bar */}
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '15px', 
+              margin: '15px 0 20px 0', 
+              background: 'rgba(255, 255, 255, 0.03)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              padding: '6px 14px',
+              borderRadius: '12px',
+              width: 'fit-content',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+            }}>
+              {/* Favorite Heart Button */}
+              <button
+                onClick={handleToggleFavorite}
+                style={{
+                  background: data.is_favorite ? 'rgba(233, 30, 99, 0.2)' : 'transparent',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: data.is_favorite ? '#e91e63' : 'rgba(255, 255, 255, 0.4)',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseOver={e => {
+                  e.currentTarget.style.color = '#e91e63';
+                  e.currentTarget.style.background = 'rgba(233, 30, 99, 0.1)';
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.color = data.is_favorite ? '#e91e63' : 'rgba(255, 255, 255, 0.4)';
+                  e.currentTarget.style.background = data.is_favorite ? 'rgba(233, 30, 99, 0.2)' : 'transparent';
+                }}
+                title={data.is_favorite ? "Remove from Favorites" : "Mark as Favorite"}
+              >
+                <Heart size={18} fill={data.is_favorite ? "currentColor" : "none"} />
+              </button>
+
+              <div style={{ width: '1px', height: '16px', background: 'rgba(255, 255, 255, 0.15)' }} />
+
+              {/* 1-5 Star Interactive Rating */}
+              <div 
+                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                onMouseLeave={() => setHoverRating(0)}
+              >
+                {[1, 2, 3, 4, 5].map((star) => {
+                  const isLit = hoverRating ? star <= hoverRating : star <= (data.user_rating || 0);
+                  return (
+                    <Star
+                      key={star}
+                      size={18}
+                      onClick={() => handleSetRating(star)}
+                      onMouseEnter={() => setHoverRating(star)}
+                      style={{
+                        cursor: 'pointer',
+                        color: isLit ? 'var(--accent-yellow, #ffc107)' : 'rgba(255, 255, 255, 0.2)',
+                        fill: isLit ? 'var(--accent-yellow, #ffc107)' : 'none',
+                        transition: 'all 0.15s ease',
+                        transform: hoverRating === star ? 'scale(1.2)' : 'none'
+                      }}
+                    />
+                  );
+                })}
+              </div>
+
+              {data.user_rating > 0 && (
+                <span style={{ fontSize: '12px', color: 'var(--accent-yellow)', fontWeight: '600', marginLeft: '5px', opacity: 0.9 }}>
+                  Your Rating
+                </span>
+              )}
+            </div>
             
             <div className="detail-meta-row" style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap' }}>
               {data.year && (
@@ -106,6 +349,31 @@ const SeriesDetailView = ({ seriesTmdbId, onBack }) => {
               </div>
             )}
 
+            {/* Custom Tags */}
+            <div style={{ marginBottom: '20px' }}>
+              <CustomTagsList
+                tags={data.custom_tags || []}
+                onAddTag={async (newTag) => {
+                  const updatedTags = [...(data.custom_tags || []), newTag];
+                  setData(prev => ({ ...prev, custom_tags: updatedTags }));
+                  try {
+                    await api.updateItemStatus(data.id, { custom_tags: updatedTags });
+                  } catch (e) {
+                    console.error("Failed to add custom tag:", e);
+                  }
+                }}
+                onRemoveTag={async (tagToRemove) => {
+                  const updatedTags = (data.custom_tags || []).filter(t => t !== tagToRemove);
+                  setData(prev => ({ ...prev, custom_tags: updatedTags }));
+                  try {
+                    await api.updateItemStatus(data.id, { custom_tags: updatedTags });
+                  } catch (e) {
+                    console.error("Failed to remove custom tag:", e);
+                  }
+                }}
+              />
+            </div>
+
             {data.overview && (
               <div className="detail-overview" style={{ 
                 fontSize: '15px', 
@@ -127,7 +395,19 @@ const SeriesDetailView = ({ seriesTmdbId, onBack }) => {
               <div className="series-creators" style={{ marginBottom: '20px', display: 'flex', gap: '15px', alignItems: 'center' }}>
                 <span style={{ color: 'var(--text-dim)', fontSize: '13px' }}>Created by</span>
                 {data.directors.map(d => (
-                  <span key={d.id} style={{ fontWeight: '600', fontSize: '14px' }}>{d.name}</span>
+                  <span 
+                    key={d.id} 
+                    style={{ 
+                      fontWeight: '600', 
+                      fontSize: '14px', 
+                      cursor: onPersonClick ? 'pointer' : 'default',
+                      color: onPersonClick ? 'var(--accent-blue)' : 'inherit',
+                      textDecoration: onPersonClick ? 'underline' : 'none'
+                    }} 
+                    onClick={() => onPersonClick && onPersonClick(d.id)}
+                  >
+                    {d.name}
+                  </span>
                 ))}
               </div>
             )}
@@ -144,7 +424,12 @@ const SeriesDetailView = ({ seriesTmdbId, onBack }) => {
             </div>
             <div className="cast-scroll">
               {data.cast.map(c => (
-                <div key={c.id} className="cast-card">
+                <div 
+                  key={c.id} 
+                  className="cast-card"
+                  onClick={() => onPersonClick && onPersonClick(c.id)}
+                  style={{ cursor: onPersonClick ? 'pointer' : 'default' }}
+                >
                   <div className="cast-card-img">
                     {c.profile_path ? (
                       <img src={`${API_BASE}/media/images/persons${c.profile_path}`} alt={c.name} />

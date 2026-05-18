@@ -27,6 +27,21 @@ try:
         if "user_rating" not in columns:
             conn.execute(text("ALTER TABLE persons ADD COLUMN user_rating INTEGER DEFAULT NULL"))
             print("Added user_rating column to persons table")
+        if "custom_tags" not in columns:
+            conn.execute(text("ALTER TABLE persons ADD COLUMN custom_tags TEXT DEFAULT NULL"))
+            print("Added custom_tags column to persons table")
+            
+        # Migrations for media_items table
+        media_columns = [c["name"] for c in inspector.get_columns("media_items")]
+        if "is_favorite" not in media_columns:
+            conn.execute(text("ALTER TABLE media_items ADD COLUMN is_favorite INTEGER DEFAULT 0"))
+            print("Added is_favorite column to media_items table")
+        if "user_rating" not in media_columns:
+            conn.execute(text("ALTER TABLE media_items ADD COLUMN user_rating INTEGER DEFAULT NULL"))
+            print("Added user_rating column to media_items table")
+        if "custom_tags" not in media_columns:
+            conn.execute(text("ALTER TABLE media_items ADD COLUMN custom_tags TEXT DEFAULT NULL"))
+            print("Added custom_tags column to media_items table")
 except Exception as e:
     import logging
     logging.getLogger(__name__).error(f"Failed to migrate database: {e}")

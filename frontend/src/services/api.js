@@ -117,4 +117,16 @@ export const api = {
     method: 'POST',
     body: JSON.stringify(updates),
   }),
+
+  updatePersonProfile: (personId, profilePath) => fetchJson(`/api/people/${personId}/profile`, {
+    method: 'POST',
+    body: JSON.stringify({ profile_path: profilePath }),
+  }),
+
+  getPersonDetail: (personId) => fetchJson(`/api/people/${personId}`),
+  
+  updateItemStatus: (itemId, updates) => fetchJson(`/api/item/${itemId}/status`, {
+    method: 'POST',
+    body: JSON.stringify(updates),
+  }),
 };

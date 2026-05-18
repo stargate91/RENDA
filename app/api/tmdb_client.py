@@ -186,3 +186,15 @@ class TMDBClient:
         endpoint = f"/person/{person_id}/images"
         params = {"api_key": self._api_key}
         return self._call_api(endpoint, params)
+
+    def get_person_details(self, person_id: int, language: str = "en-US") -> Dict[str, Any]:
+        """Lekéri egy színész/készítő részletes adatait."""
+        if not self._api_key: return {}
+        
+        endpoint = f"/person/{person_id}"
+        params = {
+            "api_key": self._api_key,
+            "language": language,
+            "append_to_response": "images,translations,external_ids,combined_credits"
+        }
+        return self._call_api(endpoint, params)

@@ -58,8 +58,8 @@
   z-index: 2;
   display: flex;
   gap: 40px;
-  padding: 40px;
-  align-items: flex-end;
+  padding: 90px 40px 40px 40px;
+  align-items: flex-start;
   min-height: 520px;
 }
 
@@ -95,20 +95,25 @@
 }
 
 .detail-back-btn {
+  position: absolute;
+  top: 30px;
+  left: 40px;
+  z-index: 10;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.1);
-  background: rgba(255,255,255,0.05);
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(0, 0, 0, 0.45);
   color: var(--text-dim);
   cursor: pointer;
   font-size: 13px;
   font-weight: 600;
   transition: all 0.2s ease;
-  margin-bottom: 20px;
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
 }
 
 .detail-back-btn:hover {
@@ -301,15 +306,12 @@
   padding: 10px 4px;
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }
 
 .cast-scroll::-webkit-scrollbar {
-  height: 4px;
-}
-
-.cast-scroll::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.08);
-  border-radius: 4px;
+  display: none;
 }
 
 .cast-card {

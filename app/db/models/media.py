@@ -41,6 +41,9 @@ class MediaItem(Base):
     is_manual: Mapped[bool] = mapped_column(Boolean, default=False); status: Mapped[ItemStatus] = mapped_column(SQLEnum(ItemStatus), default=ItemStatus.NEW, index=True)
     planned_path: Mapped[Optional[str]] = mapped_column(String) # The path proposed by the Formatter
     category: Mapped[str] = mapped_column(String, default="video", index=True); created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    is_favorite: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", index=True)
+    user_rating: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    custom_tags: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     matches: Mapped[List["MediaMatch"]] = relationship(back_populates="media_item", cascade="all, delete-orphan")
     extras: Mapped[List["ExtraFile"]] = relationship(back_populates="parent_item", cascade="all, delete-orphan")

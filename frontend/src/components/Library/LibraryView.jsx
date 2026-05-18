@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Film, Tv, ShieldAlert, Loader2, User, Clapperboard, Settings, Plus, Minus, X, Star } from 'lucide-react';
+import { Search, Film, Tv, ShieldAlert, Loader2, User, Clapperboard, Settings, Plus, Minus, X, Star, Heart, Tag } from 'lucide-react';
 import { api } from '../../services/api';
 import MovieDetailView from './MovieDetailView';
 import SeriesDetailView from './SeriesDetailView';
+import PersonDetailView from './PersonDetailView';
 import '../../styles/components/library.css';
 
 const LibraryView = ({ T }) => {
@@ -10,9 +11,62 @@ const LibraryView = ({ T }) => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('movies');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTags, setSelectedTags] = useState([]);
   const [visibleCount, setVisibleCount] = useState(42);
   const [detailItemId, setDetailItemId] = useState(null);
   const [detailSeriesTmdbId, setDetailSeriesTmdbId] = useState(null);
+  const [detailPersonId, setDetailPersonId] = useState(null);
+  const [navigationStack, setNavigationStack] = useState([]);
+
+  const navigateTo = (viewType, id) => {
+    let currentState = null;
+    if (detailSeriesTmdbId) {
+      currentState = { type: 'series', id: detailSeriesTmdbId };
+    } else if (detailItemId) {
+      currentState = { type: 'movie', id: detailItemId };
+    } else if (detailPersonId) {
+      currentState = { type: 'person', id: detailPersonId };
+    } else {
+      currentState = { type: 'main' };
+    }
+
+    setNavigationStack(prev => [...prev, currentState]);
+
+    setDetailSeriesTmdbId(null);
+    setDetailItemId(null);
+    setDetailPersonId(null);
+
+    if (viewType === 'series') setDetailSeriesTmdbId(id);
+    else if (viewType === 'movie') setDetailItemId(id);
+    else if (viewType === 'person') setDetailPersonId(id);
+  };
+
+  const handleBack = () => {
+    if (navigationStack.length === 0) {
+      setDetailSeriesTmdbId(null);
+      setDetailItemId(null);
+      setDetailPersonId(null);
+      fetchLibrary();
+      return;
+    }
+
+    const prev = navigationStack[navigationStack.length - 1];
+    setNavigationStack(prevStack => prevStack.slice(0, -1));
+
+    setDetailSeriesTmdbId(null);
+    setDetailItemId(null);
+    setDetailPersonId(null);
+
+    if (prev.type === 'series') {
+      setDetailSeriesTmdbId(prev.id);
+    } else if (prev.type === 'movie') {
+      setDetailItemId(prev.id);
+    } else if (prev.type === 'person') {
+      setDetailPersonId(prev.id);
+    } else {
+      fetchLibrary();
+    }
+  };
 
   // Drawer States for managing actors/directors
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -20,11 +74,17 @@ const LibraryView = ({ T }) => {
   const [drawerSearch, setDrawerSearch] = useState('');
   const [drawerSortBy, setDrawerSortBy] = useState('library_count');
   const [drawerLoading, setDrawerLoading] = useState(false);
+  const [visiblePeopleCount, setVisiblePeopleCount] = useState(40);
 
   // Reset visible count on filter/tab changes
   useEffect(() => {
     setVisibleCount(42);
   }, [activeTab, searchQuery]);
+
+  // Reset visible people count on drawer state, search, sort, or active tab changes
+  useEffect(() => {
+    setVisiblePeopleCount(40);
+  }, [isDrawerOpen, drawerSearch, drawerSortBy, activeTab]);
 
   const observer = useRef();
   const triggerRef = useCallback(node => {
@@ -44,9 +104,28 @@ const LibraryView = ({ T }) => {
     if (node) observer.current.observe(node);
   }, [loading]);
 
+  const drawerObserver = useRef();
+  const drawerTriggerRef = useCallback(node => {
+    if (drawerLoading) return;
+    if (drawerObserver.current) drawerObserver.current.disconnect();
+    
+    drawerObserver.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting) {
+        setVisiblePeopleCount(prev => prev + 40);
+      }
+    }, {
+      root: null,
+      rootMargin: '200px',
+      threshold: 0
+    });
+    
+    if (node) drawerObserver.current.observe(node);
+  }, [drawerLoading]);
+
   const handleTabChange = (id) => {
     setActiveTab(id);
     setSearchQuery('');
+    setSelectedTags([]);
   };
 
   const fetchLibrary = useCallback(async () => {
@@ -55,10 +134,16 @@ const LibraryView = ({ T }) => {
       const res = await api.getLibrary();
       setData(res);
       
-      // Select first non-empty tab
-      if (res.counts.movies > 0) setActiveTab('movies');
-      else if (res.counts.series > 0) setActiveTab('series');
-      else if (res.counts.adult > 0) setActiveTab('adult');
+      // Select first non-empty tab if the current active tab is the default 'movies' and it has no items
+      if (res.counts) {
+        setActiveTab(prevTab => {
+          if (prevTab === 'movies' && (res.counts.movies || 0) === 0) {
+            if ((res.counts.series || 0) > 0) return 'series';
+            if ((res.counts.adult || 0) > 0) return 'adult';
+          }
+          return prevTab;
+        });
+      }
     } catch (e) {
       console.error("Failed to fetch library:", e);
     } finally {
@@ -126,8 +211,10 @@ const LibraryView = ({ T }) => {
     { id: 'series', label: T('discovery.tabs.series'), icon: <Tv size={18} />, count: data.counts.series },
     { id: 'adult', label: 'Adult', icon: <ShieldAlert size={18} />, count: data.counts.adult },
     { id: 'actors', label: 'Actors', icon: <User size={18} />, count: data.counts.actors || 0 },
-    { id: 'directors', label: 'Directors', icon: <Clapperboard size={18} />, count: data.counts.directors || 0 }
+    { id: 'directors', label: 'Directors', icon: <Clapperboard size={18} />, count: data.counts.directors || 0 },
+    { id: 'tags', label: 'Tags', icon: <Tag size={18} />, count: data.counts.tags || 0 }
   ].filter(tab => {
+    if (tab.id === 'tags') return true;
     if (tab.id === 'actors' || tab.id === 'directors') {
       // Show Actors and Directors tabs as long as we have movies or series, so the user can manage them!
       return (data.counts.movies || 0) > 0 || (data.counts.series || 0) > 0;
@@ -136,9 +223,27 @@ const LibraryView = ({ T }) => {
   });
 
   const currentItems = data[activeTab] || [];
-  let filteredItems = currentItems.filter(item => 
-    item.title && item.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+
+  // Extract all unique custom tags from current active tab's items
+  const uniqueTags = React.useMemo(() => {
+    const tags = new Set();
+    currentItems.forEach(item => {
+      if (item.custom_tags && Array.isArray(item.custom_tags)) {
+        item.custom_tags.forEach(t => tags.add(t));
+      }
+    });
+    return Array.from(tags).sort();
+  }, [currentItems]);
+
+  let filteredItems = currentItems.filter(item => {
+    const matchesSearch = !searchQuery || (item.title && item.title.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesTags = selectedTags.length === 0 || (
+      item.custom_tags && 
+      Array.isArray(item.custom_tags) && 
+      selectedTags.every(tag => item.custom_tags.includes(tag))
+    );
+    return matchesSearch && matchesTags;
+  });
 
   let renderItems = filteredItems;
   let viewMode = 'grid'; // grid (posters) or list (episodes)
@@ -178,7 +283,10 @@ const LibraryView = ({ T }) => {
       <div style={{ padding: '30px' }}>
         <SeriesDetailView 
           seriesTmdbId={detailSeriesTmdbId} 
-          onBack={() => setDetailSeriesTmdbId(null)} 
+          onBack={handleBack} 
+          onPersonClick={(personId) => {
+            navigateTo('person', personId);
+          }}
         />
       </div>
     );
@@ -189,7 +297,27 @@ const LibraryView = ({ T }) => {
       <div style={{ padding: '30px' }}>
         <MovieDetailView 
           itemId={detailItemId} 
-          onBack={() => setDetailItemId(null)} 
+          onBack={handleBack} 
+          onPersonClick={(personId) => {
+            navigateTo('person', personId);
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (detailPersonId) {
+    return (
+      <div style={{ padding: '30px' }}>
+        <PersonDetailView 
+          personId={detailPersonId} 
+          onBack={handleBack} 
+          onMovieClick={(movieId) => {
+            navigateTo('movie', movieId);
+          }}
+          onSeriesClick={(seriesTmdbId) => {
+            navigateTo('series', seriesTmdbId);
+          }}
         />
       </div>
     );
@@ -315,9 +443,111 @@ const LibraryView = ({ T }) => {
         </div>
       )}
 
+      {/* Custom Tags Filter Row */}
+      {activeTab !== 'tags' && uniqueTags.length > 0 && (
+        <div style={{ 
+          display: 'flex', 
+          flexWrap: 'wrap', 
+          alignItems: 'center', 
+          gap: '8px', 
+          marginBottom: '30px', 
+          padding: '12px 18px', 
+          background: 'rgba(255, 255, 255, 0.02)', 
+          border: '1px solid rgba(255, 255, 255, 0.05)', 
+          borderRadius: '14px',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)'
+        }}>
+          <span style={{ 
+            fontSize: '13px', 
+            color: 'var(--text-dim)', 
+            marginRight: '6px', 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '6px',
+            fontWeight: '600'
+          }}>
+            <Tag size={14} color="#a78bfa" /> Filter by Tags:
+          </span>
+          {uniqueTags.map(tag => {
+            const isSelected = selectedTags.includes(tag);
+            return (
+              <button
+                key={tag}
+                onClick={() => {
+                  setSelectedTags(prev => 
+                    prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+                  );
+                }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  color: isSelected ? '#fff' : 'rgba(255, 255, 255, 0.6)',
+                  background: isSelected 
+                    ? 'linear-gradient(135deg, rgba(139, 92, 246, 0.25) 0%, rgba(59, 130, 246, 0.25) 100%)' 
+                    : 'rgba(255, 255, 255, 0.03)',
+                  border: isSelected 
+                    ? '1px solid rgba(139, 92, 246, 0.5)' 
+                    : '1px solid rgba(255, 255, 255, 0.1)',
+                  padding: '5px 12px',
+                  borderRadius: '20px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  boxShadow: isSelected ? '0 4px 10px rgba(139, 92, 246, 0.15)' : 'none',
+                }}
+                onMouseOver={e => {
+                  if (!isSelected) {
+                    e.currentTarget.style.color = '#fff';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+                  }
+                }}
+                onMouseOut={e => {
+                  if (!isSelected) {
+                    e.currentTarget.style.color = 'rgba(255, 255, 255, 0.6)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                  }
+                }}
+              >
+                {tag}
+              </button>
+            );
+          })}
+          {selectedTags.length > 0 && (
+            <button
+              onClick={() => setSelectedTags([])}
+              style={{
+                marginLeft: 'auto',
+                background: 'none',
+                border: 'none',
+                color: '#ef4444',
+                fontSize: '11px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+            >
+              <X size={12} /> Clear Filters
+            </button>
+          )}
+        </div>
+      )}
 
 
-      {renderItems.length > 0 ? (
+
+      {activeTab === 'tags' ? (
+        <TagsManagerView 
+          tags={data.tags || []} 
+          searchQuery={searchQuery}
+          navigateTo={navigateTo}
+        />
+      ) : renderItems.length > 0 ? (
         <>
           <div className="library-grid" style={{
             display: 'grid',
@@ -339,16 +569,16 @@ const LibraryView = ({ T }) => {
                 if (item.isSeriesNode || item.isEpisodeNode) {
                   const targetTmdbId = item.series_tmdb_id || item.tmdb_id;
                   if (targetTmdbId) {
-                    setDetailSeriesTmdbId(targetTmdbId);
+                    navigateTo('series', targetTmdbId);
                   } else {
                     console.warn("No TMDB ID found for this series. Cannot open detail view.");
                   }
                 }
                 else if (item.type === 'actor' || item.type === 'director') {
-                  // Actors/Directors: no detail page yet
+                  navigateTo('person', item.id);
                 } else {
                   // Open movie detail page
-                  setDetailItemId(item.id);
+                  navigateTo('movie', item.id);
                 }
               }}
               onMouseOver={e => {
@@ -383,6 +613,53 @@ const LibraryView = ({ T }) => {
                     <div style={{ fontSize: '14px', fontWeight: '700' }}>{item.displayTitle}</div>
                   </div>
                 )}
+
+                {/* User Badges (Favorite & User Rating) */}
+                {(item.is_favorite || item.user_rating > 0) && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '10px',
+                    right: '10px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px',
+                    zIndex: 10,
+                  }}>
+                    {item.is_favorite && (
+                      <div style={{
+                        background: 'rgba(233, 30, 99, 0.95)',
+                        color: '#fff',
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
+                        backdropFilter: 'blur(4px)',
+                      }}>
+                        <Heart size={14} fill="currentColor" />
+                      </div>
+                    )}
+                    {item.user_rating > 0 && (
+                      <div style={{
+                        background: 'rgba(255, 193, 7, 0.95)',
+                        color: '#000',
+                        padding: '2px 8px',
+                        borderRadius: '12px',
+                        fontSize: '11px',
+                        fontWeight: '800',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '2px',
+                        boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
+                        backdropFilter: 'blur(4px)',
+                      }}>
+                        <Star size={10} fill="currentColor" /> {item.user_rating}
+                      </div>
+                    )}
+                  </div>
+                )}
   
                 <div className="poster-overlay" style={{
                   position: 'absolute',
@@ -413,6 +690,26 @@ const LibraryView = ({ T }) => {
                       }}>★ {item.rating.toFixed(1)}</span>
                     )}
                   </div>
+                  {item.custom_tags && item.custom_tags.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '8px' }}>
+                      {item.custom_tags.slice(0, 3).map(tag => (
+                        <span key={tag} style={{
+                          fontSize: '9px',
+                          fontWeight: '700',
+                          color: '#fff',
+                          background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(59, 130, 246, 0.2) 100%)',
+                          border: '1px solid rgba(139, 92, 246, 0.35)',
+                          padding: '1px 5px',
+                          borderRadius: '8px',
+                        }}>
+                          {tag}
+                        </span>
+                      ))}
+                      {item.custom_tags.length > 3 && (
+                        <span style={{ fontSize: '9px', color: 'rgba(255, 255, 255, 0.4)', alignSelf: 'center', fontWeight: '700' }}>+{item.custom_tags.length - 3}</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -602,113 +899,130 @@ const LibraryView = ({ T }) => {
                   <Loader2 className="animate-spin" size={24} color="var(--accent-blue)" />
                 </div>
               ) : peopleList.length > 0 ? (
-                peopleList.map(person => {
-                  const hasPortrait = person.profile_path;
-                  // Custom name hash gradient generator
-                  const getHashGradient = (name) => {
-                    let hash = 0;
-                    for (let i = 0; i < name.length; i++) {
-                      hash = name.charCodeAt(i) + ((hash << 5) - hash);
-                    }
-                    const c1 = Math.abs(hash % 360);
-                    const c2 = (c1 + 40) % 360;
-                    return `linear-gradient(135deg, hsl(${c1}, 70%, 45%) 0%, hsl(${c2}, 75%, 25%) 100%)`;
-                  };
-                  const initials = person.name ? person.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() : '?';
+                <>
+                  {peopleList.slice(0, visiblePeopleCount).map(person => {
+                    const hasPortrait = person.profile_path;
+                    // Custom name hash gradient generator
+                    const getHashGradient = (name) => {
+                      let hash = 0;
+                      for (let i = 0; i < name.length; i++) {
+                        hash = name.charCodeAt(i) + ((hash << 5) - hash);
+                      }
+                      const c1 = Math.abs(hash % 360);
+                      const c2 = (c1 + 40) % 360;
+                      return `linear-gradient(135deg, hsl(${c1}, 70%, 45%) 0%, hsl(${c2}, 75%, 25%) 100%)`;
+                    };
+                    const initials = person.name ? person.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() : '?';
 
-                  return (
-                    <div 
-                      key={person.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '12px',
-                        background: 'rgba(255, 255, 255, 0.02)',
-                        border: '1px solid rgba(255, 255, 255, 0.04)',
-                        borderRadius: '12px',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        {/* Circle Portrait */}
-                        <div style={{
-                          width: '42px',
-                          height: '42px',
-                          borderRadius: '50%',
-                          overflow: 'hidden',
-                          background: hasPortrait ? 'none' : getHashGradient(person.name),
+                    return (
+                      <div 
+                        key={person.id}
+                        style={{
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'center',
-                          boxShadow: '0 4px 10px rgba(0,0,0,0.2)',
-                          fontWeight: '700',
-                          fontSize: '14px',
-                          color: '#fff'
-                        }}>
-                          {hasPortrait ? (
-                            <img 
-                              src={`http://localhost:8000/media/images/persons${person.profile_path}`} 
-                              alt={person.name} 
-                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                            />
-                          ) : (
-                            initials
-                          )}
-                        </div>
-                        <div>
-                          <div style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>{person.name}</div>
-                          <div style={{ fontSize: '11px', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span>{person.library_count} {person.library_count === 1 ? 'item' : 'items'}</span>
-                            <span style={{ width: '3px', height: '3px', borderRadius: '50%', background: 'rgba(255,255,255,0.2)' }}></span>
-                            <span>★ {person.popularity ? person.popularity.toFixed(1) : '0.0'}</span>
+                          justifyContent: 'space-between',
+                          padding: '12px',
+                          background: 'rgba(255, 255, 255, 0.02)',
+                          border: '1px solid rgba(255, 255, 255, 0.04)',
+                          borderRadius: '12px',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <div 
+                          style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '12px',
+                            cursor: 'pointer'
+                          }}
+                          onClick={() => {
+                            setIsDrawerOpen(false);
+                            navigateTo('person', person.id);
+                          }}
+                        >
+                          {/* Circle Portrait */}
+                          <div style={{
+                            width: '42px',
+                            height: '42px',
+                            borderRadius: '50%',
+                            overflow: 'hidden',
+                            background: hasPortrait ? 'none' : getHashGradient(person.name),
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: '0 4px 10px rgba(0,0,0,0.2)',
+                            fontWeight: '700',
+                            fontSize: '14px',
+                            color: '#fff'
+                          }}>
+                            {hasPortrait ? (
+                              <img 
+                                src={`http://localhost:8000/media/images/persons${person.profile_path}`} 
+                                alt={person.name} 
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              />
+                            ) : (
+                              initials
+                            )}
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>{person.name}</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span>{person.library_count} {person.library_count === 1 ? 'item' : 'items'}</span>
+                              <span style={{ width: '3px', height: '3px', borderRadius: '50%', background: 'rgba(255,255,255,0.2)' }}></span>
+                              <span>★ {person.popularity ? person.popularity.toFixed(1) : '0.0'}</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      {/* +/- and Star Toggles */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <button
-                          onClick={() => handleToggleStatus(person.id, 'is_favorite', person.is_favorite)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            color: person.is_favorite ? 'var(--accent-yellow)' : 'rgba(255,255,255,0.15)',
-                            padding: '6px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            transition: 'all 0.2s'
-                          }}
-                          title={person.is_favorite ? "Remove from Favorites" : "Mark as Favorite"}
-                        >
-                          <Star size={18} fill={person.is_favorite ? "currentColor" : "none"} />
-                        </button>
+                        {/* +/- and Star Toggles */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <button
+                            onClick={() => handleToggleStatus(person.id, 'is_favorite', person.is_favorite)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: person.is_favorite ? '#e91e63' : 'rgba(255,255,255,0.15)',
+                              padding: '6px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'all 0.2s'
+                            }}
+                            title={person.is_favorite ? "Remove from Favorites" : "Mark as Favorite"}
+                          >
+                            <Heart size={18} fill={person.is_favorite ? "currentColor" : "none"} />
+                          </button>
 
-                        <button
-                          onClick={() => handleToggleStatus(person.id, 'is_active', person.is_active)}
-                          style={{
-                            background: person.is_active ? 'rgba(76, 175, 80, 0.15)' : 'rgba(255,255,255,0.04)',
-                            border: `1px solid ${person.is_active ? 'rgba(76, 175, 80, 0.3)' : 'rgba(255,255,255,0.08)'}`,
-                            borderRadius: '8px',
-                            color: person.is_active ? '#4CAF50' : 'var(--text-dim)',
-                            width: '32px',
-                            height: '32px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s'
-                          }}
-                          title={person.is_active ? "Remove from Library" : "Add to Library"}
-                        >
-                          {person.is_active ? <Minus size={14} /> : <Plus size={14} />}
-                        </button>
+
+                          <button
+                            onClick={() => handleToggleStatus(person.id, 'is_active', person.is_active)}
+                            style={{
+                              background: person.is_active ? 'rgba(76, 175, 80, 0.15)' : 'rgba(255,255,255,0.04)',
+                              border: `1px solid ${person.is_active ? 'rgba(76, 175, 80, 0.3)' : 'rgba(255,255,255,0.08)'}`,
+                              borderRadius: '8px',
+                              color: person.is_active ? '#4CAF50' : 'var(--text-dim)',
+                              width: '32px',
+                              height: '32px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s'
+                            }}
+                            title={person.is_active ? "Remove from Library" : "Add to Library"}
+                          >
+                            {person.is_active ? <Minus size={14} /> : <Plus size={14} />}
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })
+                    );
+                  })}
+                  {peopleList.length > visiblePeopleCount && (
+                    <div ref={drawerTriggerRef} style={{ height: '10px', margin: '15px 0' }} />
+                  )}
+                </>
               ) : (
                 <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--text-dim)', fontSize: '13px' }}>
                   No matched people found.
@@ -716,6 +1030,222 @@ const LibraryView = ({ T }) => {
               )}
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const TagsManagerView = ({ tags, searchQuery, navigateTo }) => {
+  const [expandedTag, setExpandedTag] = useState(null);
+
+  const filteredTags = tags.filter(tag =>
+    tag.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  if (filteredTags.length === 0) {
+    return (
+      <div className="library-empty" style={{ 
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', 
+        height: '400px', color: 'var(--text-dim)' 
+      }}>
+        <Tag size={64} style={{ opacity: 0.1, marginBottom: '20px' }} />
+        <h3 style={{ color: '#fff', fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>
+          No Tags Found
+        </h3>
+        <p style={{ color: 'var(--text-dim)', fontSize: '14px', maxWidth: '300px', textAlign: 'center' }}>
+          {searchQuery ? `No tags matching "${searchQuery}".` : 'Add custom tags to your movies, series, or people to see them here!'}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '25px', animation: 'fadeIn 0.4s ease-out' }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+        gap: '20px'
+      }}>
+        {filteredTags.map(tag => {
+          const isExpanded = expandedTag === tag.name;
+          return (
+            <div 
+              key={tag.name}
+              style={{
+                background: 'var(--bg-card)',
+                border: isExpanded ? '1px solid rgba(139, 92, 246, 0.4)' : '1px solid var(--border-card)',
+                borderRadius: '16px',
+                padding: '20px',
+                cursor: 'pointer',
+                transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                boxShadow: isExpanded ? '0 10px 30px rgba(139, 92, 246, 0.15)' : 'none',
+                transform: isExpanded ? 'translateY(-4px)' : 'none',
+              }}
+              onClick={() => setExpandedTag(isExpanded ? null : tag.name)}
+              onMouseOver={e => {
+                if (!isExpanded) {
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }
+              }}
+              onMouseOut={e => {
+                if (!isExpanded) {
+                  e.currentTarget.style.borderColor = 'var(--border-card)';
+                  e.currentTarget.style.transform = 'none';
+                }
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '10px',
+                    background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(59, 130, 246, 0.2) 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: '1px solid rgba(139, 92, 246, 0.3)'
+                  }}>
+                    <Tag size={16} color="#a78bfa" />
+                  </div>
+                  <span style={{ fontSize: '18px', fontWeight: '800', color: '#fff' }}>{tag.name}</span>
+                </div>
+                <span style={{
+                  fontSize: '11px',
+                  fontWeight: '800',
+                  color: '#fff',
+                  background: 'rgba(139, 92, 246, 0.2)',
+                  border: '1px solid rgba(139, 92, 246, 0.4)',
+                  padding: '3px 8px',
+                  borderRadius: '20px'
+                }}>
+                  {tag.total_count} item{tag.total_count !== 1 ? 's' : ''}
+                </span>
+              </div>
+
+              {/* Counts Breakdown pills */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', fontSize: '11px', color: 'var(--text-dim)' }}>
+                {tag.movies.length > 0 && (
+                  <span style={{ background: 'rgba(255,255,255,0.03)', padding: '3px 8px', borderRadius: '8px' }}>
+                    🎬 {tag.movies.length} Movie{tag.movies.length !== 1 ? 's' : ''}
+                  </span>
+                )}
+                {tag.series.length > 0 && (
+                  <span style={{ background: 'rgba(255,255,255,0.03)', padding: '3px 8px', borderRadius: '8px' }}>
+                    📺 {tag.series.length} Series
+                  </span>
+                )}
+                {tag.adult.length > 0 && (
+                  <span style={{ background: 'rgba(255,255,255,0.03)', padding: '3px 8px', borderRadius: '8px' }}>
+                    🔞 {tag.adult.length} Adult
+                  </span>
+                )}
+                {(tag.actors.length > 0 || tag.directors.length > 0) && (
+                  <span style={{ background: 'rgba(255,255,255,0.03)', padding: '3px 8px', borderRadius: '8px' }}>
+                    👥 {tag.actors.length + tag.directors.length} Person{tag.actors.length + tag.directors.length !== 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
+
+              <div style={{ marginTop: '12px', fontSize: '11px', color: '#a78bfa', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                {isExpanded ? 'Click to collapse details' : 'Click to show tagged items'}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Expanded tag list */}
+      {expandedTag && (
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.01)',
+          border: '1px solid rgba(255, 255, 255, 0.05)',
+          borderRadius: '20px',
+          padding: '25px',
+          animation: 'slideDown 0.3s ease-out',
+          backdropFilter: 'blur(8px)',
+        }}>
+          <h3 style={{ fontSize: '20px', fontWeight: '800', color: '#fff', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Tag size={20} color="#a78bfa" /> Items tagged with "{expandedTag}"
+          </h3>
+
+          {(() => {
+            const tagObj = tags.find(t => t.name === expandedTag);
+            if (!tagObj) return null;
+
+            const allTaggedItems = [
+              ...tagObj.movies.map(m => ({ ...m, category: 'Movie', folder: 'posters' })),
+              ...tagObj.series.map(s => ({ ...s, category: 'Series', folder: 'posters', isSeriesNode: true })),
+              ...tagObj.adult.map(a => ({ ...a, category: 'Adult', folder: 'posters' })),
+              ...tagObj.actors.map(ac => ({ ...ac, category: 'Actor', folder: 'persons' })),
+              ...tagObj.directors.map(d => ({ ...d, category: 'Director', folder: 'persons' }))
+            ];
+
+            return (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                gap: '20px'
+              }}>
+                {allTaggedItems.map(item => (
+                  <div 
+                    key={`${item.category}_${item.id}`}
+                    onClick={() => {
+                      if (item.isSeriesNode) {
+                        navigateTo('series', item.series_tmdb_id || item.tmdb_id);
+                      } else if (item.category === 'Actor' || item.category === 'Director') {
+                        navigateTo('person', item.id);
+                      } else {
+                        navigateTo('movie', item.id);
+                      }
+                    }}
+                    style={{
+                      background: 'rgba(255,255,255,0.02)',
+                      border: '1px solid rgba(255,255,255,0.05)',
+                      borderRadius: '12px',
+                      overflow: 'hidden',
+                      cursor: 'pointer',
+                      transition: 'transform 0.2s',
+                    }}
+                    onMouseOver={e => e.currentTarget.style.transform = 'scale(1.03)'}
+                    onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
+                  >
+                    <div style={{ aspectRatio: '2/3', position: 'relative', background: '#111' }}>
+                      {item.poster_path ? (
+                        <img 
+                          src={`http://localhost:8000/media/images/${item.folder}${item.poster_path}`} 
+                          alt={item.title}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      ) : (
+                        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#444' }}>
+                          🎬
+                        </div>
+                      )}
+                      <span style={{
+                        position: 'absolute',
+                        bottom: '5px',
+                        left: '5px',
+                        fontSize: '9px',
+                        fontWeight: '800',
+                        color: '#fff',
+                        background: 'rgba(0,0,0,0.8)',
+                        padding: '2px 6px',
+                        borderRadius: '4px'
+                      }}>
+                        {item.category}
+                      </span>
+                    </div>
+                    <div style={{ padding: '8px', fontSize: '12px', fontWeight: '700', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {item.title}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>

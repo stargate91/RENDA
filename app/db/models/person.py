@@ -19,6 +19,7 @@ class Person(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", index=True)
     is_favorite: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", index=True)
     user_rating: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    custom_tags: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
     localizations: Mapped[List["PersonLocalization"]] = relationship(back_populates="person", cascade="all, delete-orphan")
     media_links: Mapped[List["MediaPersonLink"]] = relationship(back_populates="person")
 

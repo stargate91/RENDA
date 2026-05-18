@@ -95,7 +95,10 @@ class MediaLibraryService:
                 "tmdb_id": active_match.tmdb_id if active_match else None,
                 "series_title": loc.series_title if loc else None,
                 "season_title": loc.season_title if loc else None,
-                "episode_title": loc.episode_title if loc else None
+                "episode_title": loc.episode_title if loc else None,
+                "is_favorite": item.is_favorite or False,
+                "user_rating": item.user_rating,
+                "custom_tags": item.custom_tags or []
             }
 
             if active_match and active_match.is_adult:
@@ -157,7 +160,8 @@ class MediaLibraryService:
                     "path": None,
                     "is_active": p.is_active,
                     "is_favorite": p.is_favorite,
-                    "user_rating": p.user_rating
+                    "user_rating": p.user_rating,
+                    "custom_tags": p.custom_tags or []
                 })
                 library["counts"]["actors"] += 1
                 
@@ -176,9 +180,81 @@ class MediaLibraryService:
                     "path": None,
                     "is_active": p.is_active,
                     "is_favorite": p.is_favorite,
-                    "user_rating": p.user_rating
+                    "user_rating": p.user_rating,
+                    "custom_tags": p.custom_tags or []
                 })
                 library["counts"]["directors"] += 1
+
+        # Collect all unique tags and associate them with their respective item references
+        tags_map = {}
+        
+        # Movies/Series/Adult items
+        for group in ["movies", "series", "adult"]:
+            for item in library.get(group, []):
+                tags = item.get("custom_tags")
+                if tags and isinstance(tags, list):
+                    for tag in tags:
+                        tag_clean = tag.strip()
+                        if not tag_clean:
+                            continue
+                        if tag_clean not in tags_map:
+                            tags_map[tag_clean] = {
+                                "name": tag_clean,
+                                "movies": [],
+                                "series": [],
+                                "adult": [],
+                                "actors": [],
+                                "directors": [],
+                                "total_count": 0
+                            }
+                        tags_map[tag_clean][group].append(item)
+                        tags_map[tag_clean]["total_count"] += 1
+                        
+        # Actors
+        for actor in library.get("actors", []):
+            tags = actor.get("custom_tags")
+            if tags and isinstance(tags, list):
+                for tag in tags:
+                    tag_clean = tag.strip()
+                    if not tag_clean:
+                        continue
+                    if tag_clean not in tags_map:
+                        tags_map[tag_clean] = {
+                            "name": tag_clean,
+                            "movies": [],
+                            "series": [],
+                            "adult": [],
+                            "actors": [],
+                            "directors": [],
+                            "total_count": 0
+                        }
+                    tags_map[tag_clean]["actors"].append(actor)
+                    tags_map[tag_clean]["total_count"] += 1
+                    
+        # Directors
+        for director in library.get("directors", []):
+            tags = director.get("custom_tags")
+            if tags and isinstance(tags, list):
+                for tag in tags:
+                    tag_clean = tag.strip()
+                    if not tag_clean:
+                        continue
+                    if tag_clean not in tags_map:
+                        tags_map[tag_clean] = {
+                            "name": tag_clean,
+                            "movies": [],
+                            "series": [],
+                            "adult": [],
+                            "actors": [],
+                            "directors": [],
+                            "total_count": 0
+                        }
+                    tags_map[tag_clean]["directors"].append(director)
+                    tags_map[tag_clean]["total_count"] += 1
+                    
+        # Sort tags alphabetically
+        library["tags"] = sorted(tags_map.values(), key=lambda t: t["name"].lower())
+        library["counts"]["tags"] = len(library["tags"])
 
         return library
 

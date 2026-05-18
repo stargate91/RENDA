@@ -1,10 +1,175 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Clock, Calendar, Star, Users, Clapperboard, Film, Monitor, HardDrive, ExternalLink, User, FolderOpen } from 'lucide-react';
+import { ArrowLeft, Clock, Calendar, Star, Heart, Users, Clapperboard, Film, Monitor, HardDrive, ExternalLink, User, FolderOpen, Tag, Check, Plus, X } from 'lucide-react';
 import { api, API_BASE } from '../../services/api';
 
-const MovieDetailView = ({ itemId, onBack }) => {
+const CustomTagsList = ({ tags, onAddTag, onRemoveTag }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [newTag, setNewTag] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const trimmed = newTag.trim();
+    if (trimmed && !tags.includes(trimmed)) {
+      onAddTag(trimmed);
+      setNewTag('');
+    }
+    setIsEditing(false);
+  };
+
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', marginTop: '15px' }}>
+      {tags.map((tag) => (
+        <span
+          key={tag}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '12px',
+            fontWeight: '600',
+            color: '#fff',
+            background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(59, 130, 246, 0.2) 100%)',
+            border: '1px solid rgba(139, 92, 246, 0.35)',
+            padding: '4px 10px',
+            borderRadius: '12px',
+            transition: 'all 0.2s ease',
+            boxShadow: '0 4px 10px rgba(0, 0, 0, 0.1)',
+          }}
+        >
+          <Tag size={12} color="#a78bfa" />
+          {tag}
+          <button
+            onClick={() => onRemoveTag(tag)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'rgba(255, 255, 255, 0.4)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 0,
+              marginLeft: '2px',
+              transition: 'color 0.15s ease',
+            }}
+            onMouseOver={e => e.currentTarget.style.color = '#ef4444'}
+            onMouseOut={e => e.currentTarget.style.color = 'rgba(255, 255, 255, 0.4)'}
+          >
+            <X size={12} />
+          </button>
+        </span>
+      ))}
+
+      {isEditing ? (
+        <form onSubmit={handleSubmit} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <input
+            type="text"
+            placeholder="Add tag..."
+            value={newTag}
+            onChange={(e) => setNewTag(e.target.value)}
+            autoFocus
+            onBlur={() => setTimeout(() => setIsEditing(false), 200)}
+            onKeyDown={(e) => { if (e.key === 'Escape') setIsEditing(false); }}
+            style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              borderRadius: '10px',
+              padding: '4px 8px',
+              color: '#fff',
+              fontSize: '12px',
+              outline: 'none',
+              width: '100px',
+              transition: 'all 0.2s',
+            }}
+          />
+          <button
+            type="submit"
+            style={{
+              background: 'rgba(59, 130, 246, 0.2)',
+              border: '1px solid rgba(59, 130, 246, 0.4)',
+              color: '#3b82f6',
+              borderRadius: '6px',
+              width: '24px',
+              height: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+            }}
+          >
+            <Check size={12} />
+          </button>
+        </form>
+      ) : (
+        <button
+          onClick={() => setIsEditing(true)}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            fontSize: '11px',
+            fontWeight: '700',
+            color: 'rgba(255, 255, 255, 0.6)',
+            background: 'rgba(255, 255, 255, 0.03)',
+            border: '1px dashed rgba(255, 255, 255, 0.2)',
+            padding: '4px 10px',
+            borderRadius: '12px',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+          }}
+          onMouseOver={e => {
+            e.currentTarget.style.color = '#fff';
+            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.4)';
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+          }}
+          onMouseOut={e => {
+            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.6)';
+            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+          }}
+        >
+          <Plus size={12} />
+          Add Tag
+        </button>
+      )}
+    </div>
+  );
+};
+
+const MovieDetailView = ({ itemId, onBack, onPersonClick }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [hoverRating, setHoverRating] = useState(0);
+
+  const handleToggleFavorite = async () => {
+    if (!data) return;
+    const currentFav = data.is_favorite;
+    const newFav = !currentFav;
+    
+    setData(prev => ({ ...prev, is_favorite: newFav }));
+    
+    try {
+      await api.updateItemStatus(itemId, { is_favorite: newFav });
+    } catch (e) {
+      console.error("Failed to toggle favorite:", e);
+      setData(prev => ({ ...prev, is_favorite: currentFav }));
+    }
+  };
+
+  const handleSetRating = async (ratingValue) => {
+    if (!data) return;
+    const currentRating = data.user_rating;
+    const newRating = currentRating === ratingValue ? null : ratingValue;
+    
+    setData(prev => ({ ...prev, user_rating: newRating }));
+    
+    try {
+      await api.updateItemStatus(itemId, { user_rating: newRating });
+    } catch (e) {
+      console.error("Failed to update rating:", e);
+      setData(prev => ({ ...prev, user_rating: currentRating }));
+    }
+  };
 
   useEffect(() => {
     const fetchDetail = async () => {
@@ -81,6 +246,10 @@ const MovieDetailView = ({ itemId, onBack }) => {
     <div className="movie-detail">
       {/* ===== HERO ===== */}
       <div className="detail-hero">
+        <button className="detail-back-btn" onClick={onBack}>
+          <ArrowLeft size={14} /> Back to Library
+        </button>
+
         {backdropUrl && (
           <img className="detail-hero-backdrop" src={backdropUrl} alt="" />
         )}
@@ -98,10 +267,6 @@ const MovieDetailView = ({ itemId, onBack }) => {
           </div>
 
           <div className="detail-info">
-            <button className="detail-back-btn" onClick={onBack}>
-              <ArrowLeft size={14} /> Back to Library
-            </button>
-
             <h1 className="detail-title">{data.title}</h1>
             
             {data.original_title && data.original_title !== data.title && (
@@ -111,6 +276,84 @@ const MovieDetailView = ({ itemId, onBack }) => {
             {data.tagline && (
               <div className="detail-tagline">"{data.tagline}"</div>
             )}
+
+            {/* Premium Glassmorphic User Interaction Bar */}
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '15px', 
+              margin: '15px 0 20px 0', 
+              background: 'rgba(255, 255, 255, 0.03)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              padding: '6px 14px',
+              borderRadius: '12px',
+              width: 'fit-content',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+            }}>
+              {/* Favorite Heart Button */}
+              <button
+                onClick={handleToggleFavorite}
+                style={{
+                  background: data.is_favorite ? 'rgba(233, 30, 99, 0.2)' : 'transparent',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: data.is_favorite ? '#e91e63' : 'rgba(255, 255, 255, 0.4)',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseOver={e => {
+                  e.currentTarget.style.color = '#e91e63';
+                  e.currentTarget.style.background = 'rgba(233, 30, 99, 0.1)';
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.color = data.is_favorite ? '#e91e63' : 'rgba(255, 255, 255, 0.4)';
+                  e.currentTarget.style.background = data.is_favorite ? 'rgba(233, 30, 99, 0.2)' : 'transparent';
+                }}
+                title={data.is_favorite ? "Remove from Favorites" : "Mark as Favorite"}
+              >
+                <Heart size={18} fill={data.is_favorite ? "currentColor" : "none"} />
+              </button>
+
+              <div style={{ width: '1px', height: '16px', background: 'rgba(255, 255, 255, 0.15)' }} />
+
+              {/* 1-5 Star Interactive Rating */}
+              <div 
+                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                onMouseLeave={() => setHoverRating(0)}
+              >
+                {[1, 2, 3, 4, 5].map((star) => {
+                  const isLit = hoverRating ? star <= hoverRating : star <= (data.user_rating || 0);
+                  return (
+                    <Star
+                      key={star}
+                      size={18}
+                      onClick={() => handleSetRating(star)}
+                      onMouseEnter={() => setHoverRating(star)}
+                      style={{
+                        cursor: 'pointer',
+                        color: isLit ? 'var(--accent-yellow, #ffc107)' : 'rgba(255, 255, 255, 0.2)',
+                        fill: isLit ? 'var(--accent-yellow, #ffc107)' : 'none',
+                        transition: 'all 0.15s ease',
+                        transform: hoverRating === star ? 'scale(1.2)' : 'none'
+                      }}
+                    />
+                  );
+                })}
+              </div>
+
+              {data.user_rating > 0 && (
+                <span style={{ fontSize: '12px', color: 'var(--accent-yellow)', fontWeight: '600', marginLeft: '5px', opacity: 0.9 }}>
+                  Your Rating
+                </span>
+              )}
+            </div>
 
             {/* Meta pills */}
             <div className="detail-meta-row">
@@ -145,6 +388,29 @@ const MovieDetailView = ({ itemId, onBack }) => {
                 ))}
               </div>
             )}
+
+            {/* Custom Tags */}
+            <CustomTagsList
+              tags={data.custom_tags || []}
+              onAddTag={async (newTag) => {
+                const updatedTags = [...(data.custom_tags || []), newTag];
+                setData(prev => ({ ...prev, custom_tags: updatedTags }));
+                try {
+                  await api.updateItemStatus(itemId, { custom_tags: updatedTags });
+                } catch (e) {
+                  console.error("Failed to add custom tag:", e);
+                }
+              }}
+              onRemoveTag={async (tagToRemove) => {
+                const updatedTags = (data.custom_tags || []).filter(t => t !== tagToRemove);
+                setData(prev => ({ ...prev, custom_tags: updatedTags }));
+                try {
+                  await api.updateItemStatus(itemId, { custom_tags: updatedTags });
+                } catch (e) {
+                  console.error("Failed to remove custom tag:", e);
+                }
+              }}
+            />
 
             {/* Ratings */}
             {hasRatings && (
@@ -201,7 +467,12 @@ const MovieDetailView = ({ itemId, onBack }) => {
             </div>
             <div className="director-row">
               {data.directors.map(d => (
-                <div key={d.id} className="director-card">
+                <div 
+                  key={d.id} 
+                  className="director-card"
+                  onClick={() => onPersonClick && onPersonClick(d.id)}
+                  style={{ cursor: onPersonClick ? 'pointer' : 'default' }}
+                >
                   <div className="director-card-img">
                     {d.profile_path ? (
                       <img src={`${API_BASE}/media/images/persons${d.profile_path}`} alt={d.name} />
@@ -227,7 +498,12 @@ const MovieDetailView = ({ itemId, onBack }) => {
             </div>
             <div className="cast-scroll">
               {data.cast.map(c => (
-                <div key={c.id} className="cast-card">
+                <div 
+                  key={c.id} 
+                  className="cast-card"
+                  onClick={() => onPersonClick && onPersonClick(c.id)}
+                  style={{ cursor: onPersonClick ? 'pointer' : 'default' }}
+                >
                   <div className="cast-card-img">
                     {c.profile_path ? (
                       <img src={`${API_BASE}/media/images/persons${c.profile_path}`} alt={c.name} />
