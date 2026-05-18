@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Clock, Calendar, Star, Heart, Users, Clapperboard, Film, Monitor, HardDrive, ExternalLink, User, FolderOpen, Tag, Check, Plus, X } from 'lucide-react';
 import { api, API_BASE } from '../../services/api';
+import { useAppContext } from '../../context/AppContext';
 
 const CustomTagsList = ({ tags, onAddTag, onRemoveTag }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -137,6 +138,7 @@ const CustomTagsList = ({ tags, onAddTag, onRemoveTag }) => {
 };
 
 const MovieDetailView = ({ itemId, onBack, onPersonClick }) => {
+  const { T } = useAppContext();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [hoverRating, setHoverRating] = useState(0);
@@ -285,51 +287,44 @@ const MovieDetailView = ({ itemId, onBack, onPersonClick }) => {
               <div className="detail-tagline">"{data.tagline}"</div>
             )}
 
-            {/* Big Premium Play Button */}
+            {/* futuristic glassmorphic play button */}
             <button
               onClick={() => handlePlayMedia(data.id)}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '12px',
-                padding: '14px 32px',
-                background: 'linear-gradient(135deg, #0088ff 0%, #a200ff 100%)',
-                border: 'none',
+                padding: '12px 32px',
+                background: 'rgba(59, 130, 246, 0.1)',
+                border: '1px solid rgba(59, 130, 246, 0.45)',
                 borderRadius: '12px',
-                color: '#fff',
-                fontSize: '16px',
+                color: '#ffffff',
+                fontSize: '15px',
                 fontWeight: '800',
                 cursor: 'pointer',
-                boxShadow: '0 8px 30px rgba(0, 136, 255, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                boxShadow: '0 8px 24px rgba(59, 130, 246, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                 textTransform: 'uppercase',
                 letterSpacing: '1px',
-                marginBottom: '15px'
+                marginBottom: '20px',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
               }}
               onMouseOver={e => {
-                e.currentTarget.style.transform = 'translateY(-3px) scale(1.02)';
-                e.currentTarget.style.boxShadow = '0 16px 40px rgba(0, 136, 255, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.5)';
+                e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
+                e.currentTarget.style.background = 'rgba(59, 130, 246, 0.25)';
+                e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.85)';
+                e.currentTarget.style.boxShadow = '0 12px 32px rgba(59, 130, 246, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.2)';
               }}
               onMouseOut={e => {
                 e.currentTarget.style.transform = 'none';
-                e.currentTarget.style.boxShadow = '0 8px 30px rgba(0, 136, 255, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3)';
+                e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)';
+                e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.45)';
+                e.currentTarget.style.boxShadow = '0 8px 24px rgba(59, 130, 246, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1)';
               }}
             >
-              <span style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center', 
-                background: '#fff', 
-                borderRadius: '50%', 
-                width: '26px', 
-                height: '26px', 
-                color: '#000', 
-                paddingLeft: '3px',
-                boxShadow: '0 4px 10px rgba(0,0,0,0.2)'
-              }}>
-                ▶
-              </span>
-              Lejátszás
+              <span style={{ fontSize: '16px', display: 'flex', alignItems: 'center', color: '#3b82f6' }}>▶</span>
+              {T('common.play')}
             </button>
 
             {/* Premium Glassmorphic User Interaction Bar */}

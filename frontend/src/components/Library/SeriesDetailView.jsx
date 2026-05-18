@@ -535,38 +535,8 @@ const SeriesDetailView = ({ seriesTmdbId, onBack, onPersonClick }) => {
                           handlePlayMedia(episode.id);
                         }}
                         className="episode-play-overlay-btn"
-                        style={{
-                          position: 'absolute',
-                          inset: 0,
-                          zIndex: 5,
-                          background: 'rgba(0, 0, 0, 0.45)',
-                          border: 'none',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
-                          opacity: 0,
-                          transition: 'opacity 0.2s ease',
-                          color: '#fff'
-                        }}
                       >
-                        <div style={{
-                          width: '40px',
-                          height: '40px',
-                          borderRadius: '50%',
-                          background: 'rgba(255, 255, 255, 0.95)',
-                          color: '#000',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
-                          paddingLeft: '3px',
-                          transition: 'transform 0.2s ease'
-                        }}
-                        className="play-icon-circle"
-                        >
-                          ▶
-                        </div>
+                        <div className="play-icon-circle">▶</div>
                       </button>
 
                       <div className="episode-number" style={{ zIndex: 2 }}>{episode.episode_number}</div>
@@ -668,11 +638,77 @@ const SeriesDetailView = ({ seriesTmdbId, onBack, onPersonClick }) => {
         </div>
       </div>
       <style>{`
-        .episode-thumb:hover .episode-play-overlay-btn {
+        /* Smooth transitions for episode cards */
+        .episode-card {
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+          border: 1px solid transparent !important;
+        }
+        .episode-card:hover {
+          background: rgba(255, 255, 255, 0.015) !important;
+          border-color: rgba(59, 130, 246, 0.1) !important;
+          box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2) !important;
+        }
+        
+        /* Episode thumb image zoom */
+        .episode-thumb {
+          position: relative !important;
+          overflow: hidden !important;
+          border-radius: 8px !important;
+          border: 1px solid rgba(255, 255, 255, 0.08) !important;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+        .episode-thumb img {
+          transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+        .episode-card:hover .episode-thumb {
+          border-color: rgba(59, 130, 246, 0.4) !important;
+          box-shadow: 0 0 15px rgba(59, 130, 246, 0.15) !important;
+        }
+        .episode-card:hover .episode-thumb img {
+          transform: scale(1.06) !important;
+        }
+
+        /* Hover Play Overlay button inside thumb */
+        .episode-play-overlay-btn {
+          position: absolute !important;
+          inset: 0 !important;
+          z-index: 5 !important;
+          background: rgba(18, 19, 24, 0.5) !important;
+          border: none !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          cursor: pointer !important;
+          opacity: 0 !important;
+          transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+        .episode-card:hover .episode-play-overlay-btn {
           opacity: 1 !important;
         }
-        .episode-thumb:hover .play-icon-circle {
-          transform: scale(1.1) !important;
+
+        /* Centered Cyber-Blue Glass Play Icon */
+        .play-icon-circle {
+          width: 42px !important;
+          height: 42px !important;
+          border-radius: 50% !important;
+          background: rgba(59, 130, 246, 0.15) !important;
+          border: 1px solid rgba(59, 130, 246, 0.55) !important;
+          color: #3b82f6 !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+          padding-left: 3px !important;
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+          backdrop-filter: blur(4px) !important;
+          -webkit-backdrop-filter: blur(4px) !important;
+        }
+        .episode-play-overlay-btn:hover .play-icon-circle {
+          transform: scale(1.15) !important;
+          background: rgba(59, 130, 246, 0.35) !important;
+          border-color: rgba(59, 130, 246, 0.95) !important;
+          box-shadow: 0 8px 20px rgba(59, 130, 246, 0.65) !important;
+          color: #ffffff !important;
         }
       `}</style>
     </div>

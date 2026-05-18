@@ -4,7 +4,8 @@ const en = {
     "save": "Save Changes",
     "cancel": "Cancel",
     "confirm": "Confirm",
-    "delete": "Delete"
+    "delete": "Delete",
+    "play": "Play"
   },
   "units": {
     "m": "m",

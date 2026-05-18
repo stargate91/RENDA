@@ -714,7 +714,50 @@ const LibraryView = ({ T }) => {
                   opacity: 0,
                   transition: 'opacity 0.3s ease'
                 }}>
-                  {/* Centered Play Button for playable items */}
+
+                  {/* Left-aligned metadata container with padding to avoid floating play button */}
+                  <div style={{ paddingRight: '52px' }}>
+                    <div style={{ fontSize: '16px', fontWeight: '800', marginBottom: '5px', lineHeight: '1.2' }}>
+                      {item.isEpisodeNode && <span style={{ opacity: 0.6, marginRight: '5px' }}>{item.episode_number}.</span>}
+                      {item.displayTitle}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '13px', color: 'var(--text-dim)' }}>{item.isSeasonNode ? `${item.year || ''}` : item.year}</span>
+                      {item.rating > 0 && (
+                        <span style={{ 
+                          fontSize: '11px', 
+                          fontWeight: '700', 
+                          color: 'var(--accent-yellow)',
+                          background: 'rgba(255, 193, 7, 0.1)',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          border: '1px solid rgba(255, 193, 7, 0.2)'
+                        }}>★ {item.rating.toFixed(1)}</span>
+                      )}
+                    </div>
+                    {item.custom_tags && item.custom_tags.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '8px' }}>
+                        {item.custom_tags.slice(0, 2).map(tag => (
+                          <span key={tag} style={{
+                            fontSize: '9px',
+                            fontWeight: '700',
+                            color: '#fff',
+                            background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(59, 130, 246, 0.2) 100%)',
+                            border: '1px solid rgba(139, 92, 246, 0.35)',
+                            padding: '1px 5px',
+                            borderRadius: '8px',
+                          }}>
+                            {tag}
+                          </span>
+                        ))}
+                        {item.custom_tags.length > 2 && (
+                          <span style={{ fontSize: '9px', color: 'rgba(255, 255, 255, 0.4)', alignSelf: 'center', fontWeight: '700' }}>+{item.custom_tags.length - 2}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Spotify-style Floating Action Play Button */}
                   {(item.type === 'movie' || item.isEpisodeNode) && (
                     <button
                       onClick={async (e) => {
@@ -725,79 +768,44 @@ const LibraryView = ({ T }) => {
                           console.error("Failed to play media:", err);
                         }
                       }}
-                      className="grid-play-btn"
                       style={{
                         position: 'absolute',
-                        top: '40%',
-                        left: '50%',
-                        transform: 'translate(-50%, -50%)',
-                        width: '52px',
-                        height: '52px',
+                        bottom: '20px',
+                        right: '20px',
+                        width: '44px',
+                        height: '44px',
                         borderRadius: '50%',
-                        background: 'rgba(255, 255, 255, 0.9)',
-                        border: 'none',
+                        background: 'rgba(59, 130, 246, 0.15)',
+                        border: '1px solid rgba(59, 130, 246, 0.5)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                        boxShadow: '0 6px 16px rgba(0,0,0,0.5)',
                         cursor: 'pointer',
-                        transition: 'all 0.2s ease-out',
-                        color: '#000',
+                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                        color: '#3b82f6',
                         paddingLeft: '3px',
-                        zIndex: 10
+                        zIndex: 20,
+                        backdropFilter: 'blur(8px)',
+                        WebkitBackdropFilter: 'blur(8px)',
                       }}
                       onMouseOver={e => {
-                        e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1.15)';
-                        e.currentTarget.style.background = '#fff';
-                        e.currentTarget.style.boxShadow = '0 12px 30px rgba(59, 130, 246, 0.4)';
+                        e.currentTarget.style.transform = 'scale(1.1) translateY(-2px)';
+                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.35)';
+                        e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.9)';
+                        e.currentTarget.style.boxShadow = '0 8px 24px rgba(59, 130, 246, 0.6)';
+                        e.currentTarget.style.color = '#ffffff';
                       }}
                       onMouseOut={e => {
-                        e.currentTarget.style.transform = 'translate(-50%, -50%)';
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
-                        e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.5)';
+                        e.currentTarget.style.transform = 'none';
+                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)';
+                        e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.5)';
+                        e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.5)';
+                        e.currentTarget.style.color = '#3b82f6';
                       }}
                     >
-                      <span style={{ fontSize: '18px' }}>▶</span>
+                      <span style={{ fontSize: '15px', display: 'flex', alignItems: 'center' }}>▶</span>
                     </button>
-                  )}
-
-                  <div style={{ fontSize: '16px', fontWeight: '800', marginBottom: '5px' }}>
-                    {item.isEpisodeNode && <span style={{ opacity: 0.6, marginRight: '5px' }}>{item.episode_number}.</span>}
-                    {item.displayTitle}
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '13px', color: 'var(--text-dim)' }}>{item.isSeasonNode ? `${item.year || ''}` : item.year}</span>
-                    {item.rating > 0 && (
-                      <span style={{ 
-                        fontSize: '11px', 
-                        fontWeight: '700', 
-                        color: 'var(--accent-yellow)',
-                        background: 'rgba(255, 193, 7, 0.1)',
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        border: '1px solid rgba(255, 193, 7, 0.2)'
-                      }}>★ {item.rating.toFixed(1)}</span>
-                    )}
-                  </div>
-                  {item.custom_tags && item.custom_tags.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '8px' }}>
-                      {item.custom_tags.slice(0, 3).map(tag => (
-                        <span key={tag} style={{
-                          fontSize: '9px',
-                          fontWeight: '700',
-                          color: '#fff',
-                          background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(59, 130, 246, 0.2) 100%)',
-                          border: '1px solid rgba(139, 92, 246, 0.35)',
-                          padding: '1px 5px',
-                          borderRadius: '8px',
-                        }}>
-                          {tag}
-                        </span>
-                      ))}
-                      {item.custom_tags.length > 3 && (
-                        <span style={{ fontSize: '9px', color: 'rgba(255, 255, 255, 0.4)', alignSelf: 'center', fontWeight: '700' }}>+{item.custom_tags.length - 3}</span>
-                      )}
-                    </div>
                   )}
                 </div>
               </div>
