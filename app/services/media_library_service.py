@@ -126,64 +126,69 @@ class MediaLibraryService:
         library["counts"]["actors"] = 0
         library["counts"]["directors"] = 0
         
+        # Színészek lekérdezése (Csak aktív)
+        from sqlalchemy import or_
+        actor_filters = [Person.known_for_department == "Acting"]
         if matched_match_ids:
-            # Színészek lekérdezése (Csak aktív)
-            db_actors = self.db.query(Person).join(
-                MediaPersonLink, MediaPersonLink.person_id == Person.id
-            ).filter(
-                MediaPersonLink.media_match_id.in_(matched_match_ids),
-                MediaPersonLink.job == "Actor",
-                Person.is_active == True
-            ).distinct().all()
+            actor_filters.append((MediaPersonLink.job == "Actor") & (MediaPersonLink.media_match_id.in_(matched_match_ids)))
             
-            # Rendezők / Készítők lekérdezése (Csak aktív)
-            db_directors = self.db.query(Person).join(
-                MediaPersonLink, MediaPersonLink.person_id == Person.id
-            ).filter(
-                MediaPersonLink.media_match_id.in_(matched_match_ids),
-                MediaPersonLink.job.in_(["Director", "Creator"]),
-                Person.is_active == True
-            ).distinct().all()
+        db_actors = self.db.query(Person).outerjoin(
+            MediaPersonLink, MediaPersonLink.person_id == Person.id
+        ).filter(
+            Person.is_active == True,
+            or_(*actor_filters)
+        ).distinct().all()
+        
+        # Rendezők / Készítők lekérdezése (Csak aktív)
+        director_filters = [Person.known_for_department.in_(["Directing", "Writing", "Creator"])]
+        if matched_match_ids:
+            director_filters.append((MediaPersonLink.job.in_(["Director", "Creator"])) & (MediaPersonLink.media_match_id.in_(matched_match_ids)))
             
-            for p in db_actors:
-                loc = p.localizations[0] if p.localizations else None
-                name = loc.name if loc else "Unknown Actor"
-                
-                library["actors"].append({
-                    "id": p.id,
-                    "title": name,
-                    "year": None,
-                    "poster_path": p.profile_path,
-                    "backdrop_path": None,
-                    "rating": p.popularity or 0.0,
-                    "type": "actor",
-                    "path": None,
-                    "is_active": p.is_active,
-                    "is_favorite": p.is_favorite,
-                    "user_rating": p.user_rating,
-                    "custom_tags": p.custom_tags or []
-                })
-                library["counts"]["actors"] += 1
-                
-            for p in db_directors:
-                loc = p.localizations[0] if p.localizations else None
-                name = loc.name if loc else "Unknown Director"
-                
-                library["directors"].append({
-                    "id": p.id,
-                    "title": name,
-                    "year": None,
-                    "poster_path": p.profile_path,
-                    "backdrop_path": None,
-                    "rating": p.popularity or 0.0,
-                    "type": "director",
-                    "path": None,
-                    "is_active": p.is_active,
-                    "is_favorite": p.is_favorite,
-                    "user_rating": p.user_rating,
-                    "custom_tags": p.custom_tags or []
-                })
-                library["counts"]["directors"] += 1
+        db_directors = self.db.query(Person).outerjoin(
+            MediaPersonLink, MediaPersonLink.person_id == Person.id
+        ).filter(
+            Person.is_active == True,
+            or_(*director_filters)
+        ).distinct().all()
+        for p in db_actors:
+            loc = p.localizations[0] if p.localizations else None
+            name = loc.name if loc else "Unknown Actor"
+            
+            library["actors"].append({
+                "id": p.id,
+                "title": name,
+                "year": None,
+                "poster_path": p.profile_path,
+                "backdrop_path": None,
+                "rating": p.popularity or 0.0,
+                "type": "actor",
+                "path": None,
+                "is_active": p.is_active,
+                "is_favorite": p.is_favorite,
+                "user_rating": p.user_rating,
+                "custom_tags": p.custom_tags or []
+            })
+            library["counts"]["actors"] += 1
+            
+        for p in db_directors:
+            loc = p.localizations[0] if p.localizations else None
+            name = loc.name if loc else "Unknown Director"
+            
+            library["directors"].append({
+                "id": p.id,
+                "title": name,
+                "year": None,
+                "poster_path": p.profile_path,
+                "backdrop_path": None,
+                "rating": p.popularity or 0.0,
+                "type": "director",
+                "path": None,
+                "is_active": p.is_active,
+                "is_favorite": p.is_favorite,
+                "user_rating": p.user_rating,
+                "custom_tags": p.custom_tags or []
+            })
+            library["counts"]["directors"] += 1
 
         # Collect all unique tags and associate them with their respective item references
         tags_map = {}
