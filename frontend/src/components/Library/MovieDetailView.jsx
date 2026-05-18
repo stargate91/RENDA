@@ -171,6 +171,14 @@ const MovieDetailView = ({ itemId, onBack, onPersonClick }) => {
     }
   };
 
+  const handlePlayMedia = async (itemId) => {
+    try {
+      await api.playMedia(itemId);
+    } catch (e) {
+      console.error("Failed to play media file:", e);
+    }
+  };
+
   useEffect(() => {
     const fetchDetail = async () => {
       setLoading(true);
@@ -276,6 +284,53 @@ const MovieDetailView = ({ itemId, onBack, onPersonClick }) => {
             {data.tagline && (
               <div className="detail-tagline">"{data.tagline}"</div>
             )}
+
+            {/* Big Premium Play Button */}
+            <button
+              onClick={() => handlePlayMedia(data.id)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '14px 32px',
+                background: 'linear-gradient(135deg, #0088ff 0%, #a200ff 100%)',
+                border: 'none',
+                borderRadius: '12px',
+                color: '#fff',
+                fontSize: '16px',
+                fontWeight: '800',
+                cursor: 'pointer',
+                boxShadow: '0 8px 30px rgba(0, 136, 255, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                textTransform: 'uppercase',
+                letterSpacing: '1px',
+                marginBottom: '15px'
+              }}
+              onMouseOver={e => {
+                e.currentTarget.style.transform = 'translateY(-3px) scale(1.02)';
+                e.currentTarget.style.boxShadow = '0 16px 40px rgba(0, 136, 255, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.5)';
+              }}
+              onMouseOut={e => {
+                e.currentTarget.style.transform = 'none';
+                e.currentTarget.style.boxShadow = '0 8px 30px rgba(0, 136, 255, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3)';
+              }}
+            >
+              <span style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                background: '#fff', 
+                borderRadius: '50%', 
+                width: '26px', 
+                height: '26px', 
+                color: '#000', 
+                paddingLeft: '3px',
+                boxShadow: '0 4px 10px rgba(0,0,0,0.2)'
+              }}>
+                ▶
+              </span>
+              Lejátszás
+            </button>
 
             {/* Premium Glassmorphic User Interaction Bar */}
             <div style={{ 

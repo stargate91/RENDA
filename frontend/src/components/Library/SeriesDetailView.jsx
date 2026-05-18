@@ -173,6 +173,14 @@ const SeriesDetailView = ({ seriesTmdbId, onBack, onPersonClick }) => {
     }
   };
 
+  const handlePlayMedia = async (itemId) => {
+    try {
+      await api.playMedia(itemId);
+    } catch (e) {
+      console.error("Failed to play media file:", e);
+    }
+  };
+
   useEffect(() => {
     const fetchDetail = async () => {
       setLoading(true);
@@ -505,7 +513,7 @@ const SeriesDetailView = ({ seriesTmdbId, onBack, onPersonClick }) => {
                     className="episode-header" 
                     onClick={() => setExpandedEpisodeId(isExpanded ? null : episode.id)}
                   >
-                    <div className="episode-thumb">
+                    <div className="episode-thumb" style={{ position: 'relative' }}>
                       <div className="episode-thumb-placeholder" style={{ position: 'absolute', inset: 0 }}>
                         <Play size={24} opacity={0.3} />
                       </div>
@@ -519,6 +527,48 @@ const SeriesDetailView = ({ seriesTmdbId, onBack, onPersonClick }) => {
                           }}
                         />
                       )}
+                      
+                      {/* Play Episode Overlay Button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePlayMedia(episode.id);
+                        }}
+                        className="episode-play-overlay-btn"
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          zIndex: 5,
+                          background: 'rgba(0, 0, 0, 0.45)',
+                          border: 'none',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          opacity: 0,
+                          transition: 'opacity 0.2s ease',
+                          color: '#fff'
+                        }}
+                      >
+                        <div style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '50%',
+                          background: 'rgba(255, 255, 255, 0.95)',
+                          color: '#000',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                          paddingLeft: '3px',
+                          transition: 'transform 0.2s ease'
+                        }}
+                        className="play-icon-circle"
+                        >
+                          ▶
+                        </div>
+                      </button>
+
                       <div className="episode-number" style={{ zIndex: 2 }}>{episode.episode_number}</div>
                     </div>
                     
@@ -617,6 +667,14 @@ const SeriesDetailView = ({ seriesTmdbId, onBack, onPersonClick }) => {
           </a>
         </div>
       </div>
+      <style>{`
+        .episode-thumb:hover .episode-play-overlay-btn {
+          opacity: 1 !important;
+        }
+        .episode-thumb:hover .play-icon-circle {
+          transform: scale(1.1) !important;
+        }
+      `}</style>
     </div>
   );
 };

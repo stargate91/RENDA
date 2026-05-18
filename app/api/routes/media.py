@@ -174,6 +174,45 @@ def reveal_in_explorer(payload: dict):
         return {"status": "error", "message": str(e)}
 
 
+@router.post("/media/play")
+def play_media_item(payload: dict):
+    """Launches the media file locally using the OS default associated media player."""
+    item_id = payload.get("item_id")
+    if not item_id:
+        return JSONResponse(status_code=400, content={"error": "item_id is required"})
+        
+    db = Session()
+    try:
+        from app.db.models import MediaItem
+        import os
+        import platform
+        import subprocess
+        
+        item = db.query(MediaItem).filter(MediaItem.id == item_id).first()
+        if not item:
+            return JSONResponse(status_code=404, content={"error": "Media item not found"})
+            
+        file_path = item.current_path
+        if not file_path or not os.path.exists(file_path):
+            return JSONResponse(status_code=404, content={"error": f"Media file not found at: {file_path}"})
+            
+        logger.info(f"Launching media file: {file_path}")
+        
+        if platform.system() == "Windows":
+            os.startfile(os.path.normpath(file_path))
+        elif platform.system() == "Darwin": # macOS
+            subprocess.run(["open", file_path])
+        else: # Linux
+            subprocess.run(["xdg-open", file_path])
+            
+        return {"status": "success", "message": f"Launched player for {file_path}"}
+    except Exception as e:
+        logger.error(f"Failed to play media file: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    finally:
+        db.close()
+
+
 @router.get("/library/item/{item_id}")
 def get_library_item_detail(item_id: int):
     """Returns comprehensive detail data for a single library item (movie detail page)."""

@@ -140,4 +140,9 @@ export const api = {
     method: 'POST',
     body: JSON.stringify(updates),
   }),
+  
+  playMedia: (itemId) => fetchJson('/api/media/play', {
+    method: 'POST',
+    body: JSON.stringify({ item_id: itemId })
+  }),
 };

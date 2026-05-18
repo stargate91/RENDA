@@ -714,6 +714,53 @@ const LibraryView = ({ T }) => {
                   opacity: 0,
                   transition: 'opacity 0.3s ease'
                 }}>
+                  {/* Centered Play Button for playable items */}
+                  {(item.type === 'movie' || item.isEpisodeNode) && (
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        try {
+                          await api.playMedia(item.id);
+                        } catch (err) {
+                          console.error("Failed to play media:", err);
+                        }
+                      }}
+                      className="grid-play-btn"
+                      style={{
+                        position: 'absolute',
+                        top: '40%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        width: '52px',
+                        height: '52px',
+                        borderRadius: '50%',
+                        background: 'rgba(255, 255, 255, 0.9)',
+                        border: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease-out',
+                        color: '#000',
+                        paddingLeft: '3px',
+                        zIndex: 10
+                      }}
+                      onMouseOver={e => {
+                        e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1.15)';
+                        e.currentTarget.style.background = '#fff';
+                        e.currentTarget.style.boxShadow = '0 12px 30px rgba(59, 130, 246, 0.4)';
+                      }}
+                      onMouseOut={e => {
+                        e.currentTarget.style.transform = 'translate(-50%, -50%)';
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
+                        e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.5)';
+                      }}
+                    >
+                      <span style={{ fontSize: '18px' }}>▶</span>
+                    </button>
+                  )}
+
                   <div style={{ fontSize: '16px', fontWeight: '800', marginBottom: '5px' }}>
                     {item.isEpisodeNode && <span style={{ opacity: 0.6, marginRight: '5px' }}>{item.episode_number}.</span>}
                     {item.displayTitle}
