@@ -251,21 +251,22 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
           <div 
             className="detail-poster profile-avatar-container" 
             style={{ 
-              borderRadius: '50%', 
-              aspectRatio: '1/1', 
-              width: '200px', 
-              minWidth: '200px', 
+              borderRadius: '16px', 
+              aspectRatio: '2/3', 
+              width: '240px', 
+              minWidth: '240px', 
               border: '4px solid rgba(255, 255, 255, 0.15)',
               position: 'relative',
               cursor: data.images && data.images.length > 1 ? 'pointer' : 'default',
-              overflow: 'hidden'
+              overflow: 'hidden',
+              boxShadow: '0 12px 36px rgba(0, 0, 0, 0.5)'
             }}
             onClick={() => data.images && data.images.length > 1 && setShowImageModal(true)}
           >
             {profileUrl ? (
-              <img className="profile-avatar-img" src={profileUrl} alt={data.name} style={{ borderRadius: '50%', aspectRatio: '1/1', width: '100%', height: '100%', objectFit: 'cover', transition: 'all 0.3s' }} />
+              <img className="profile-avatar-img" src={profileUrl} alt={data.name} style={{ borderRadius: '12px', width: '100%', height: '100%', objectFit: 'cover', transition: 'all 0.3s' }} />
             ) : (
-              <div className="detail-poster-placeholder" style={{ borderRadius: '50%' }}>
+              <div className="detail-poster-placeholder" style={{ borderRadius: '12px' }}>
                 <User size={64} color="var(--text-muted)" />
               </div>
             )}
@@ -289,7 +290,7 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
                   fontSize: '12px',
                   fontWeight: '600',
                   gap: '6px',
-                  borderRadius: '50%'
+                  borderRadius: '12px'
                 }}
               >
                 <Sparkles size={18} />
