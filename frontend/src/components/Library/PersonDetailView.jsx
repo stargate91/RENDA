@@ -255,11 +255,11 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
               aspectRatio: '2/3', 
               width: '240px', 
               minWidth: '240px', 
-              border: '4px solid rgba(255, 255, 255, 0.15)',
               position: 'relative',
               cursor: data.images && data.images.length > 1 ? 'pointer' : 'default',
               overflow: 'hidden',
-              boxShadow: '0 12px 36px rgba(0, 0, 0, 0.5)'
+              boxShadow: '0 12px 36px rgba(0, 0, 0, 0.5)',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
             }}
             onClick={() => data.images && data.images.length > 1 && setShowImageModal(true)}
           >
@@ -912,6 +912,14 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
       )}
 
       <style>{`
+        .profile-avatar-container {
+          border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        }
+        .profile-avatar-container:hover {
+          border-color: rgba(64, 169, 255, 0.45) !important;
+          box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 16px rgba(64, 169, 255, 0.25) !important;
+          transform: translateY(-4px);
+        }
         .profile-avatar-container:hover .profile-avatar-hover {
           opacity: 1 !important;
         }
