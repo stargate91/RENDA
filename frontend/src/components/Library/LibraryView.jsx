@@ -615,49 +615,45 @@ const LibraryView = ({ T }) => {
                 )}
 
                 {/* User Badges (Favorite & User Rating) */}
-                {(item.is_favorite || item.user_rating > 0) && (
+                {item.is_favorite && (
                   <div style={{
                     position: 'absolute',
                     top: '10px',
                     right: '10px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '6px',
                     zIndex: 10,
+                    background: 'rgba(233, 30, 99, 0.95)',
+                    color: '#fff',
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
+                    backdropFilter: 'blur(4px)',
                   }}>
-                    {item.is_favorite && (
-                      <div style={{
-                        background: 'rgba(233, 30, 99, 0.95)',
-                        color: '#fff',
-                        width: '28px',
-                        height: '28px',
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
-                        backdropFilter: 'blur(4px)',
-                      }}>
-                        <Heart size={14} fill="currentColor" />
-                      </div>
-                    )}
-                    {item.user_rating > 0 && (
-                      <div style={{
-                        background: 'rgba(255, 193, 7, 0.95)',
-                        color: '#000',
-                        padding: '2px 8px',
-                        borderRadius: '12px',
-                        fontSize: '11px',
-                        fontWeight: '800',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '2px',
-                        boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
-                        backdropFilter: 'blur(4px)',
-                      }}>
-                        <Star size={10} fill="currentColor" /> {item.user_rating}
-                      </div>
-                    )}
+                    <Heart size={14} fill="currentColor" />
+                  </div>
+                )}
+                {item.user_rating > 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '10px',
+                    left: '10px',
+                    zIndex: 10,
+                    background: 'rgba(255, 193, 7, 0.95)',
+                    color: '#000',
+                    padding: '4px 8px',
+                    borderRadius: '12px',
+                    fontSize: '11px',
+                    fontWeight: '800',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '2px',
+                    boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
+                    backdropFilter: 'blur(4px)',
+                  }}>
+                    <Star size={10} fill="currentColor" /> {item.user_rating}
                   </div>
                 )}
   

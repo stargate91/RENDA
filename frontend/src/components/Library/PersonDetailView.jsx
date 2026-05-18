@@ -552,7 +552,7 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
                     borderRadius: '12px',
                     textAlign: 'center'
                   }}>
-                    Nincs film a könyvtáradban ettől a színésztől. Kattints a "Show Missing" gombra a teljes filmográfia megtekintéséhez.
+                    No movies from this person in your library. Click "Show Missing" to view their complete filmography.
                   </div>
                 ) : (
                   displayedMovies.map(movie => {
@@ -706,7 +706,7 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
                     borderRadius: '12px',
                     textAlign: 'center'
                   }}>
-                    Nincs sorozat a könyvtáradban ettől a színésztől. Kattints a "Show Missing" gombra a teljes filmográfia megtekintéséhez.
+                    No series from this person in your library. Click "Show Missing" to view their complete filmography.
                   </div>
                 ) : (
                   displayedSeries.map(show => {
