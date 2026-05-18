@@ -92,6 +92,7 @@ class MediaLibraryService:
                 "season_number": active_match.season_number if active_match else None,
                 "episode_number": active_match.episode_number if active_match else None,
                 "series_tmdb_id": active_match.series_tmdb_id if active_match else None,
+                "tmdb_id": active_match.tmdb_id if active_match else None,
                 "series_title": loc.series_title if loc else None,
                 "season_title": loc.season_title if loc else None,
                 "episode_title": loc.episode_title if loc else None
@@ -113,7 +114,7 @@ class MediaLibraryService:
         # 1. MATCHED aktív matchek ID-jai
         matched_match_ids = [
             m.id for m in self.db.query(MediaMatch).join(MediaItem).filter(
-                MediaItem.status.in_([ItemStatus.MATCHED, ItemStatus.RENAMED, ItemStatus.ORGANIZED])
+                MediaItem.status.in_([ItemStatus.RENAMED, ItemStatus.ORGANIZED])
             ).filter(MediaMatch.is_active == True).all()
         ]
         

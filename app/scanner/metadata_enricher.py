@@ -292,7 +292,7 @@ class MetadataEnricher:
         from ..db.models import Person, MediaPersonLink
         
         credits = details.get("credits", {})
-        cast = credits.get("cast", [])[:10] # Top 10 színész
+        cast = credits.get("cast", [])[:20] # Top 20 színész
         crew = credits.get("crew", [])
         
         # 1. Rendezők / Készítők

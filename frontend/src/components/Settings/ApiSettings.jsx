@@ -100,8 +100,8 @@ const ApiSettings = ({ settings, setSettings, T }) => {
             <input
               type="password"
               className="form-input"
-              value={settings.imdb_api_key || ''}
-              onChange={e => setSettings({ ...settings, imdb_api_key: e.target.value })}
+              value={settings.omdb_api_key || ''}
+              onChange={e => setSettings({ ...settings, omdb_api_key: e.target.value })}
               placeholder="e.g. 1dabf98c"
             />
           </div>

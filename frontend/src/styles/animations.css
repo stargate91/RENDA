@@ -31,3 +31,7 @@
 .spin {
   animation: spin 1.5s linear infinite;
 }
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}

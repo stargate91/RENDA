@@ -97,11 +97,40 @@ class Resolver:
         """
         candidates: Dict[int, Dict[str, Any]] = {} # tmdb_id -> raw_data
 
+        # Szezon-alapú támogatás validálása sorozatokhoz
+        def filter_by_season_support(tv_results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+            target_season = item.fn_season or item.fd_season or item.it_season
+            if not target_season:
+                return tv_results
+            
+            valid = []
+            for res in tv_results:
+                res_id = res.get("id")
+                if not res_id: continue
+                # Details TMDB call (cached)
+                details = self.api.get_details(res_id, "tv", language=language)
+                if details:
+                    num_seasons = details.get("number_of_seasons") or 0
+                    if num_seasons >= target_season:
+                        valid.append(res)
+                    else:
+                        from ..utils.logger import logger
+                        logger.info(f"Skipping TV series candidate '{res.get('name') or res.get('original_name')}' (ID: {res_id}) because it only has {num_seasons} seasons, but file has season {target_season}")
+                else:
+                    # Ha nincs details (pl. API hiba), megtartjuk biztonsági okokból
+                    valid.append(res)
+            return valid
+
         # 1. Forrás: IMDb ID (Source of Truth)
         if item.nfo_imdb_id:
             res = self.api.find_by_imdb(item.nfo_imdb_id, language=language)
             if res:
-                self._add_candidate(candidates, res)
+                if res.get("item_type") == "tv":
+                    res_list = filter_by_season_support([res])
+                    if res_list:
+                        self._add_candidate(candidates, res)
+                else:
+                    self._add_candidate(candidates, res)
 
         # 2. Forrás: Triple Guessit Search (ha még nincs 100%-os találatunk)
         if not candidates:
@@ -125,10 +154,14 @@ class Resolver:
 
                 tmdb_type = "tv" if item.item_type in (ItemType.SERIES, ItemType.EPISODE) else "movie"
                 results = self.api.search(clean_title, item_type=tmdb_type, year=year, language=language)
+                if tmdb_type == "tv":
+                    results = filter_by_season_support(results)
                 
                 # FALLBACK 1: Ha évszámmal nem volt találat, próbáljuk meg anélkül
                 if not results and year:
                     results = self.api.search(clean_title, item_type=tmdb_type, year=None, language=language)
+                    if tmdb_type == "tv":
+                        results = filter_by_season_support(results)
                 
                 # FALLBACK 2: Ha még mindig nincs találat, és a cím végén gyanús, törtből származó számcsoport van (pl. '2 12' -> '2')
                 if not results:
@@ -136,8 +169,12 @@ class Resolver:
                     if fallback_match:
                         fallback_title = fallback_match.group(1).strip()
                         results = self.api.search(fallback_title, item_type=tmdb_type, year=year, language=language)
+                        if tmdb_type == "tv":
+                            results = filter_by_season_support(results)
                         if not results and year:
                             results = self.api.search(fallback_title, item_type=tmdb_type, year=None, language=language)
+                            if tmdb_type == "tv":
+                                results = filter_by_season_support(results)
                 
                 for res in results:
                     res["item_type"] = tmdb_type
@@ -229,6 +266,24 @@ class Resolver:
                 if data.get("name"): all_titles.append(data.get("name"))
                 if data.get("original_title"): all_titles.append(data.get("original_title"))
                 if data.get("original_name"): all_titles.append(data.get("original_name"))
+                
+                # Lekérjük a részletes adatokat a gyorsítótárból a fordításokért
+                details = self.api.get_details(tmdb_id, "tv" if itype == ItemType.SERIES else "movie", language=language)
+                if details:
+                    # Alternatív címek a részletekből
+                    alt_titles_data = details.get("alternative_titles", {}).get("results", []) or details.get("alternative_titles", {}).get("titles", [])
+                    if isinstance(alt_titles_data, list):
+                        for alt in alt_titles_data:
+                            if alt.get("title"): all_titles.append(alt.get("title"))
+                            if alt.get("name"): all_titles.append(alt.get("name"))
+                            
+                    # Fordítások a részletekből
+                    translations = details.get("translations", {}).get("translations", [])
+                    if isinstance(translations, list):
+                        for trans in translations:
+                            t_data = trans.get("data", {})
+                            if t_data.get("name"): all_titles.append(t_data.get("name"))
+                            if t_data.get("title"): all_titles.append(t_data.get("title"))
                 
                 def clean_title(t: str) -> str:
                     if not t: return ""

@@ -45,11 +45,11 @@ app.add_middleware(
 )
 
 # Include Routers
-app.include_router(scanner.router)
-app.include_router(settings.router)
-app.include_router(media.router)
-app.include_router(metadata.router)
-app.include_router(renamer.router)
+app.include_router(scanner.router, prefix="/api")
+app.include_router(settings.router, prefix="/api")
+app.include_router(media.router, prefix="/api")
+app.include_router(metadata.router, prefix="/api")
+app.include_router(renamer.router, prefix="/api")
 
 if __name__ == "__main__":
     import uvicorn
