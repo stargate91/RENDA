@@ -617,6 +617,99 @@ def get_people(
         db.close()
 
 
+@router.get("/people/search-tmdb")
+def search_people_tmdb(query: str, language: str = None):
+    """Searches the TMDB API for people (actors/directors)."""
+    db = Session()
+    try:
+        from app.api.tmdb_client import TMDBClient
+        from app.db.models import UserSetting
+        
+        # Get language settings if not specified
+        if not language:
+            lang_setting = db.query(UserSetting).filter(UserSetting.key == "metadata_primary_language").first()
+            language = lang_setting.value if lang_setting else "en-US"
+            
+        client = TMDBClient(db)
+        results = client.search_person(query=query, language=language)
+        return results
+    except Exception as e:
+        logger.error(f"Error searching TMDB people: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    finally:
+        db.close()
+
+
+@router.post("/people/add-tmdb")
+def add_person_tmdb(payload: dict):
+    """Fetches a person by TMDB ID, creates/updates them in the DB, sets as active, and enriches metadata in all configured languages."""
+    tmdb_id = payload.get("tmdb_id")
+    if not tmdb_id:
+        return JSONResponse(status_code=400, content={"error": "tmdb_id is required"})
+        
+    db = Session()
+    try:
+        from app.api.tmdb_client import TMDBClient
+        from app.services.person_service import PersonService
+        from app.db.models import Person, UserSetting
+        
+        client = TMDBClient(db)
+        person_service = PersonService(db)
+        
+        # 1. Fetch configured primary and fallback languages
+        primary_lang = db.query(UserSetting).filter(UserSetting.key == "metadata_primary_language").first()
+        fallback_lang = db.query(UserSetting).filter(UserSetting.key == "metadata_fallback_language").first()
+        
+        langs = []
+        if primary_lang and primary_lang.value:
+            langs.append(primary_lang.value)
+        if fallback_lang and fallback_lang.value and fallback_lang.value not in langs:
+            langs.append(fallback_lang.value)
+        if not langs:
+            langs = ["en-US"]
+            
+        # Use first language to fetch initial person data
+        tmdb_data = client.get_person_details(tmdb_id, language=langs[0])
+        if not tmdb_data or "id" not in tmdb_data:
+            return JSONResponse(status_code=404, content={"error": "Person not found on TMDB"})
+            
+        # 2. Get or create person in DB
+        person = person_service.get_or_create_person(tmdb_data)
+        
+        # 3. Explicitly set to active (so they appear in the catalog immediately!)
+        person.is_active = True
+        
+        # 4. Save initially so we have the record
+        db.commit()
+        
+        # 5. Enrich metadata in all configured languages
+        person_service.enrich_person_metadata(person.id, languages=langs)
+        
+        # Re-query to get fully enriched localizations
+        person = db.query(Person).filter(Person.id == tmdb_id).first()
+        loc = person.localizations[0] if person.localizations else None
+        
+        return JSONResponse(content={
+            "id": person.id,
+            "name": loc.name if loc else tmdb_data.get("name", "Unknown"),
+            "profile_path": person.profile_path,
+            "popularity": person.popularity or 0.0,
+            "is_active": person.is_active,
+            "is_favorite": person.is_favorite,
+            "user_rating": person.user_rating,
+            "library_count": 0,
+            "known_for": person.known_for_department
+        })
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error adding TMDB person: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    finally:
+        db.close()
+
+
 @router.get("/people/{person_id}")
 def get_person_detail(person_id: int):
     """Returns comprehensive detail data for a single person, including their biography and associated library items."""
@@ -972,95 +1065,3 @@ def update_item_status(item_id: int, payload: dict):
     finally:
         db.close()
 
-
-@router.get("/people/search-tmdb")
-def search_people_tmdb(query: str, language: str = None):
-    """Searches the TMDB API for people (actors/directors)."""
-    db = Session()
-    try:
-        from app.api.tmdb_client import TMDBClient
-        from app.db.models import UserSetting
-        
-        # Get language settings if not specified
-        if not language:
-            lang_setting = db.query(UserSetting).filter(UserSetting.key == "metadata_primary_language").first()
-            language = lang_setting.value if lang_setting else "en-US"
-            
-        client = TMDBClient(db)
-        results = client.search_person(query=query, language=language)
-        return results
-    except Exception as e:
-        logger.error(f"Error searching TMDB people: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
-    finally:
-        db.close()
-
-
-@router.post("/people/add-tmdb")
-def add_person_tmdb(payload: dict):
-    """Fetches a person by TMDB ID, creates/updates them in the DB, sets as active, and enriches metadata in all configured languages."""
-    tmdb_id = payload.get("tmdb_id")
-    if not tmdb_id:
-        return JSONResponse(status_code=400, content={"error": "tmdb_id is required"})
-        
-    db = Session()
-    try:
-        from app.api.tmdb_client import TMDBClient
-        from app.services.person_service import PersonService
-        from app.db.models import Person, UserSetting
-        
-        client = TMDBClient(db)
-        person_service = PersonService(db)
-        
-        # 1. Fetch configured primary and fallback languages
-        primary_lang = db.query(UserSetting).filter(UserSetting.key == "metadata_primary_language").first()
-        fallback_lang = db.query(UserSetting).filter(UserSetting.key == "metadata_fallback_language").first()
-        
-        langs = []
-        if primary_lang and primary_lang.value:
-            langs.append(primary_lang.value)
-        if fallback_lang and fallback_lang.value and fallback_lang.value not in langs:
-            langs.append(fallback_lang.value)
-        if not langs:
-            langs = ["en-US"]
-            
-        # Use first language to fetch initial person data
-        tmdb_data = client.get_person_details(tmdb_id, language=langs[0])
-        if not tmdb_data or "id" not in tmdb_data:
-            return JSONResponse(status_code=404, content={"error": "Person not found on TMDB"})
-            
-        # 2. Get or create person in DB
-        person = person_service.get_or_create_person(tmdb_data)
-        
-        # 3. Explicitly set to active (so they appear in the catalog immediately!)
-        person.is_active = True
-        
-        # 4. Save initially so we have the record
-        db.commit()
-        
-        # 5. Enrich metadata in all configured languages
-        person_service.enrich_person_metadata(person.id, languages=langs)
-        
-        # Re-query to get fully enriched localizations
-        person = db.query(Person).filter(Person.id == tmdb_id).first()
-        loc = person.localizations[0] if person.localizations else None
-        
-        return JSONResponse(content={
-            "id": person.id,
-            "name": loc.name if loc else tmdb_data.get("name", "Unknown"),
-            "profile_path": person.profile_path,
-            "popularity": person.popularity or 0.0,
-            "is_active": person.is_active,
-            "is_favorite": person.is_favorite,
-            "user_rating": person.user_rating,
-            "library_count": 0,
-            "known_for": person.known_for_department
-        })
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Error adding TMDB person: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
-        return JSONResponse(status_code=500, content={"error": str(e)})
-    finally:
-        db.close()
