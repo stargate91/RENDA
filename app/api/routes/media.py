@@ -524,3 +524,115 @@ def retry_item_image(item_id: int):
         return {"status": "success", "message": "Image queued for retry"}
     finally:
         db.close()
+
+
+@router.get("/people")
+def get_people(
+    search: str = None,
+    role: str = None,
+    sort_by: str = "library_count"
+):
+    """Returns a list of all people associated with organized library items."""
+    db = Session()
+    try:
+        from app.db.models import Person, MediaPersonLink, MediaMatch, MediaItem, ItemStatus
+        from sqlalchemy import func
+        
+        # 1. matched aktív matchek ID-jai
+        matched_match_ids = [
+            m.id for m in db.query(MediaMatch).join(MediaItem).filter(
+                MediaItem.status.in_([ItemStatus.RENAMED, ItemStatus.ORGANIZED])
+            ).filter(MediaMatch.is_active == True).all()
+        ]
+        
+        if not matched_match_ids:
+            return []
+            
+        # 2. Személyek és könyvtár-előfordulási darabszám lekérdezése
+        query = db.query(
+            Person,
+            func.count(MediaPersonLink.id).label("library_count")
+        ).join(
+            MediaPersonLink, MediaPersonLink.person_id == Person.id
+        ).filter(
+            MediaPersonLink.media_match_id.in_(matched_match_ids)
+        )
+        
+        if role == "Actor":
+            query = query.filter(MediaPersonLink.job == "Actor")
+        elif role == "Director":
+            query = query.filter(MediaPersonLink.job.in_(["Director", "Creator"]))
+            
+        query = query.group_by(Person.id)
+        results = query.all()
+        
+        people_list = []
+        for person, library_count in results:
+            loc = person.localizations[0] if person.localizations else None
+            name = loc.name if loc else "Unknown"
+            
+            # Keresés szűrés
+            if search and search.lower() not in name.lower():
+                continue
+                
+            people_list.append({
+                "id": person.id,
+                "name": name,
+                "profile_path": person.profile_path,
+                "popularity": person.popularity or 0.0,
+                "is_active": person.is_active,
+                "is_favorite": person.is_favorite,
+                "user_rating": person.user_rating,
+                "library_count": library_count,
+                "known_for": person.known_for_department
+            })
+            
+        # Rendezési logika
+        if sort_by == "library_count":
+            people_list.sort(key=lambda x: (-x["library_count"], -x["popularity"]))
+        elif sort_by == "popularity":
+            people_list.sort(key=lambda x: (-x["popularity"], -x["library_count"]))
+        elif sort_by == "name":
+            people_list.sort(key=lambda x: x["name"].lower())
+            
+        return people_list
+    except Exception as e:
+        import traceback
+        logger.error(f"Error getting people list: {e}")
+        logger.error(traceback.format_exc())
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    finally:
+        db.close()
+
+
+@router.post("/people/{person_id}/status")
+def update_person_status(person_id: int, payload: dict):
+    """Updates the status (is_active, is_favorite, user_rating) of a person."""
+    db = Session()
+    try:
+        from app.db.models import Person
+        person = db.query(Person).filter(Person.id == person_id).first()
+        if not person:
+            return JSONResponse(status_code=404, content={"error": "Person not found"})
+            
+        if "is_active" in payload:
+            person.is_active = bool(payload["is_active"])
+        if "is_favorite" in payload:
+            person.is_favorite = bool(payload["is_favorite"])
+        if "user_rating" in payload:
+            rating = payload["user_rating"]
+            person.user_rating = int(rating) if rating is not None else None
+            
+        db.commit()
+        return {
+            "status": "success",
+            "is_active": person.is_active,
+            "is_favorite": person.is_favorite,
+            "user_rating": person.user_rating
+        }
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating person status: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    finally:
+        db.close()

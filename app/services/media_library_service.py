@@ -124,20 +124,22 @@ class MediaLibraryService:
         library["counts"]["directors"] = 0
         
         if matched_match_ids:
-            # Színészek lekérdezése
+            # Színészek lekérdezése (Csak aktív)
             db_actors = self.db.query(Person).join(
                 MediaPersonLink, MediaPersonLink.person_id == Person.id
             ).filter(
                 MediaPersonLink.media_match_id.in_(matched_match_ids),
-                MediaPersonLink.job == "Actor"
+                MediaPersonLink.job == "Actor",
+                Person.is_active == True
             ).distinct().all()
             
-            # Rendezők / Készítők lekérdezése
+            # Rendezők / Készítők lekérdezése (Csak aktív)
             db_directors = self.db.query(Person).join(
                 MediaPersonLink, MediaPersonLink.person_id == Person.id
             ).filter(
                 MediaPersonLink.media_match_id.in_(matched_match_ids),
-                MediaPersonLink.job.in_(["Director", "Creator"])
+                MediaPersonLink.job.in_(["Director", "Creator"]),
+                Person.is_active == True
             ).distinct().all()
             
             for p in db_actors:
@@ -152,7 +154,10 @@ class MediaLibraryService:
                     "backdrop_path": None,
                     "rating": p.popularity or 0.0,
                     "type": "actor",
-                    "path": None
+                    "path": None,
+                    "is_active": p.is_active,
+                    "is_favorite": p.is_favorite,
+                    "user_rating": p.user_rating
                 })
                 library["counts"]["actors"] += 1
                 
@@ -168,7 +173,10 @@ class MediaLibraryService:
                     "backdrop_path": None,
                     "rating": p.popularity or 0.0,
                     "type": "director",
-                    "path": None
+                    "path": None,
+                    "is_active": p.is_active,
+                    "is_favorite": p.is_favorite,
+                    "user_rating": p.user_rating
                 })
                 library["counts"]["directors"] += 1
 

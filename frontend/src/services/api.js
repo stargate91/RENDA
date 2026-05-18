@@ -104,4 +104,17 @@ export const api = {
   undoRename: (batchId) => fetchJson(`/api/rename/undo/${batchId}`, {
     method: 'POST'
   }),
+
+  getPeople: (search, role, sortBy) => {
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    if (role) params.append('role', role);
+    if (sortBy) params.append('sort_by', sortBy);
+    return fetchJson(`/api/people?${params.toString()}`);
+  },
+
+  updatePersonStatus: (personId, updates) => fetchJson(`/api/people/${personId}/status`, {
+    method: 'POST',
+    body: JSON.stringify(updates),
+  }),
 };

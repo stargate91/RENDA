@@ -12,6 +12,25 @@ from app.api.routes import scanner, settings, media, metadata, renamer
 Base.metadata.create_all(bind=engine)
 CacheBase.metadata.create_all(bind=cache_engine)
 
+# Run schema migrations for Person table if needed
+try:
+    from sqlalchemy import inspect, text
+    inspector = inspect(engine)
+    columns = [c["name"] for c in inspector.get_columns("persons")]
+    with engine.begin() as conn:
+        if "is_active" not in columns:
+            conn.execute(text("ALTER TABLE persons ADD COLUMN is_active INTEGER DEFAULT 0"))
+            print("Added is_active column to persons table")
+        if "is_favorite" not in columns:
+            conn.execute(text("ALTER TABLE persons ADD COLUMN is_favorite INTEGER DEFAULT 0"))
+            print("Added is_favorite column to persons table")
+        if "user_rating" not in columns:
+            conn.execute(text("ALTER TABLE persons ADD COLUMN user_rating INTEGER DEFAULT NULL"))
+            print("Added user_rating column to persons table")
+except Exception as e:
+    import logging
+    logging.getLogger(__name__).error(f"Failed to migrate database: {e}")
+
 from contextlib import asynccontextmanager
 from app.services.background_tasks import start_background_workers, stop_background_workers
 

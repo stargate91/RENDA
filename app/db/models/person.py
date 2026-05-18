@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import List, Optional
-from sqlalchemy import String, Integer, Float, DateTime, Enum as SQLEnum, JSON, ForeignKey
+from sqlalchemy import String, Integer, Float, DateTime, Enum as SQLEnum, JSON, ForeignKey, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 from .enums import ImageStatus
@@ -16,6 +16,9 @@ class Person(Base):
     images: Mapped[Optional[List[str]]] = mapped_column(JSON); external_ids: Mapped[Optional[dict]] = mapped_column(JSON)
     fetched_languages: Mapped[Optional[str]] = mapped_column(String); image_status: Mapped[ImageStatus] = mapped_column(SQLEnum(ImageStatus), default=ImageStatus.PENDING, index=True)
     last_updated: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", index=True)
+    is_favorite: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", index=True)
+    user_rating: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     localizations: Mapped[List["PersonLocalization"]] = relationship(back_populates="person", cascade="all, delete-orphan")
     media_links: Mapped[List["MediaPersonLink"]] = relationship(back_populates="person")
 

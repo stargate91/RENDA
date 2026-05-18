@@ -769,3 +769,43 @@
   border-color: var(--accent-blue);
   color: var(--accent-blue);
 }
+
+/* ===== DRAWER (SZEREPLŐ- ÉS ALKOTÓKEZELŐ OLDALPANEL) ===== */
+
+.drawer-overlay {
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.drawer-content {
+  animation: slideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0.9;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Drawer scrollbar styles */
+.drawer-content div::-webkit-scrollbar {
+  width: 6px;
+}
+
+.drawer-content div::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.drawer-content div::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+
+.drawer-content div::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
