@@ -44,10 +44,15 @@ class MediaItem(Base):
     is_favorite: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", index=True)
     user_rating: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     custom_tags: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    last_watched_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, index=True)
+    resume_position: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=0)
+    watch_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0", index=True)
+    is_watched: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     matches: Mapped[List["MediaMatch"]] = relationship(back_populates="media_item", cascade="all, delete-orphan")
     extras: Mapped[List["ExtraFile"]] = relationship(back_populates="parent_item", cascade="all, delete-orphan")
     action_logs: Mapped[List["ActionLog"]] = relationship(back_populates="media_item")
+    playback_logs: Mapped[List["PlaybackLog"]] = relationship(back_populates="media_item", cascade="all, delete-orphan")
     def __repr__(self) -> str: return f"<MediaItem(id={self.id}, status={self.status.value}, path={self.current_path})>"
 
 
@@ -62,3 +67,12 @@ class ExtraFile(Base):
     language: Mapped[Optional[str]] = mapped_column(String)
     parent_item: Mapped["MediaItem"] = relationship(back_populates="extras")
     action_logs: Mapped[List["ActionLog"]] = relationship(back_populates="extra_file")
+
+
+class PlaybackLog(Base):
+    """Level 4: Tracking history of playback clicks."""
+    __tablename__ = "playback_logs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    media_item_id: Mapped[int] = mapped_column(ForeignKey("media_items.id", ondelete="CASCADE"), index=True)
+    watched_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    media_item: Mapped["MediaItem"] = relationship(back_populates="playback_logs")

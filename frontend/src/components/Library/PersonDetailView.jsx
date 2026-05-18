@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Star, Heart, Plus, Minus, Calendar, MapPin, Film, Tv, User, Award, Sparkles, Eye, EyeOff, Tag, Check, X } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ArrowLeft, Star, Heart, Plus, Minus, Calendar, MapPin, Film, Tv, User, Award, Sparkles, Eye, EyeOff, Tag, Check, X, Upload, Link } from 'lucide-react';
 import { api, API_BASE } from '../../services/api';
 
 const CustomTagsList = ({ tags, onAddTag, onRemoveTag }) => {
@@ -160,18 +160,19 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
     }
   };
 
+  const fetchDetail = async () => {
+    setLoading(true);
+    try {
+      const res = await api.getPersonDetail(personId);
+      setData(res);
+    } catch (e) {
+      console.error("Failed to fetch person detail:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchDetail = async () => {
-      setLoading(true);
-      try {
-        const res = await api.getPersonDetail(personId);
-        setData(res);
-      } catch (e) {
-        console.error("Failed to fetch person detail:", e);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchDetail();
   }, [personId]);
 
@@ -198,6 +199,38 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
       setShowImageModal(false);
     } catch (e) {
       console.error("Failed to update profile picture:", e);
+    } finally {
+      setUpdatingProfile(null);
+    }
+  };
+
+  const fileInputRef = useRef(null);
+
+  const handleCustomUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUpdatingProfile('upload');
+    try {
+      await api.uploadPersonProfile(data.id, file);
+      await fetchDetail();
+      setShowImageModal(false);
+    } catch (err) {
+      console.error("Upload failed", err);
+    } finally {
+      setUpdatingProfile(null);
+    }
+  };
+
+  const handleCustomUrl = async () => {
+    const url = prompt("Enter an image URL (Imgur, direct link, TMDB, etc.):");
+    if (!url) return;
+    setUpdatingProfile('url');
+    try {
+      await api.updatePersonProfile(data.id, url);
+      await fetchDetail();
+      setShowImageModal(false);
+    } catch (err) {
+      console.error("URL update failed", err);
     } finally {
       setUpdatingProfile(null);
     }
@@ -256,12 +289,12 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
               width: '240px', 
               minWidth: '240px', 
               position: 'relative',
-              cursor: data.images && data.images.length > 1 ? 'pointer' : 'default',
+              cursor: 'pointer',
               overflow: 'hidden',
               boxShadow: '0 12px 36px rgba(0, 0, 0, 0.5)',
               transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
             }}
-            onClick={() => data.images && data.images.length > 1 && setShowImageModal(true)}
+            onClick={() => setShowImageModal(true)}
           >
             {profileUrl ? (
               <img className="profile-avatar-img" src={profileUrl} alt={data.name} style={{ borderRadius: '12px', width: '100%', height: '100%', objectFit: 'cover', transition: 'all 0.3s' }} />
@@ -270,33 +303,32 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
                 <User size={64} color="var(--text-muted)" />
               </div>
             )}
-            {data.images && data.images.length > 1 && (
-              <div 
-                className="profile-avatar-hover"
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  background: 'rgba(0,0,0,0.5)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  opacity: 0,
-                  transition: 'opacity 0.3s',
-                  color: '#fff',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  gap: '6px',
-                  borderRadius: '12px'
-                }}
-              >
-                <Sparkles size={18} />
-                <span>Choose Photo</span>
-              </div>
-            )}
+            
+            <div 
+              className="profile-avatar-hover"
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                background: 'rgba(0,0,0,0.5)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: 0,
+                transition: 'opacity 0.3s',
+                color: '#fff',
+                fontSize: '12px',
+                fontWeight: '600',
+                gap: '6px',
+                borderRadius: '12px'
+              }}
+            >
+              <Sparkles size={18} />
+              <span>Change Photo</span>
+            </div>
           </div>
 
           <div className="detail-info">
@@ -833,6 +865,31 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
                 style={{ background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
                 ✕
+              </button>
+            </div>
+
+            {/* Custom Upload Actions */}
+            <div style={{ padding: '16px 24px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', gap: '12px' }}>
+              <input type="file" accept="image/*" ref={fileInputRef} style={{ display: 'none' }} onChange={handleCustomUpload} />
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                disabled={updatingProfile !== null}
+                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '10px', color: '#3b82f6', fontWeight: '600', cursor: updatingProfile ? 'not-allowed' : 'pointer', transition: 'all 0.2s' }}
+                onMouseOver={e => !updatingProfile && (e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)')}
+                onMouseOut={e => !updatingProfile && (e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)')}
+              >
+                {updatingProfile === 'upload' ? <div style={{ width: '16px', height: '16px', border: '2px solid rgba(59,130,246,0.3)', borderTopColor: '#3b82f6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /> : <Upload size={16} />}
+                Upload File
+              </button>
+              <button 
+                onClick={handleCustomUrl}
+                disabled={updatingProfile !== null}
+                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '10px', color: '#fff', fontWeight: '600', cursor: updatingProfile ? 'not-allowed' : 'pointer', transition: 'all 0.2s' }}
+                onMouseOver={e => !updatingProfile && (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)')}
+                onMouseOut={e => !updatingProfile && (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)')}
+              >
+                {updatingProfile === 'url' ? <div style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /> : <Link size={16} />}
+                Set via URL
               </button>
             </div>
 

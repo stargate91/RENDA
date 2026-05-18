@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Film, Tv, ShieldAlert, Loader2, User, Clapperboard, Settings, Plus, Minus, X, Star, Heart, Tag, Check } from 'lucide-react';
+import { Search, Film, Tv, ShieldAlert, Loader2, User, Clapperboard, Settings, Plus, Minus, X, Star, Heart, Tag, Check, Play } from 'lucide-react';
 import { api } from '../../services/api';
 import MovieDetailView from './MovieDetailView';
 import SeriesDetailView from './SeriesDetailView';
@@ -700,6 +700,49 @@ const LibraryView = ({ T }) => {
                     backdropFilter: 'blur(4px)',
                   }}>
                     <Star size={10} fill="currentColor" /> {item.user_rating}
+                  </div>
+                )}
+
+                {/* Playback Progress Bar */}
+                {item.resume_position > 0 && item.duration > 0 && !item.is_watched && (
+                  <div style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    height: '4px',
+                    width: '100%',
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    zIndex: 20
+                  }}>
+                    <div style={{
+                      height: '100%',
+                      width: `${Math.min(100, (item.resume_position / item.duration) * 100)}%`,
+                      background: '#3b82f6',
+                      boxShadow: '0 0 10px rgba(59, 130, 246, 0.8)'
+                    }} />
+                  </div>
+                )}
+
+                {/* Watched Checkmark */}
+                {item.is_watched && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '10px',
+                    right: item.is_favorite ? '45px' : '10px',
+                    zIndex: 10,
+                    background: 'rgba(59, 130, 246, 0.2)',
+                    color: '#3b82f6',
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
+                    backdropFilter: 'blur(4px)',
+                    border: '1px solid rgba(59, 130, 246, 0.5)'
+                  }}>
+                    <Check size={16} strokeWidth={3} />
                   </div>
                 )}
   

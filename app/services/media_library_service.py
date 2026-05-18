@@ -98,7 +98,12 @@ class MediaLibraryService:
                 "episode_title": loc.episode_title if loc else None,
                 "is_favorite": item.is_favorite or False,
                 "user_rating": item.user_rating,
-                "custom_tags": item.custom_tags or []
+                "custom_tags": item.custom_tags or [],
+                "watch_count": getattr(item, "watch_count", 0),
+                "is_watched": getattr(item, "is_watched", False),
+                "resume_position": getattr(item, "resume_position", 0),
+                "last_watched_at": getattr(item, "last_watched_at").isoformat() if getattr(item, "last_watched_at", None) else None,
+                "duration": item.duration or 0
             }
 
             if active_match and active_match.is_adult:

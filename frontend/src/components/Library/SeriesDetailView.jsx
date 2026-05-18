@@ -231,6 +231,28 @@ const SeriesDetailView = ({ seriesTmdbId, onBack, onPersonClick }) => {
 
   const activeSeason = data.seasons.find(s => s.season_number === activeSeasonNum);
 
+  // Calculate the Next Episode to watch
+  let continueEpisode = null;
+  let allEpisodes = [];
+  data.seasons.forEach(s => s.episodes.forEach(e => allEpisodes.push(e)));
+  
+  if (allEpisodes.length > 0) {
+    // Check if there's a partially watched episode first
+    const partiallyWatched = allEpisodes.find(e => !e.is_watched && e.resume_position > 0);
+    if (partiallyWatched) {
+      continueEpisode = partiallyWatched;
+    } else {
+      // Find the first unwatched episode
+      const firstUnwatched = allEpisodes.find(e => !e.is_watched);
+      if (firstUnwatched) {
+        continueEpisode = firstUnwatched;
+      } else {
+        // All watched, default to the first one
+        continueEpisode = allEpisodes[0];
+      }
+    }
+  }
+
   return (
     <div className="movie-detail series-detail">
       {/* ===== HERO ===== */}
@@ -257,6 +279,44 @@ const SeriesDetailView = ({ seriesTmdbId, onBack, onPersonClick }) => {
 
           <div className="detail-info">
             <h1 className="detail-title">{data.title}</h1>
+
+            {/* Premium Continue Watching Banner */}
+            {continueEpisode && (
+              <button 
+                onClick={() => handlePlayMedia(continueEpisode.id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  margin: '15px 0',
+                  padding: '12px 24px',
+                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(139, 92, 246, 0.2))',
+                  border: '1px solid rgba(59, 130, 246, 0.5)',
+                  borderRadius: '30px',
+                  color: '#fff',
+                  fontSize: '15px',
+                  fontWeight: '800',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  boxShadow: '0 4px 15px rgba(59, 130, 246, 0.2)',
+                  backdropFilter: 'blur(10px)',
+                  letterSpacing: '0.5px'
+                }}
+                onMouseOver={e => {
+                  e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
+                  e.currentTarget.style.boxShadow = '0 8px 25px rgba(59, 130, 246, 0.4)';
+                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(139, 92, 246, 0.3))';
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                  e.currentTarget.style.boxShadow = '0 4px 15px rgba(59, 130, 246, 0.2)';
+                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(139, 92, 246, 0.2))';
+                }}
+              >
+                <Play size={18} fill="currentColor" />
+                Continue: Episode {continueEpisode.episode_number}
+              </button>
+            )}
 
             {/* Premium Glassmorphic User Interaction Bar */}
             <div style={{ 
@@ -538,6 +598,49 @@ const SeriesDetailView = ({ seriesTmdbId, onBack, onPersonClick }) => {
                       >
                         <div className="play-icon-circle">▶</div>
                       </button>
+
+                      {/* Playback Progress Bar */}
+                      {episode.resume_position > 0 && tech.duration > 0 && !episode.is_watched && (
+                        <div style={{
+                          position: 'absolute',
+                          bottom: 0,
+                          left: 0,
+                          height: '3px',
+                          width: '100%',
+                          background: 'rgba(255, 255, 255, 0.2)',
+                          zIndex: 20
+                        }}>
+                          <div style={{
+                            height: '100%',
+                            width: `${Math.min(100, (episode.resume_position / tech.duration) * 100)}%`,
+                            background: '#3b82f6',
+                            boxShadow: '0 0 10px rgba(59, 130, 246, 0.8)'
+                          }} />
+                        </div>
+                      )}
+
+                      {/* Watched Checkmark */}
+                      {episode.is_watched && (
+                        <div style={{
+                          position: 'absolute',
+                          top: '6px',
+                          right: '6px',
+                          zIndex: 10,
+                          background: 'rgba(59, 130, 246, 0.2)',
+                          color: '#3b82f6',
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 2px 5px rgba(0,0,0,0.3)',
+                          backdropFilter: 'blur(4px)',
+                          border: '1px solid rgba(59, 130, 246, 0.5)'
+                        }}>
+                          <Check size={14} strokeWidth={3} />
+                        </div>
+                      )}
 
                       <div className="episode-number" style={{ zIndex: 2 }}>{episode.episode_number}</div>
                     </div>

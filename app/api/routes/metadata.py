@@ -46,7 +46,13 @@ def search_metadata(query: str, item_type: str = "movie", year: Optional[int] = 
         
         # Get include_adult setting
         adult_setting = db.query(UserSetting).filter(UserSetting.key == "include_adult").first()
-        include_adult = adult_setting.value.lower() == "true" if adult_setting else False
+        include_adult = False
+        if adult_setting:
+            val = adult_setting.value
+            if isinstance(val, str):
+                include_adult = val.lower() == "true"
+            else:
+                include_adult = bool(val)
         
         client = TMDBClient(db)
         results = client.search(query, item_type=item_type, year=year, language=language, include_adult=include_adult)

@@ -42,6 +42,18 @@ try:
         if "custom_tags" not in media_columns:
             conn.execute(text("ALTER TABLE media_items ADD COLUMN custom_tags TEXT DEFAULT NULL"))
             print("Added custom_tags column to media_items table")
+        if "last_watched_at" not in media_columns:
+            conn.execute(text("ALTER TABLE media_items ADD COLUMN last_watched_at TIMESTAMP DEFAULT NULL"))
+            print("Added last_watched_at column to media_items table")
+        if "resume_position" not in media_columns:
+            conn.execute(text("ALTER TABLE media_items ADD COLUMN resume_position INTEGER DEFAULT 0"))
+            print("Added resume_position column to media_items table")
+        if "watch_count" not in media_columns:
+            conn.execute(text("ALTER TABLE media_items ADD COLUMN watch_count INTEGER DEFAULT 0"))
+            print("Added watch_count column to media_items table")
+        if "is_watched" not in media_columns:
+            conn.execute(text("ALTER TABLE media_items ADD COLUMN is_watched INTEGER DEFAULT 0"))
+            print("Added is_watched column to media_items table")
 except Exception as e:
     import logging
     logging.getLogger(__name__).error(f"Failed to migrate database: {e}")

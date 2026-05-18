@@ -49,7 +49,22 @@ export const api = {
 
   getItemFullMetadata: (itemId) => fetchJson(`/api/item/${itemId}/full-metadata`),
 
+  resetProgress: (itemId) => fetchJson(`/api/library/item/${itemId}/reset-progress`, { method: 'POST' }),
+
   retryItemImage: (itemId) => fetchJson(`/api/item/${itemId}/retry-image`, { method: 'POST' }),
+
+
+
+  uploadPersonProfile: async (personId, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await fetch(`${API_BASE}/api/people/${personId}/upload-profile`, {
+      method: 'POST',
+      body: formData,
+    });
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    return response.json();
+  },
 
   clearDatabase: () => fetchJson('/api/database/clear', {
     method: 'POST',
