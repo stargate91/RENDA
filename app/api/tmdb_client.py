@@ -124,6 +124,21 @@ class TMDBClient:
         data = self._call_api(endpoint, params)
         return data.get("results", [])
 
+    def search_person(self, query: str, language: str = "en-US", include_adult: bool = False) -> List[Dict[str, Any]]:
+        """Keresés a színészek/rendezők között a TMDB-n."""
+        if not self._api_key or not query:
+            return []
+
+        endpoint = "/search/person"
+        params = {
+            "api_key": self._api_key,
+            "query": query,
+            "language": language,
+            "include_adult": "true" if include_adult else "false"
+        }
+        data = self._call_api(endpoint, params)
+        return data.get("results", [])
+
     def find_by_imdb(self, imdb_id: str, language: str = "en-US") -> Optional[Dict[str, Any]]:
         """Azonosítás IMDb ID alapján."""
         if not self._api_key or not imdb_id:

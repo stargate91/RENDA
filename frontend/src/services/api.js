@@ -125,6 +125,17 @@ export const api = {
 
   getPersonDetail: (personId) => fetchJson(`/api/people/${personId}`),
   
+  searchPeopleTMDB: (query, language) => {
+    const params = new URLSearchParams({ query });
+    if (language) params.append('language', language);
+    return fetchJson(`/api/people/search-tmdb?${params.toString()}`);
+  },
+
+  addPersonTMDB: (tmdbId) => fetchJson('/api/people/add-tmdb', {
+    method: 'POST',
+    body: JSON.stringify({ tmdb_id: tmdbId }),
+  }),
+  
   updateItemStatus: (itemId, updates) => fetchJson(`/api/item/${itemId}/status`, {
     method: 'POST',
     body: JSON.stringify(updates),
