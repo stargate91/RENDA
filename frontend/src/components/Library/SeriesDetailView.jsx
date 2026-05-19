@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Monitor, Play, Clapperboard, Users, User, ChevronDown, ChevronUp, FolderOpen, ExternalLink, Star, Heart, RefreshCcw, Tag, Check, Plus, X, Film } from 'lucide-react';
 import { api, API_BASE } from '../../services/api';
+import { useAppContext } from '../../context/AppContext';
 
 const CustomTagsList = ({ tags, onAddTag, onRemoveTag }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [newTag, setNewTag] = useState('');
   const [globalTags, setGlobalTags] = useState([]);
   const containerRef = React.useRef(null);
+  const { T } = useAppContext();
 
   useEffect(() => {
     if (isEditing) {
@@ -132,7 +134,7 @@ const CustomTagsList = ({ tags, onAddTag, onRemoveTag }) => {
           }}
         >
           {isEditing ? <X size={12} /> : <Plus size={12} />}
-          {isEditing ? 'Cancel' : 'Add Tag'}
+          {isEditing ? T('detail.tags.cancel') : T('detail.tags.add')}
         </button>
 
         {isEditing && (
@@ -154,7 +156,7 @@ const CustomTagsList = ({ tags, onAddTag, onRemoveTag }) => {
             <form onSubmit={handleSubmit} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
               <input
                 type="text"
-                placeholder="Search or create tag..."
+                placeholder={T('detail.tags.search_placeholder')}
                 value={newTag}
                 onChange={(e) => setNewTag(e.target.value)}
                 autoFocus
@@ -198,7 +200,7 @@ const CustomTagsList = ({ tags, onAddTag, onRemoveTag }) => {
               paddingRight: '2px'
             }}>
               <div style={{ fontSize: '10px', fontWeight: '800', color: 'rgba(255, 255, 255, 0.4)', padding: '4px 2px 2px 2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Available Tags
+                {T('detail.tags.available')}
               </div>
               {filteredTags.length > 0 ? (
                 filteredTags.map(t => (
@@ -234,7 +236,7 @@ const CustomTagsList = ({ tags, onAddTag, onRemoveTag }) => {
                 ))
               ) : (
                 <div style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.4)', padding: '10px 4px', textAlign: 'center', fontStyle: 'italic' }}>
-                  {newTag.trim() ? 'Press enter to create new tag' : 'No pre-created tags available'}
+                  {newTag.trim() ? T('detail.tags.create_hint') : T('detail.tags.none_available')}
                 </div>
               )}
             </div>
@@ -246,11 +248,41 @@ const CustomTagsList = ({ tags, onAddTag, onRemoveTag }) => {
 };
 
 const SeriesDetailView = ({ seriesTmdbId, onBack, onPersonClick }) => {
+  const { T, openResolver, showResolverModal } = useAppContext();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeSeasonNum, setActiveSeasonNum] = useState(1);
   const [expandedEpisodeId, setExpandedEpisodeId] = useState(null);
   const [hoverRating, setHoverRating] = useState(0);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+
+  useEffect(() => {
+    if (!showResolverModal && data) {
+      const fetchDetail = async () => {
+        try {
+          const res = await api.getLibrarySeriesDetail(seriesTmdbId);
+          setData(res);
+        } catch (e) {
+          console.error("Failed to re-fetch series details:", e);
+        }
+      };
+      fetchDetail();
+    }
+  }, [showResolverModal]);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setIsLightboxOpen(false);
+      }
+    };
+    if (isLightboxOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isLightboxOpen]);
 
   const handlePlayTrailer = () => {
     if (data?.trailer_key) {
@@ -333,23 +365,33 @@ const SeriesDetailView = ({ seriesTmdbId, onBack, onPersonClick }) => {
   if (!data) {
     return (
       <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-dim)' }}>
-        <p>Could not load series details.</p>
+        <p>{T('library.could_not_load')}</p>
         <button className="detail-back-btn" onClick={onBack} style={{ marginTop: '20px' }}>
-          <ArrowLeft size={16} /> Go Back
+          <ArrowLeft size={16} /> {T('library.go_back')}
         </button>
       </div>
     );
   }
 
-  const backdropUrl = data.backdrop_path ? `${API_BASE}/media/images/backdrops${data.backdrop_path}` : null;
-  const posterUrl = data.poster_path ? `${API_BASE}/media/images/posters${data.poster_path}` : null;
+  const backdropUrl = data.backdrop_path 
+    ? (data.in_library === false 
+        ? `https://image.tmdb.org/t/p/w1280${data.backdrop_path}`
+        : `${API_BASE}/media/images/backdrops${data.backdrop_path}`)
+    : null;
+  const posterUrl = data.poster_path 
+    ? (data.in_library === false 
+        ? `https://image.tmdb.org/t/p/w500${data.poster_path}`
+        : `${API_BASE}/media/images/posters${data.poster_path}`)
+    : null;
 
   const activeSeason = data.seasons.find(s => s.season_number === activeSeasonNum);
 
   // Calculate the Next Episode to watch
   let continueEpisode = null;
   let allEpisodes = [];
-  data.seasons.forEach(s => s.episodes.forEach(e => allEpisodes.push(e)));
+  if (data.in_library !== false) {
+    data.seasons.forEach(s => s.episodes.forEach(e => allEpisodes.push(e)));
+  }
   
   if (allEpisodes.length > 0) {
     // Check if there's a partially watched episode first
@@ -373,7 +415,7 @@ const SeriesDetailView = ({ seriesTmdbId, onBack, onPersonClick }) => {
       {/* ===== HERO ===== */}
       <div className="detail-hero">
         <button className="detail-back-btn" onClick={onBack}>
-          <ArrowLeft size={14} /> Back to Library
+          <ArrowLeft size={14} /> {T('library.go_back')}
         </button>
 
         {backdropUrl && (
@@ -388,7 +430,11 @@ const SeriesDetailView = ({ seriesTmdbId, onBack, onPersonClick }) => {
         <div className="detail-hero-gradient" />
 
         <div className="detail-hero-content">
-          <div className="detail-poster">
+          <div 
+            className="detail-poster" 
+            style={posterUrl ? { cursor: 'zoom-in' } : {}}
+            onClick={() => posterUrl && setIsLightboxOpen(true)}
+          >
             {posterUrl ? (
               <img src={posterUrl} alt={data.title} />
             ) : (
@@ -473,7 +519,7 @@ const SeriesDetailView = ({ seriesTmdbId, onBack, onPersonClick }) => {
                   }}
                 >
                   <Film size={16} />
-                  Play Trailer
+                  {T('detail.play_trailer')}
                 </button>
               )}
             </div>
@@ -648,7 +694,7 @@ const SeriesDetailView = ({ seriesTmdbId, onBack, onPersonClick }) => {
         {data.cast && data.cast.length > 0 && (
           <div className="detail-section">
             <div className="detail-section-title">
-              <Users size={20} /> Series Cast
+              <Users size={20} /> {T('detail.series_cast')}
             </div>
             <div className="cast-scroll">
               {data.cast.map(c => (
@@ -660,7 +706,10 @@ const SeriesDetailView = ({ seriesTmdbId, onBack, onPersonClick }) => {
                 >
                   <div className="cast-card-img">
                     {c.profile_path ? (
-                      <img src={`${API_BASE}/media/images/persons${c.profile_path}`} alt={c.name} />
+                      <img 
+                        src={c.profile_path.startsWith('http') ? c.profile_path : `${API_BASE}/media/images/persons${c.profile_path}`} 
+                        alt={c.name} 
+                      />
                     ) : (
                       <div className="cast-card-img-placeholder"><User size={24} color="var(--text-muted)" /></div>
                     )}
@@ -678,7 +727,11 @@ const SeriesDetailView = ({ seriesTmdbId, onBack, onPersonClick }) => {
           <div className="detail-section-title" style={{ marginBottom: '15px' }}>Seasons</div>
           <div className="season-cards-scroll" style={{ display: 'flex', gap: '15px', overflowX: 'auto', padding: '10px 4px' }}>
             {data.seasons.map(season => {
-              const sPosterUrl = season.poster_path ? `${API_BASE}/media/images/posters${season.poster_path}` : posterUrl;
+              const sPosterUrl = season.poster_path 
+                ? (data.in_library === false 
+                    ? `https://image.tmdb.org/t/p/w342${season.poster_path}`
+                    : `${API_BASE}/media/images/posters${season.poster_path}`)
+                : posterUrl;
               const isActive = activeSeasonNum === season.season_number;
               return (
                 <div
@@ -723,7 +776,11 @@ const SeriesDetailView = ({ seriesTmdbId, onBack, onPersonClick }) => {
           <div className="episode-list detail-section">
             {activeSeason.episodes.map(episode => {
               const isExpanded = expandedEpisodeId === episode.id;
-              const thumbUrl = episode.still_path ? `${API_BASE}/media/images/stills${episode.still_path}` : null;
+              const thumbUrl = episode.still_path 
+                ? (data.in_library === false 
+                    ? `https://image.tmdb.org/t/p/w300${episode.still_path}`
+                    : `${API_BASE}/media/images/stills${episode.still_path}`)
+                : null;
               const tech = episode.technical || {};
 
               return (
@@ -749,15 +806,17 @@ const SeriesDetailView = ({ seriesTmdbId, onBack, onPersonClick }) => {
                       )}
                       
                       {/* Play Episode Overlay Button */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePlayMedia(episode.id);
-                        }}
-                        className="episode-play-overlay-btn"
-                      >
-                        <div className="play-icon-circle">▶</div>
-                      </button>
+                      {data.in_library !== false && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePlayMedia(episode.id);
+                          }}
+                          className="episode-play-overlay-btn"
+                        >
+                          <div className="play-icon-circle">▶</div>
+                        </button>
+                      )}
 
                       {/* Playback Progress Bar */}
                       {episode.resume_position > 0 && tech.duration > 0 && !episode.is_watched && (
@@ -842,49 +901,148 @@ const SeriesDetailView = ({ seriesTmdbId, onBack, onPersonClick }) => {
                             <span className="tech-val">{tech.audio_codec} {tech.audio_channels}</span>
                           </div>
                         )}
-                        <div className="tech-item">
-                          <span className="tech-label">Size</span>
-                          <span className="tech-val">{formatSize(tech.size_bytes)}</span>
-                        </div>
-                        {tech.source && tech.source !== 'none' && (
-                          <div className="tech-item">
-                            <span className="tech-label">Source</span>
-                            <span className="tech-val">{tech.source.toUpperCase()}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="episode-actions">
-                        <button 
-                          className="episode-action-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            api.revealInExplorer(episode.path);
-                          }}
-                        >
-                          <FolderOpen size={16} /> Reveal File
-                        </button>
-                        <button 
-                          className="episode-action-btn"
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            try {
-                              await api.retryItemImage(episode.id);
-                              alert('Image queued for retry! It will be downloaded in the background.');
-                            } catch (err) {
-                              console.error("Failed to retry image:", err);
-                              alert('Failed to trigger image retry.');
-                            }
-                          }}
-                        >
-                          <RefreshCcw size={16} /> Retry Image
-                        </button>
-                      </div>
+                         {tech.size_bytes > 0 && (
+                           <div className="tech-item">
+                             <span className="tech-label">Size</span>
+                             <span className="tech-val">{formatSize(tech.size_bytes)}</span>
+                           </div>
+                         )}
+                         {tech.source && tech.source !== 'none' && (
+                           <div className="tech-item">
+                             <span className="tech-label">Source</span>
+                             <span className="tech-val">{tech.source.toUpperCase()}</span>
+                           </div>
+                         )}
+                       </div>
+ 
+                       {data.in_library !== false && (
+                         <div className="episode-actions">
+                           <button 
+                             className="episode-action-btn"
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               api.revealInExplorer(episode.path);
+                             }}
+                           >
+                             <FolderOpen size={16} /> Reveal File
+                           </button>
+                           <button 
+                             className="episode-action-btn"
+                             onClick={async (e) => {
+                               e.stopPropagation();
+                               try {
+                                 await api.retryItemImage(episode.id);
+                                 alert('Image queued for retry! It will be downloaded in the background.');
+                               } catch (err) {
+                                 console.error("Failed to retry image:", err);
+                                 alert('Failed to trigger image retry.');
+                               }
+                             }}
+                           >
+                             <RefreshCcw size={16} /> Retry Image
+                           </button>
+                           <button 
+                             className="episode-action-btn"
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               openResolver({
+                                 id: episode.id,
+                                 title: episode.title || `Episode ${episode.episode_number}`,
+                                 filename: episode.filename,
+                                 type: 'episode',
+                                 season: activeSeasonNum,
+                                 episode: episode.episode_number
+                               });
+                             }}
+                           >
+                             <RefreshCcw size={16} /> {T('resolver.correct_match') || 'Párosítás javítása'}
+                           </button>
+                         </div>
+                       )}
                     </div>
                   )}
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* File Info */}
+        {data.path && (
+          <div className="detail-section" style={{ marginTop: '20px' }}>
+            <div className="detail-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FolderOpen size={20} /> Folder
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openResolver({
+                    id: data.id,
+                    title: data.title,
+                    filename: data.filename || data.title,
+                    type: 'series',
+                    year: data.year
+                  });
+                }}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '6px',
+                  color: 'rgba(255, 255, 255, 0.6)',
+                  fontSize: '11px',
+                  fontWeight: '600',
+                  padding: '4px 10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseOver={e => {
+                  e.currentTarget.style.color = '#fff';
+                  e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)';
+                  e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.4)';
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.color = 'rgba(255, 255, 255, 0.6)';
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                }}
+              >
+                <RefreshCcw size={12} />
+                {T('resolver.correct_match') || 'Párosítás javítása'}
+              </button>
+            </div>
+            <div 
+              className="file-path-display"
+              onClick={() => data.path && api.revealInExplorer(data.path)}
+              title="Click to reveal in file explorer"
+              style={{
+                background: 'rgba(255, 255, 255, 0.02)',
+                border: '1px solid rgba(255, 255, 255, 0.05)',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontFamily: 'monospace',
+                color: 'var(--text-dim)',
+                cursor: 'pointer',
+                wordBreak: 'break-all',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseOver={e => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                e.currentTarget.style.color = '#fff';
+              }}
+              onMouseOut={e => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)';
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)';
+                e.currentTarget.style.color = 'var(--text-dim)';
+              }}
+            >
+              {data.path}
+            </div>
           </div>
         )}
 
@@ -974,6 +1132,82 @@ const SeriesDetailView = ({ seriesTmdbId, onBack, onPersonClick }) => {
           color: #ffffff !important;
         }
       `}</style>
+
+      {/* ===== POSTER LIGHTBOX MODAL ===== */}
+      {isLightboxOpen && posterUrl && (
+        <div 
+          onClick={() => setIsLightboxOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(10, 10, 12, 0.95)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            animation: 'fadeIn 0.25s ease-out',
+            cursor: 'zoom-out',
+          }}
+        >
+          {/* Close button */}
+          <button
+            onClick={() => setIsLightboxOpen(false)}
+            style={{
+              position: 'absolute',
+              top: '25px',
+              right: '25px',
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '50%',
+              width: '44px',
+              height: '44px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#fff',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+            onMouseOver={e => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+              e.currentTarget.style.transform = 'scale(1.05)';
+            }}
+            onMouseOut={e => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+          >
+            <X size={20} />
+          </button>
+
+          {/* Large image wrapper */}
+          <div 
+            onClick={e => e.stopPropagation()}
+            style={{
+              position: 'relative',
+              maxWidth: '90%',
+              maxHeight: '90%',
+              borderRadius: '20px',
+              overflow: 'hidden',
+              boxShadow: '0 30px 100px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.1)',
+              animation: 'scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+            }}
+          >
+            <img 
+              src={posterUrl} 
+              alt={data.title} 
+              style={{
+                display: 'block',
+                maxWidth: '100%',
+                maxHeight: '85vh',
+                objectFit: 'contain',
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -359,7 +359,7 @@ export const AppProvider = ({ children }) => {
     setConfirmDialog({ isOpen: true, title, message, onConfirm });
   };
 
-  const wipeDatabase = async () => {
+  const wipeDatabase = async (options) => {
     confirmAction(
       T('alerts.wipe_db_title'),
       T('alerts.wipe_db_msg'),
@@ -377,7 +377,7 @@ export const AppProvider = ({ children }) => {
             setProgress(p => p ? { ...p, current: displayProgress } : p);
           }, 200);
 
-          const res = await api.clearDatabase();
+          const res = await api.clearDatabase(options);
           if (res && res.status === "error") {
             throw new Error(res.message || "Wipe failed");
           }

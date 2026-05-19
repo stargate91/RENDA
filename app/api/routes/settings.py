@@ -74,25 +74,74 @@ def update_settings(settings: dict):
 
 
 @router.post("/database/clear")
-def clear_database():
-    """Wipes the entire database except for the user_settings table, including the cache."""
+def clear_database(options: dict = None):
+    """Wipes specific database sections based on options (except user_settings), preserving local images."""
+    if not options:
+        options = {"all": True}
+        
     db = Session()
     try:
         from app.db.base import cache_engine
         import logging
         logger = logging.getLogger(__name__)
 
-        # Clear main database tables
-        for table in reversed(Base.metadata.sorted_tables):
-            if table.name != "user_settings":
-                db.execute(table.delete())
-                
-        # Clear cache database tables using the cache engine directly
-        from app.db.base import CacheBase
-        with cache_engine.begin() as conn:
-            for table in reversed(CacheBase.metadata.sorted_tables):
-                conn.execute(table.delete())
-                
+        if options.get("all"):
+            # Clear everything except user_settings
+            for table in reversed(Base.metadata.sorted_tables):
+                if table.name != "user_settings":
+                    db.execute(table.delete())
+            # Clear cache database
+            from app.db.base import CacheBase
+            with cache_engine.begin() as conn:
+                for table in reversed(CacheBase.metadata.sorted_tables):
+                    conn.execute(table.delete())
+        else:
+            # 1. Scanned Files & Discovery
+            if options.get("discovery"):
+                from app.db.models.enums import ItemStatus
+                from app.db.models import MediaItem
+                disc_statuses = [
+                    ItemStatus.NEW, ItemStatus.NO_MATCH, ItemStatus.UNCERTAIN, 
+                    ItemStatus.MULTIPLE, ItemStatus.MATCHED, ItemStatus.ERROR
+                ]
+                db.query(MediaItem).filter(MediaItem.status.in_(disc_statuses)).delete(synchronize_session=False)
+
+            # 2. Organized Library & Performers
+            if options.get("library"):
+                from app.db.models.enums import ItemStatus
+                from app.db.models import MediaItem, Person, PersonLocalization, MediaPersonLink
+                lib_statuses = [ItemStatus.ORGANIZED, ItemStatus.RENAMED]
+                # Delete library media items
+                db.query(MediaItem).filter(MediaItem.status.in_(lib_statuses)).delete(synchronize_session=False)
+                # Delete all persons (actors / directors database)
+                db.query(MediaPersonLink).delete(synchronize_session=False)
+                db.query(PersonLocalization).delete(synchronize_session=False)
+                db.query(Person).delete(synchronize_session=False)
+
+            # 3. Metadata Cache
+            if options.get("cache"):
+                from app.db.base import CacheBase
+                with cache_engine.begin() as conn:
+                    for table in reversed(CacheBase.metadata.sorted_tables):
+                        conn.execute(table.delete())
+
+            # 4. Custom Tags
+            if options.get("tags"):
+                from app.db.models import Tag
+                from app.db.models.person import Person
+                # Delete all Tag entities from the tags table
+                db.query(Tag).delete(synchronize_session=False)
+                # Clear custom_tags on persons
+                db.query(Person).update({Person.custom_tags: None}, synchronize_session=False)
+
+            # 5. Operation History & logs
+            if options.get("history"):
+                from app.db.models.action import ActionBatch, ActionLog
+                from app.db.models.media import PlaybackLog
+                db.query(ActionLog).delete(synchronize_session=False)
+                db.query(ActionBatch).delete(synchronize_session=False)
+                db.query(PlaybackLog).delete(synchronize_session=False)
+
         db.commit()
         return {"status": "success"}
     except Exception as e:

@@ -450,17 +450,199 @@ def play_media_item(payload: dict):
         db.close()
 
 
+def _ensure_person_cached(db, actor_id: int, actor_name: str, actor_profile_path: Optional[str], actor_popularity: Optional[float], ui_lang: str) -> Optional[str]:
+    """
+    Checks if a person exists in the database. If not, creates them with ImageStatus.PENDING so they get cached by the ImageWorker.
+    Returns the local profile path if already downloaded, or the TMDB URL if pending.
+    """
+    from app.db.models import Person, PersonLocalization, ImageStatus
+    from typing import Optional
+    import os
+
+    if not actor_profile_path:
+        return None
+
+    # Check if person already exists
+    person = db.query(Person).filter(Person.id == actor_id).first()
+    if not person:
+        try:
+            # Create Person
+            person = Person(
+                id=actor_id,
+                popularity=actor_popularity,
+                profile_path=actor_profile_path,
+                image_status=ImageStatus.PENDING,
+                is_active=False
+            )
+            db.add(person)
+            
+            # Create Localization
+            lang_code = ui_lang.split("-")[0] if ui_lang else "en"
+            loc = PersonLocalization(
+                person_id=actor_id,
+                language=lang_code,
+                name=actor_name
+            )
+            db.add(loc)
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error creating virtual Person: {e}")
+            person = db.query(Person).filter(Person.id == actor_id).first()
+    else:
+        # If person exists but has no profile path or image status is none, update it
+        updated = False
+        if not person.profile_path and actor_profile_path:
+            person.profile_path = actor_profile_path
+            person.image_status = ImageStatus.PENDING
+            updated = True
+        elif person.image_status == ImageStatus.FAILED and actor_profile_path:
+            person.image_status = ImageStatus.PENDING
+            updated = True
+        
+        if updated:
+            try:
+                db.commit()
+            except Exception as e:
+                db.rollback()
+                logger.error(f"Error updating Person profile: {e}")
+
+    # Check if local image is available
+    if person and person.local_profile_path:
+        # Check if file actually exists on disk
+        local_file_path = os.path.join("data", "media", "images", "persons", actor_profile_path.lstrip("/"))
+        if os.path.exists(local_file_path):
+            return actor_profile_path # Return relative path (e.g. /qA2...jpg)
+            
+    # Otherwise, return full TMDB URL
+    return f"https://image.tmdb.org/t/p/h632{actor_profile_path}"
+
+
 @router.get("/library/item/{item_id}")
-def get_library_item_detail(item_id: int):
+def get_library_item_detail(item_id: str):
     """Returns comprehensive detail data for a single library item (movie detail page)."""
     db = Session()
     try:
         from app.db.models import MediaItem, MediaMatch, UserSetting, Person, MediaPersonLink, PersonLocalization, TMDBCache
 
+        # Check if item_id is virtual (starts with tmdb_)
+        if isinstance(item_id, str) and item_id.startswith("tmdb_"):
+            try:
+                tmdb_id = int(item_id.split("_")[1])
+            except (ValueError, IndexError):
+                return JSONResponse(status_code=400, content={"error": "Invalid TMDB ID format"})
+                
+            from app.api.tmdb_client import TMDBClient
+            tmdb_client = TMDBClient(db)
+            
+            ui_lang_setting = db.query(UserSetting).filter(UserSetting.key == "fallback_metadata_language").first()
+            ui_lang = ui_lang_setting.value if ui_lang_setting and ui_lang_setting.value != "none" else "en"
+            
+            tmdb_data = tmdb_client.get_details(tmdb_id, "movie", language=ui_lang)
+            if not tmdb_data:
+                return JSONResponse(status_code=404, content={"error": "Movie not found on TMDB"})
+                
+            credits = tmdb_data.get("credits", {})
+            cast = []
+            directors = []
+            raw_directors = [c for c in credits.get("crew", []) if c.get("job") in ("Director", "Creator")][:2]
+            for crew in raw_directors:
+                profile_path = _ensure_person_cached(
+                    db,
+                    crew.get("id"),
+                    crew.get("name"),
+                    crew.get("profile_path"),
+                    crew.get("popularity", 0),
+                    ui_lang
+                )
+                directors.append({
+                    "id": crew.get("id"),
+                    "name": crew.get("name"),
+                    "job": crew.get("job"),
+                    "profile_path": profile_path,
+                    "popularity": crew.get("popularity", 0)
+                })
+            
+            director_ids = {d["id"] for d in directors}
+            raw_cast = [a for a in credits.get("cast", []) if a.get("id") not in director_ids][:10]
+            for actor in raw_cast:
+                profile_path = _ensure_person_cached(
+                    db,
+                    actor.get("id"),
+                    actor.get("name"),
+                    actor.get("profile_path"),
+                    actor.get("popularity", 0),
+                    ui_lang
+                )
+                cast.append({
+                    "id": actor.get("id"),
+                    "name": actor.get("name"),
+                    "character": actor.get("character"),
+                    "job": "Actor",
+                    "profile_path": profile_path,
+                    "popularity": actor.get("popularity", 0)
+                })
+
+            videos = tmdb_data.get("videos", {}).get("results", [])
+            trailer_key = None
+            for v in videos:
+                if v.get("site") == "YouTube" and v.get("type") in ("Trailer", "Teaser"):
+                    trailer_key = v.get("key")
+                    break
+
+            release_date = tmdb_data.get("release_date")
+            year = None
+            if release_date:
+                try:
+                    year = int(release_date.split("-")[0])
+                except:
+                    pass
+
+            result = {
+                "id": f"tmdb_{tmdb_id}",
+                "title": tmdb_data.get("title") or tmdb_data.get("original_title") or "Unknown",
+                "original_title": tmdb_data.get("original_title"),
+                "tagline": tmdb_data.get("tagline"),
+                "overview": tmdb_data.get("overview"),
+                "genres": [g["name"] for g in tmdb_data.get("genres", [])],
+                "year": year,
+                "release_date": release_date,
+                "runtime": tmdb_data.get("runtime"),
+                "rating_tmdb": tmdb_data.get("vote_average"),
+                "vote_count_tmdb": tmdb_data.get("vote_count"),
+                "budget": tmdb_data.get("budget"),
+                "revenue": tmdb_data.get("revenue"),
+                "poster_path": tmdb_data.get("poster_path"),
+                "backdrop_path": tmdb_data.get("backdrop_path"),
+                "original_language": tmdb_data.get("original_language"),
+                "type": "movie",
+                "tmdb_id": tmdb_id,
+                "imdb_id": tmdb_data.get("external_ids", {}).get("imdb_id"),
+                "cast": cast,
+                "directors": directors,
+                "is_adult": tmdb_data.get("adult", False),
+                "is_favorite": False,
+                "user_rating": None,
+                "custom_tags": [],
+                "tags": [],
+                "watch_count": 0,
+                "is_watched": False,
+                "resume_position": 0,
+                "trailer_key": trailer_key,
+                "in_library": False,
+            }
+            return JSONResponse(content=result, media_type="application/json; charset=utf-8")
+
+        # Original logic for local item
+        try:
+            item_id_int = int(item_id)
+        except ValueError:
+            return JSONResponse(status_code=400, content={"error": "Invalid item ID"})
+
         item = db.query(MediaItem).options(
             joinedload(MediaItem.matches).joinedload(MediaMatch.localizations),
             joinedload(MediaItem.matches).joinedload(MediaMatch.people).joinedload(MediaPersonLink.person).joinedload(Person.localizations)
-        ).filter(MediaItem.id == item_id).first()
+        ).filter(MediaItem.id == item_id_int).first()
         
         if not item:
             return JSONResponse(status_code=404, content={"error": "Item not found"})
@@ -554,8 +736,8 @@ def get_library_item_detail(item_id: int):
             "filename": item.filename,
             "tmdb_id": active_match.tmdb_id,
             "imdb_id": active_match.imdb_id,
-            "cast": cast[:20],  # Top 20 cast members
-            "directors": directors,
+            "cast": cast[:10],  # Top 10 cast members
+            "directors": directors[:2],
             "technical": technical,
             "is_adult": active_match.is_adult,
             "is_favorite": item.is_favorite or False,
@@ -605,17 +787,29 @@ def reset_item_progress(item_id: int):
 
 
 @router.get("/library/series/{series_tmdb_id}")
-def get_library_series_detail(series_tmdb_id: int):
+def get_library_series_detail(series_tmdb_id: str):
     """Returns comprehensive detail data for a full series, including seasons and episodes."""
     db = Session()
     try:
         from app.db.models import MediaItem, MediaMatch, UserSetting, Person, MediaPersonLink, ItemStatus, ItemType, TMDBCache
         from sqlalchemy import or_, and_
         
+        # Parse virtual/real tmdb_id
+        if isinstance(series_tmdb_id, str) and series_tmdb_id.startswith("tmdb_"):
+            try:
+                series_tmdb_id_int = int(series_tmdb_id.split("_")[1])
+            except (ValueError, IndexError):
+                return JSONResponse(status_code=400, content={"error": "Invalid series TMDB ID"})
+        else:
+            try:
+                series_tmdb_id_int = int(series_tmdb_id)
+            except ValueError:
+                return JSONResponse(status_code=400, content={"error": "Invalid series TMDB ID"})
+                
         # Try to fetch full series metadata from cache
         tmdb_cache = db.query(TMDBCache).filter(
-            TMDBCache.tmdb_id == series_tmdb_id,
-            TMDBCache.cache_key.like(f"/tv/{series_tmdb_id}%")
+            TMDBCache.tmdb_id == series_tmdb_id_int,
+            TMDBCache.cache_key.like(f"/tv/{series_tmdb_id_int}%")
         ).first()
         cached_series = tmdb_cache.raw_data if tmdb_cache else {}
         cached_seasons = {s.get("season_number"): s for s in cached_series.get("seasons", [])}
@@ -626,15 +820,143 @@ def get_library_series_detail(series_tmdb_id: int):
             joinedload(MediaItem.matches).joinedload(MediaMatch.people).joinedload(MediaPersonLink.person)
         ).filter(
             or_(
-                MediaMatch.series_tmdb_id == series_tmdb_id,
-                MediaMatch.tmdb_id == series_tmdb_id
+                MediaMatch.series_tmdb_id == series_tmdb_id_int,
+                MediaMatch.tmdb_id == series_tmdb_id_int
             ),
             MediaMatch.is_active == True,
             MediaItem.status.in_([ItemStatus.RENAMED, ItemStatus.ORGANIZED])
         ).all()
 
         if not items:
-            return JSONResponse(status_code=404, content={"error": "Series not found or has no organized episodes"})
+            # Series is not in library, try to query TMDB directly
+            from app.api.tmdb_client import TMDBClient
+            tmdb_client = TMDBClient(db)
+            ui_lang_setting = db.query(UserSetting).filter(UserSetting.key == "fallback_metadata_language").first()
+            ui_lang = ui_lang_setting.value if ui_lang_setting and ui_lang_setting.value != "none" else "en"
+            
+            tmdb_data = tmdb_client.get_details(series_tmdb_id_int, "series", language=ui_lang)
+            if not tmdb_data:
+                return JSONResponse(status_code=404, content={"error": "Series not found on TMDB"})
+                
+            credits = tmdb_data.get("credits", {})
+            cast = []
+            directors = []
+            raw_directors = [c for c in credits.get("crew", []) if c.get("job") in ("Director", "Creator", "Executive Producer")][:2]
+            for crew in raw_directors:
+                profile_path = _ensure_person_cached(
+                    db,
+                    crew.get("id"),
+                    crew.get("name"),
+                    crew.get("profile_path"),
+                    crew.get("popularity", 0),
+                    ui_lang
+                )
+                directors.append({
+                    "id": crew.get("id"),
+                    "name": crew.get("name"),
+                    "job": crew.get("job"),
+                    "profile_path": profile_path,
+                    "popularity": crew.get("popularity", 0)
+                })
+                
+            director_ids = {d["id"] for d in directors}
+            raw_cast = [a for a in credits.get("cast", []) if a.get("id") not in director_ids][:10]
+            for actor in raw_cast:
+                profile_path = _ensure_person_cached(
+                    db,
+                    actor.get("id"),
+                    actor.get("name"),
+                    actor.get("profile_path"),
+                    actor.get("popularity", 0),
+                    ui_lang
+                )
+                cast.append({
+                    "id": actor.get("id"),
+                    "name": actor.get("name"),
+                    "character": actor.get("character"),
+                    "job": "Actor",
+                    "profile_path": profile_path,
+                    "popularity": actor.get("popularity", 0)
+                })
+
+            videos = tmdb_data.get("videos", {}).get("results", [])
+            trailer_key = None
+            for v in videos:
+                if v.get("site") == "YouTube" and v.get("type") in ("Trailer", "Teaser"):
+                    trailer_key = v.get("key")
+                    break
+
+            first_air_date = tmdb_data.get("first_air_date")
+            year = None
+            if first_air_date:
+                try:
+                    year = int(first_air_date.split("-")[0])
+                except:
+                    pass
+
+            seasons_list = []
+            for s in sorted(tmdb_data.get("seasons", []), key=lambda x: x.get("season_number") or 0):
+                s_num = s.get("season_number")
+                if s_num is None:
+                    continue
+                
+                # Fetch season detail to get episodes
+                try:
+                    season_detail = tmdb_client.get_season_details(series_tmdb_id_int, s_num, language=ui_lang)
+                except Exception:
+                    season_detail = {}
+                    
+                episodes_list = []
+                for ep in season_detail.get("episodes", []):
+                    episodes_list.append({
+                        "id": f"tmdb_{series_tmdb_id_int}_{s_num}_{ep.get('episode_number')}",
+                        "episode_number": ep.get("episode_number"),
+                        "title": ep.get("name") or f"Episode {ep.get('episode_number')}",
+                        "overview": ep.get("overview"),
+                        "still_path": ep.get("still_path"),
+                        "runtime": ep.get("runtime"),
+                        "rating_tmdb": ep.get("vote_average"),
+                        "vote_count_tmdb": ep.get("vote_count"),
+                        "path": None,
+                        "filename": None,
+                        "technical": {},
+                        "watch_count": 0,
+                        "is_watched": False,
+                        "resume_position": 0,
+                        "last_watched_at": None,
+                        "in_library": False
+                    })
+
+                seasons_list.append({
+                    "season_number": s_num,
+                    "title": s.get("name") or f"Season {s_num}",
+                    "overview": s.get("overview"),
+                    "poster_path": s.get("poster_path"),
+                    "air_date": s.get("air_date"),
+                    "episodes": episodes_list
+                })
+
+            result = {
+                "id": f"tmdb_{series_tmdb_id_int}",
+                "series_tmdb_id": series_tmdb_id_int,
+                "title": tmdb_data.get("name") or tmdb_data.get("original_name") or "Unknown Series",
+                "backdrop_path": tmdb_data.get("backdrop_path"),
+                "poster_path": tmdb_data.get("poster_path"),
+                "year": year,
+                "overview": tmdb_data.get("overview"),
+                "rating_tmdb": tmdb_data.get("vote_average"),
+                "genres": [g["name"] for g in tmdb_data.get("genres", [])],
+                "cast": cast,
+                "directors": directors,
+                "seasons": seasons_list,
+                "is_favorite": False,
+                "user_rating": None,
+                "custom_tags": [],
+                "trailer_key": trailer_key,
+                "path": None,
+                "in_library": False
+            }
+            return JSONResponse(content=result, media_type="application/json; charset=utf-8")
 
         # Determine UI language
         ui_lang_setting = db.query(UserSetting).filter(UserSetting.key == "fallback_metadata_language").first()
@@ -694,6 +1016,7 @@ def get_library_series_detail(series_tmdb_id: int):
             "user_rating": base_item.user_rating,
             "custom_tags": [t.name for t in base_item.tags] if base_item.tags else [],
             "trailer_key": base_loc.trailer_url if base_loc else None,
+            "path": base_item.current_path,
         }
 
         series_cast_map = {}
@@ -805,7 +1128,8 @@ def get_library_series_detail(series_tmdb_id: int):
             elif p["job"] == "Actor":
                 series_data["cast"].append(p)
 
-        series_data["cast"] = series_data["cast"][:20]
+        series_data["cast"] = series_data["cast"][:10]
+        series_data["directors"] = series_data["directors"][:2]
 
         return JSONResponse(content=series_data, media_type="application/json; charset=utf-8")
     except Exception as e:
@@ -1440,4 +1764,56 @@ def update_item_status(item_id: int, payload: dict):
         return JSONResponse(status_code=500, content={"error": str(e)})
     finally:
         db.close()
+
+
+@router.post("/media/bulk-tags")
+def bulk_update_item_tags(payload: dict):
+    """Bulk adds or removes tags from multiple media items."""
+    item_ids = payload.get("item_ids", [])
+    add_tag_names = [str(t).strip() for t in payload.get("add_tags", []) if str(t).strip()]
+    remove_tag_names = [str(t).strip() for t in payload.get("remove_tags", []) if str(t).strip()]
+    
+    if not item_ids:
+        return JSONResponse(status_code=400, content={"error": "item_ids list is required"})
+        
+    db = Session()
+    try:
+        from app.db.models.media import MediaItem, Tag
+        
+        # 1. Create any missing tags that are to be added
+        for name in add_tag_names:
+            existing = db.query(Tag).filter(Tag.name == name).first()
+            if not existing:
+                new_tag = Tag(name=name)
+                db.add(new_tag)
+        db.commit()
+        
+        # Fetch the Tag entities to add/remove
+        tags_to_add = db.query(Tag).filter(Tag.name.in_(add_tag_names)).all() if add_tag_names else []
+        tags_to_remove = db.query(Tag).filter(Tag.name.in_(remove_tag_names)).all() if remove_tag_names else []
+        
+        # 2. Update each media item
+        items = db.query(MediaItem).filter(MediaItem.id.in_(item_ids)).all()
+        for item in items:
+            current_tags_map = {t.id: t for t in item.tags}
+            
+            # Remove tags
+            for t_rem in tags_to_remove:
+                if t_rem.id in current_tags_map:
+                    item.tags.remove(current_tags_map[t_rem.id])
+            
+            # Add tags
+            for t_add in tags_to_add:
+                if t_add.id not in current_tags_map:
+                    item.tags.append(t_add)
+                    
+        db.commit()
+        return {"status": "success", "updated_count": len(items)}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error bulk updating item tags: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    finally:
+        db.close()
+
 

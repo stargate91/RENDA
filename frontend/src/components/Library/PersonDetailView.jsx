@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Star, Heart, Plus, Minus, Calendar, MapPin, Film, Tv, User, Award, Sparkles, Eye, EyeOff, Tag, Check, X, Upload, Link } from 'lucide-react';
 import { api, API_BASE } from '../../services/api';
+import { useAppContext } from '../../context/AppContext';
 
 const CustomTagsList = ({ tags, onAddTag, onRemoveTag }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [newTag, setNewTag] = useState('');
   const [globalTags, setGlobalTags] = useState([]);
   const containerRef = React.useRef(null);
+  const { T } = useAppContext();
 
   useEffect(() => {
     if (isEditing) {
@@ -132,7 +134,7 @@ const CustomTagsList = ({ tags, onAddTag, onRemoveTag }) => {
           }}
         >
           {isEditing ? <X size={12} /> : <Plus size={12} />}
-          {isEditing ? 'Cancel' : 'Add Tag'}
+          {isEditing ? T('detail.tags.cancel') : T('detail.tags.add')}
         </button>
 
         {isEditing && (
@@ -154,7 +156,7 @@ const CustomTagsList = ({ tags, onAddTag, onRemoveTag }) => {
             <form onSubmit={handleSubmit} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
               <input
                 type="text"
-                placeholder="Search or create tag..."
+                placeholder={T('detail.tags.search_placeholder')}
                 value={newTag}
                 onChange={(e) => setNewTag(e.target.value)}
                 autoFocus
@@ -198,7 +200,7 @@ const CustomTagsList = ({ tags, onAddTag, onRemoveTag }) => {
               paddingRight: '2px'
             }}>
               <div style={{ fontSize: '10px', fontWeight: '800', color: 'rgba(255, 255, 255, 0.4)', padding: '4px 2px 2px 2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Available Tags
+                {T('detail.tags.available')}
               </div>
               {filteredTags.length > 0 ? (
                 filteredTags.map(t => (
@@ -234,7 +236,7 @@ const CustomTagsList = ({ tags, onAddTag, onRemoveTag }) => {
                 ))
               ) : (
                 <div style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.4)', padding: '10px 4px', textAlign: 'center', fontStyle: 'italic' }}>
-                  {newTag.trim() ? 'Press enter to create new tag' : 'No pre-created tags available'}
+                  {newTag.trim() ? T('detail.tags.create_hint') : T('detail.tags.none_available')}
                 </div>
               )}
             </div>
@@ -246,6 +248,7 @@ const CustomTagsList = ({ tags, onAddTag, onRemoveTag }) => {
 };
 
 const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => {
+  const { T } = useAppContext();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showImageModal, setShowImageModal] = useState(false);
@@ -358,16 +361,20 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
     return (
       <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-dim)' }}>
         <User size={48} style={{ opacity: 0.2, marginBottom: '16px' }} />
-        <p>Could not load details.</p>
+        <p>{T('library.could_not_load')}</p>
         <button className="detail-back-btn" onClick={onBack} style={{ marginTop: '20px' }}>
-          <ArrowLeft size={16} /> Go Back
+          <ArrowLeft size={16} /> {T('library.go_back')}
         </button>
       </div>
     );
   }
 
   const backdropUrl = data.backdrop_path ? `${API_BASE}/media/images/backdrops${data.backdrop_path}` : null;
-  const profileUrl = data.profile_path ? `${API_BASE}/media/images/persons${data.profile_path}` : null;
+  const profileUrl = data.profile_path 
+    ? (data.profile_path.startsWith('http') 
+        ? data.profile_path 
+        : `${API_BASE}/media/images/persons${data.profile_path}`) 
+    : null;
 
   const getGenderLabel = (g) => {
     if (g === 1) return 'Female';
@@ -381,7 +388,7 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
       {/* ===== HERO ===== */}
       <div className="detail-hero" style={{ minHeight: '460px' }}>
         <button className="detail-back-btn" onClick={onBack}>
-          <ArrowLeft size={14} /> Back
+          <ArrowLeft size={14} /> {T('library.go_back')}
         </button>
 
         {backdropUrl && (
@@ -545,7 +552,7 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
 
               {data.user_rating > 0 && (
                 <span style={{ fontSize: '12px', color: 'var(--accent-yellow)', fontWeight: '600', marginLeft: '5px', opacity: 0.9 }}>
-                  Your Rating
+                  {T('detail.your_rating')}
                 </span>
               )}
             </div>
@@ -553,7 +560,7 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
             {/* Department / Category Tagline */}
             {data.known_for_department && (
               <div className="detail-tagline" style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Sparkles size={16} /> Known for: {data.known_for_department}
+                <Sparkles size={16} /> {T('detail.known_for')}: {data.known_for_department}
               </div>
             )}
 
@@ -561,8 +568,8 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
             <div className="detail-meta-row" style={{ marginTop: '15px' }}>
               {data.birthday && (
                 <span className="detail-meta-pill">
-                  <Calendar size={14} /> Born: {data.birthday}
-                  {data.deathday && ` — Died: ${data.deathday}`}
+                  <Calendar size={14} /> {T('detail.born')}: {data.birthday}
+                  {data.deathday && ` — ${T('detail.died')}: ${data.deathday}`}
                 </span>
               )}
               {data.place_of_birth && (
@@ -577,7 +584,7 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
               )}
               {data.popularity > 0 && (
                 <span className="detail-meta-pill accent">
-                  ★ Popularity: {data.popularity.toFixed(1)}
+                  ★ {T('detail.popularity')}: {data.popularity.toFixed(1)}
                 </span>
               )}
             </div>
@@ -633,7 +640,7 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
             <div className="detail-section" style={{ animation: 'fadeIn 0.4s ease-out' }}>
               <div className="detail-section-title" style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '10px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Film size={20} /> Movies ({libraryMoviesCount} / {totalMoviesCount} in Library)
+                  <Film size={20} /> {T('detail.movies_library_status', { library: libraryMoviesCount, total: totalMoviesCount })}
                 </div>
                 
                 {missingMoviesCount > 0 && (
@@ -671,11 +678,11 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
                   >
                     {showMissingMovies ? (
                       <>
-                        <Eye size={12} /> Hide Missing
+                        <Eye size={12} /> {T('detail.hide_missing')}
                       </>
                     ) : (
                       <>
-                        <EyeOff size={12} /> Show Missing ({missingMoviesCount})
+                        <EyeOff size={12} /> {T('detail.show_missing', { count: missingMoviesCount })}
                       </>
                     )}
                   </button>
@@ -694,7 +701,7 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
                     borderRadius: '12px',
                     textAlign: 'center'
                   }}>
-                    No movies from this person in your library. Click "Show Missing" to view their complete filmography.
+                    {T('detail.no_movies_library')}
                   </div>
                 ) : (
                   displayedMovies.map(movie => {
@@ -711,26 +718,42 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
                         style={{ 
                           display: 'flex', 
                           gap: '16px', 
-                          cursor: movie.in_library ? 'pointer' : 'default', 
+                          cursor: 'pointer', 
                           alignItems: 'center',
-                          opacity: movie.in_library ? 1 : 0.55,
+                          opacity: movie.in_library ? 1 : 0.65,
                           border: movie.in_library ? '1px solid rgba(76, 175, 80, 0.2)' : '1px solid rgba(255, 255, 255, 0.04)',
                           background: movie.in_library ? 'rgba(76, 175, 80, 0.03)' : 'rgba(255, 255, 255, 0.01)',
                           padding: '10px 14px',
                           borderRadius: '12px',
                           transition: 'all 0.2s ease',
                         }}
-                        onClick={movie.in_library ? () => onMovieClick(movie.library_item_id) : undefined}
-                        onMouseOver={movie.in_library ? e => {
-                          e.currentTarget.style.background = 'rgba(76, 175, 80, 0.06)';
-                          e.currentTarget.style.borderColor = 'rgba(76, 175, 80, 0.4)';
+                        onClick={() => {
+                          if (movie.in_library) {
+                            onMovieClick(movie.library_item_id);
+                          } else {
+                            onMovieClick('tmdb_' + movie.id);
+                          }
+                        }}
+                        onMouseOver={e => {
+                          if (movie.in_library) {
+                            e.currentTarget.style.background = 'rgba(76, 175, 80, 0.06)';
+                            e.currentTarget.style.borderColor = 'rgba(76, 175, 80, 0.4)';
+                          } else {
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+                            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                          }
                           e.currentTarget.style.transform = 'translateY(-2px)';
-                        } : undefined}
-                        onMouseOut={movie.in_library ? e => {
-                          e.currentTarget.style.background = 'rgba(76, 175, 80, 0.03)';
-                          e.currentTarget.style.borderColor = 'rgba(76, 175, 80, 0.2)';
+                        }}
+                        onMouseOut={e => {
+                          if (movie.in_library) {
+                            e.currentTarget.style.background = 'rgba(76, 175, 80, 0.03)';
+                            e.currentTarget.style.borderColor = 'rgba(76, 175, 80, 0.2)';
+                          } else {
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.01)';
+                            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.04)';
+                          }
                           e.currentTarget.style.transform = 'none';
-                        } : undefined}
+                        }}
                       >
                         <div style={{ width: '48px', height: '72px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0, border: '1px solid rgba(255,255,255,0.05)' }}>
                           {posterUrl ? (
@@ -756,11 +779,11 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
                             )}
                             {movie.in_library ? (
                               <span style={{ fontSize: '10px', color: '#4CAF50', background: 'rgba(76, 175, 80, 0.1)', padding: '1px 5px', borderRadius: '4px', fontWeight: '700' }}>
-                                ✓ In Library
+                                ✓ {T('detail.in_library')}
                               </span>
                             ) : (
                               <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.03)', padding: '1px 5px', borderRadius: '4px' }}>
-                                Missing
+                                {T('detail.missing')}
                               </span>
                             )}
                           </div>
@@ -787,7 +810,7 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
             <div className="detail-section" style={{ animation: 'fadeIn 0.4s ease-out' }}>
               <div className="detail-section-title" style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '10px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Tv size={20} /> TV Series ({librarySeriesCount} / {totalSeriesCount} in Library)
+                  <Tv size={20} /> {T('detail.series_library_status', { library: librarySeriesCount, total: totalSeriesCount })}
                 </div>
                 
                 {missingSeriesCount > 0 && (
@@ -825,11 +848,11 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
                   >
                     {showMissingSeries ? (
                       <>
-                        <Eye size={12} /> Hide Missing
+                        <Eye size={12} /> {T('detail.hide_missing')}
                       </>
                     ) : (
                       <>
-                        <EyeOff size={12} /> Show Missing ({missingSeriesCount})
+                        <EyeOff size={12} /> {T('detail.show_missing', { count: missingSeriesCount })}
                       </>
                     )}
                   </button>
@@ -848,7 +871,7 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
                     borderRadius: '12px',
                     textAlign: 'center'
                   }}>
-                    No series from this person in your library. Click "Show Missing" to view their complete filmography.
+                    {T('detail.no_series_library')}
                   </div>
                 ) : (
                   displayedSeries.map(show => {
@@ -865,26 +888,42 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
                         style={{ 
                           display: 'flex', 
                           gap: '16px', 
-                          cursor: show.in_library ? 'pointer' : 'default', 
+                          cursor: 'pointer', 
                           alignItems: 'center',
-                          opacity: show.in_library ? 1 : 0.55,
+                          opacity: show.in_library ? 1 : 0.65,
                           border: show.in_library ? '1px solid rgba(76, 175, 80, 0.2)' : '1px solid rgba(255, 255, 255, 0.04)',
                           background: show.in_library ? 'rgba(76, 175, 80, 0.03)' : 'rgba(255, 255, 255, 0.01)',
                           padding: '10px 14px',
                           borderRadius: '12px',
                           transition: 'all 0.2s ease',
                         }}
-                        onClick={show.in_library ? () => onSeriesClick(show.library_series_tmdb_id) : undefined}
-                        onMouseOver={show.in_library ? e => {
-                          e.currentTarget.style.background = 'rgba(76, 175, 80, 0.06)';
-                          e.currentTarget.style.borderColor = 'rgba(76, 175, 80, 0.4)';
+                        onClick={() => {
+                          if (show.in_library) {
+                            onSeriesClick(show.library_series_tmdb_id);
+                          } else {
+                            onSeriesClick('tmdb_' + show.id);
+                          }
+                        }}
+                        onMouseOver={e => {
+                          if (show.in_library) {
+                            e.currentTarget.style.background = 'rgba(76, 175, 80, 0.06)';
+                            e.currentTarget.style.borderColor = 'rgba(76, 175, 80, 0.4)';
+                          } else {
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+                            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                          }
                           e.currentTarget.style.transform = 'translateY(-2px)';
-                        } : undefined}
-                        onMouseOut={show.in_library ? e => {
-                          e.currentTarget.style.background = 'rgba(76, 175, 80, 0.03)';
-                          e.currentTarget.style.borderColor = 'rgba(76, 175, 80, 0.2)';
+                        }}
+                        onMouseOut={e => {
+                          if (show.in_library) {
+                            e.currentTarget.style.background = 'rgba(76, 175, 80, 0.03)';
+                            e.currentTarget.style.borderColor = 'rgba(76, 175, 80, 0.2)';
+                          } else {
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.01)';
+                            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.04)';
+                          }
                           e.currentTarget.style.transform = 'none';
-                        } : undefined}
+                        }}
                       >
                         <div style={{ width: '48px', height: '72px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0, border: '1px solid rgba(255,255,255,0.05)' }}>
                           {posterUrl ? (
@@ -910,11 +949,11 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
                             )}
                             {show.in_library ? (
                               <span style={{ fontSize: '10px', color: '#4CAF50', background: 'rgba(76, 175, 80, 0.1)', padding: '1px 5px', borderRadius: '4px', fontWeight: '700' }}>
-                                ✓ In Library
+                                ✓ {T('detail.in_library')}
                               </span>
                             ) : (
                               <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.03)', padding: '1px 5px', borderRadius: '4px' }}>
-                                Missing
+                                {T('detail.missing')}
                               </span>
                             )}
                           </div>
@@ -966,8 +1005,8 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
             {/* Header */}
             <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#fff' }}>Choose Profile Image</h3>
-                <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'var(--text-dim)' }}>Select a custom portrait for {data.name}</p>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#fff' }}>{T('detail.choose_profile')}</h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'var(--text-dim)' }}>{T('detail.select_portrait', { name: data.name })}</p>
               </div>
               <button 
                 onClick={() => setShowImageModal(false)}
@@ -988,7 +1027,7 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
                 onMouseOut={e => !updatingProfile && (e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)')}
               >
                 {updatingProfile === 'upload' ? <div style={{ width: '16px', height: '16px', border: '2px solid rgba(59,130,246,0.3)', borderTopColor: '#3b82f6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /> : <Upload size={16} />}
-                Upload File
+                {T('detail.upload_file')}
               </button>
               <button 
                 onClick={handleCustomUrl}
@@ -998,7 +1037,7 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
                 onMouseOut={e => !updatingProfile && (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)')}
               >
                 {updatingProfile === 'url' ? <div style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /> : <Link size={16} />}
-                Set via URL
+                {T('detail.set_url')}
               </button>
             </div>
 

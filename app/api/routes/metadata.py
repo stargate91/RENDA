@@ -96,6 +96,8 @@ def resolve_metadata(request: ResolveRequest):
         if not item:
             return JSONResponse(status_code=404, content={"error": "Item not found"})
             
+        original_status = item.status
+        
         # 1. Deactivate existing matches
         db.query(MediaMatch).filter(MediaMatch.media_item_id == item.id).update({"is_active": False})
         
@@ -196,10 +198,13 @@ def resolve_metadata(request: ResolveRequest):
 
         # Update item status: matched ONLY if we have at least one high-specificity match
         # (Simplified logic: use the last target's type)
-        if final_item_type in [ItemType.MOVIE, ItemType.EPISODE]:
-            item.status = ItemStatus.MATCHED
+        if original_status in [ItemStatus.RENAMED, ItemStatus.ORGANIZED]:
+            item.status = original_status
         else:
-            item.status = ItemStatus.UNCERTAIN
+            if final_item_type in [ItemType.MOVIE, ItemType.EPISODE]:
+                item.status = ItemStatus.MATCHED
+            else:
+                item.status = ItemStatus.UNCERTAIN
 
         item.item_type = final_item_type
         db.commit()
@@ -216,11 +221,40 @@ def resolve_metadata(request: ResolveRequest):
             fallback_language=fallback.value if fallback and fallback.value != "none" else None
         )
         
-        # 4. A képek letöltését a globális háttérfolyamat (background_tasks.py)
-        #    automatikusan fel fogja szedni a következő 10 másodpercben,
-        #    így elkerüljük az adatbázis lock-okat!
+        # 4. If the item was already physically renamed in the library, trigger a physical rename/move
+        if original_status == ItemStatus.RENAMED:
+            try:
+                from app.formatter.formatter import Formatter, FormatterConfig
+                from app.renamer.renamer_engine import RenamerEngine
+                from app.db.models import ActionBatch
+                import os
+                
+                # Refresh item so SQLAlchemy has all enriched metadata attributes loaded
+                db.refresh(item)
+                
+                # Look for the new active match we just created
+                new_active_match = next((m for m in item.matches if m.is_active), None)
+                if new_active_match:
+                    formatter = Formatter(FormatterConfig.from_db(db))
+                    engine = RenamerEngine(db)
+                    
+                    # Create a specific action batch for this correction
+                    batch = ActionBatch(name=f"Manual Correction: {item.filename}")
+                    db.add(batch)
+                    db.commit()
+                    
+                    # Determine target path
+                    dest_root = formatter.config.library_path if formatter.config.move_to_library and formatter.config.library_path else os.path.dirname(item.current_path)
+                    preview = formatter.plan_rename(new_active_match, dest_root)
+                    
+                    # Physically execute the rename/move operation
+                    success = engine.execute_single(preview, batch.id)
+                    if not success:
+                        logger.error(f"Failed to physically rename/move item during manual correction: {item.filename}")
+            except Exception as re_err:
+                logger.error(f"Error during manual correction renaming: {re_err}")
         
-        return {"status": "success", "match_id": match.id}
+        return {"status": "success", "match_id": active_match.id if active_match else None}
     except Exception as e:
         db.rollback()
         import traceback

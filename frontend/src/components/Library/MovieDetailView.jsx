@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Clock, Calendar, Star, Heart, Users, Clapperboard, Film, Monitor, HardDrive, ExternalLink, User, FolderOpen, Tag, Check, Plus, X } from 'lucide-react';
+import { ArrowLeft, Clock, Calendar, Star, Heart, Users, Clapperboard, Film, Monitor, HardDrive, ExternalLink, User, FolderOpen, Tag, Check, Plus, X, RefreshCcw } from 'lucide-react';
 import { api, API_BASE } from '../../services/api';
 import { useAppContext } from '../../context/AppContext';
 
@@ -8,6 +8,7 @@ const CustomTagsList = ({ tags, onAddTag, onRemoveTag }) => {
   const [newTag, setNewTag] = useState('');
   const [globalTags, setGlobalTags] = useState([]);
   const containerRef = React.useRef(null);
+  const { T } = useAppContext();
 
   useEffect(() => {
     if (isEditing) {
@@ -133,7 +134,7 @@ const CustomTagsList = ({ tags, onAddTag, onRemoveTag }) => {
           }}
         >
           {isEditing ? <X size={12} /> : <Plus size={12} />}
-          {isEditing ? 'Cancel' : 'Add Tag'}
+          {isEditing ? T('detail.tags.cancel') : T('detail.tags.add')}
         </button>
 
         {isEditing && (
@@ -155,7 +156,7 @@ const CustomTagsList = ({ tags, onAddTag, onRemoveTag }) => {
             <form onSubmit={handleSubmit} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
               <input
                 type="text"
-                placeholder="Search or create tag..."
+                placeholder={T('detail.tags.search_placeholder')}
                 value={newTag}
                 onChange={(e) => setNewTag(e.target.value)}
                 autoFocus
@@ -199,7 +200,7 @@ const CustomTagsList = ({ tags, onAddTag, onRemoveTag }) => {
               paddingRight: '2px'
             }}>
               <div style={{ fontSize: '10px', fontWeight: '800', color: 'rgba(255, 255, 255, 0.4)', padding: '4px 2px 2px 2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Available Tags
+                {T('detail.tags.available')}
               </div>
               {filteredTags.length > 0 ? (
                 filteredTags.map(t => (
@@ -235,7 +236,7 @@ const CustomTagsList = ({ tags, onAddTag, onRemoveTag }) => {
                 ))
               ) : (
                 <div style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.4)', padding: '10px 4px', textAlign: 'center', fontStyle: 'italic' }}>
-                  {newTag.trim() ? 'Press enter to create new tag' : 'No pre-created tags available'}
+                  {newTag.trim() ? T('detail.tags.create_hint') : T('detail.tags.none_available')}
                 </div>
               )}
             </div>
@@ -247,10 +248,39 @@ const CustomTagsList = ({ tags, onAddTag, onRemoveTag }) => {
 };
 
 const MovieDetailView = ({ itemId, onBack, onPersonClick }) => {
-  const { T } = useAppContext();
+  const { T, openResolver, showResolverModal } = useAppContext();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [hoverRating, setHoverRating] = useState(0);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+
+  useEffect(() => {
+    if (!showResolverModal && data) {
+      const fetchDetail = async () => {
+        try {
+          const res = await api.getLibraryItemDetail(itemId);
+          setData(res);
+        } catch (e) {
+          console.error("Failed to re-fetch detail:", e);
+        }
+      };
+      fetchDetail();
+    }
+  }, [showResolverModal]);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setIsLightboxOpen(false);
+      }
+    };
+    if (isLightboxOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isLightboxOpen]);
 
   const handlePlayTrailer = () => {
     if (data?.trailer_key) {
@@ -353,9 +383,9 @@ const MovieDetailView = ({ itemId, onBack, onPersonClick }) => {
     return (
       <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-dim)' }}>
         <Film size={48} style={{ opacity: 0.2, marginBottom: '16px' }} />
-        <p>Could not load details.</p>
+        <p>{T('library.could_not_load')}</p>
         <button className="detail-back-btn" onClick={onBack} style={{ marginTop: '20px' }}>
-          <ArrowLeft size={16} /> Go Back
+          <ArrowLeft size={16} /> {T('library.go_back')}
         </button>
       </div>
     );
@@ -364,15 +394,23 @@ const MovieDetailView = ({ itemId, onBack, onPersonClick }) => {
   const tech = data.technical || {};
   const hasRatings = data.rating_tmdb || data.rating_imdb || data.rating_rotten || data.rating_meta;
   const hasFinancials = data.budget || data.revenue;
-  const backdropUrl = data.backdrop_path ? `${API_BASE}/media/images/backdrops${data.backdrop_path}` : null;
-  const posterUrl = data.poster_path ? `${API_BASE}/media/images/posters${data.poster_path}` : null;
+  const backdropUrl = data.backdrop_path 
+    ? (data.in_library === false 
+        ? `https://image.tmdb.org/t/p/w1280${data.backdrop_path}`
+        : `${API_BASE}/media/images/backdrops${data.backdrop_path}`)
+    : null;
+  const posterUrl = data.poster_path 
+    ? (data.in_library === false 
+        ? `https://image.tmdb.org/t/p/w500${data.poster_path}`
+        : `${API_BASE}/media/images/posters${data.poster_path}`)
+    : null;
 
   return (
     <div className="movie-detail">
       {/* ===== HERO ===== */}
       <div className="detail-hero">
         <button className="detail-back-btn" onClick={onBack}>
-          <ArrowLeft size={14} /> Back to Library
+          <ArrowLeft size={14} /> {T('library.go_back')}
         </button>
 
         {backdropUrl && (
@@ -387,7 +425,11 @@ const MovieDetailView = ({ itemId, onBack, onPersonClick }) => {
         <div className="detail-hero-gradient" />
 
         <div className="detail-hero-content">
-          <div className="detail-poster">
+          <div 
+            className="detail-poster" 
+            style={posterUrl ? { cursor: 'zoom-in' } : {}}
+            onClick={() => posterUrl && setIsLightboxOpen(true)}
+          >
             {posterUrl ? (
               <img src={posterUrl} alt={data.title} />
             ) : (
@@ -410,43 +452,69 @@ const MovieDetailView = ({ itemId, onBack, onPersonClick }) => {
 
             {/* futuristic glassmorphic play button */}
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
-              <button 
-                onClick={() => handlePlayMedia(data.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  margin: '15px 0',
-                  padding: '12px 32px',
-                  background: 'rgba(59, 130, 246, 0.1)',
-                  border: '1px solid rgba(59, 130, 246, 0.45)',
-                  borderRadius: '30px',
-                  color: '#fff',
-                  fontSize: '15px',
-                  fontWeight: '800',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '1px',
-                  backdropFilter: 'blur(12px)',
-                  WebkitBackdropFilter: 'blur(12px)',
-                }}
-                onMouseOver={e => {
-                  e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
-                  e.currentTarget.style.background = 'rgba(59, 130, 246, 0.25)';
-                  e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.85)';
-                  e.currentTarget.style.boxShadow = '0 12px 32px rgba(59, 130, 246, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.2)';
-                }}
-                onMouseOut={e => {
-                  e.currentTarget.style.transform = 'none';
-                  e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)';
-                  e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.45)';
-                  e.currentTarget.style.boxShadow = '0 8px 24px rgba(59, 130, 246, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1)';
-                }}
-              >
-                <span style={{ fontSize: '16px', display: 'flex', alignItems: 'center', color: '#3b82f6' }}>▶</span>
-                {T('common.play')}
-              </button>
+              {data.in_library === false ? (
+                <div 
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    margin: '15px 0',
+                    padding: '12px 32px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '30px',
+                    color: 'rgba(255, 255, 255, 0.4)',
+                    fontSize: '15px',
+                    fontWeight: '800',
+                    textTransform: 'uppercase',
+                    letterSpacing: '1px',
+                    backdropFilter: 'blur(12px)',
+                    cursor: 'not-allowed',
+                  }}
+                  title="This item is not present in your library"
+                >
+                  <span style={{ fontSize: '16px', display: 'flex', alignItems: 'center', color: 'rgba(255, 255, 255, 0.3)' }}>✖</span>
+                  {T('detail.missing') || 'Missing'}
+                </div>
+              ) : (
+                <button 
+                  onClick={() => handlePlayMedia(data.id)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    margin: '15px 0',
+                    padding: '12px 32px',
+                    background: 'rgba(59, 130, 246, 0.1)',
+                    border: '1px solid rgba(59, 130, 246, 0.45)',
+                    borderRadius: '30px',
+                    color: '#fff',
+                    fontSize: '15px',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '1px',
+                    backdropFilter: 'blur(12px)',
+                    WebkitBackdropFilter: 'blur(12px)',
+                  }}
+                  onMouseOver={e => {
+                    e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
+                    e.currentTarget.style.background = 'rgba(59, 130, 246, 0.25)';
+                    e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.85)';
+                    e.currentTarget.style.boxShadow = '0 12px 32px rgba(59, 130, 246, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.2)';
+                  }}
+                  onMouseOut={e => {
+                    e.currentTarget.style.transform = 'none';
+                    e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)';
+                    e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.45)';
+                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(59, 130, 246, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1)';
+                  }}
+                >
+                  <span style={{ fontSize: '16px', display: 'flex', alignItems: 'center', color: '#3b82f6' }}>▶</span>
+                  {T('common.play')}
+                </button>
+              )}
               
               {data.trailer_key && (
                 <button 
@@ -481,7 +549,7 @@ const MovieDetailView = ({ itemId, onBack, onPersonClick }) => {
                   }}
                 >
                   <Film size={16} />
-                  Play Trailer
+                  {T('detail.play_trailer')}
                 </button>
               )}
             </div>
@@ -672,7 +740,7 @@ const MovieDetailView = ({ itemId, onBack, onPersonClick }) => {
         {data.directors && data.directors.length > 0 && (
           <div className="detail-section">
             <div className="detail-section-title">
-              <Clapperboard size={20} /> Director{data.directors.length > 1 ? 's' : ''}
+              <Clapperboard size={20} /> {T('detail.directors')}
             </div>
             <div className="director-row">
               {data.directors.map(d => (
@@ -682,44 +750,50 @@ const MovieDetailView = ({ itemId, onBack, onPersonClick }) => {
                   onClick={() => onPersonClick && onPersonClick(d.id)}
                   style={{ cursor: onPersonClick ? 'pointer' : 'default' }}
                 >
-                  <div className="director-card-img">
-                    {d.profile_path ? (
-                      <img src={`${API_BASE}/media/images/persons${d.profile_path}`} alt={d.name} />
-                    ) : (
-                      <div className="cast-card-img-placeholder"><User size={20} color="var(--text-muted)" /></div>
-                    )}
-                  </div>
-                  <div>
-                    <div className="director-card-name">{d.name}</div>
-                    <div className="director-card-job">{d.job}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Cast */}
-        {data.cast && data.cast.length > 0 && (
-          <div className="detail-section">
-            <div className="detail-section-title">
-              <Users size={20} /> Cast
-            </div>
-            <div className="cast-scroll">
-              {data.cast.map(c => (
-                <div 
-                  key={c.id} 
-                  className="cast-card"
-                  onClick={() => onPersonClick && onPersonClick(c.id)}
-                  style={{ cursor: onPersonClick ? 'pointer' : 'default' }}
-                >
-                  <div className="cast-card-img">
-                    {c.profile_path ? (
-                      <img src={`${API_BASE}/media/images/persons${c.profile_path}`} alt={c.name} />
-                    ) : (
-                      <div className="cast-card-img-placeholder"><User size={24} color="var(--text-muted)" /></div>
-                    )}
-                  </div>
+                   <div className="director-card-img">
+                     {d.profile_path ? (
+                       <img 
+                         src={d.profile_path.startsWith('http') ? d.profile_path : `${API_BASE}/media/images/persons${d.profile_path}`} 
+                         alt={d.name} 
+                       />
+                     ) : (
+                       <div className="cast-card-img-placeholder"><User size={20} color="var(--text-muted)" /></div>
+                     )}
+                   </div>
+                   <div>
+                     <div className="director-card-name">{d.name}</div>
+                     <div className="director-card-job">{d.job}</div>
+                   </div>
+                 </div>
+               ))}
+             </div>
+           </div>
+         )}
+ 
+         {/* Cast */}
+         {data.cast && data.cast.length > 0 && (
+           <div className="detail-section">
+             <div className="detail-section-title">
+               <Users size={20} /> {T('detail.cast')}
+             </div>
+             <div className="cast-scroll">
+               {data.cast.map(c => (
+                 <div 
+                   key={c.id} 
+                   className="cast-card"
+                   onClick={() => onPersonClick && onPersonClick(c.id)}
+                   style={{ cursor: onPersonClick ? 'pointer' : 'default' }}
+                 >
+                   <div className="cast-card-img">
+                     {c.profile_path ? (
+                       <img 
+                         src={c.profile_path.startsWith('http') ? c.profile_path : `${API_BASE}/media/images/persons${c.profile_path}`} 
+                         alt={c.name} 
+                       />
+                     ) : (
+                       <div className="cast-card-img-placeholder"><User size={24} color="var(--text-muted)" /></div>
+                     )}
+                   </div>
                   <div className="cast-card-name">{c.name}</div>
                   {c.character && <div className="cast-card-character">{c.character}</div>}
                 </div>
@@ -731,7 +805,7 @@ const MovieDetailView = ({ itemId, onBack, onPersonClick }) => {
         {/* Technical Info */}
         <div className="detail-section">
           <div className="detail-section-title">
-            <Monitor size={20} /> Technical Details
+            <Monitor size={20} /> {T('detail.technical_info')}
           </div>
           <div className="info-grid">
             {tech.resolution && (
@@ -833,18 +907,61 @@ const MovieDetailView = ({ itemId, onBack, onPersonClick }) => {
         )}
 
         {/* File Info */}
-        <div className="detail-section">
-          <div className="detail-section-title">
-            <FolderOpen size={20} /> File
+        {data.in_library !== false && (
+          <div className="detail-section">
+            <div className="detail-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FolderOpen size={20} /> File
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openResolver({
+                    id: data.id,
+                    title: data.title,
+                    filename: data.filename,
+                    type: 'movie',
+                    year: data.year
+                  });
+                }}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '6px',
+                  color: 'rgba(255, 255, 255, 0.6)',
+                  fontSize: '11px',
+                  fontWeight: '600',
+                  padding: '4px 10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseOver={e => {
+                  e.currentTarget.style.color = '#fff';
+                  e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)';
+                  e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.4)';
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.color = 'rgba(255, 255, 255, 0.6)';
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                }}
+              >
+                <RefreshCcw size={12} />
+                {T('resolver.correct_match') || 'Párosítás javítása'}
+              </button>
+            </div>
+            <div 
+              className="file-path-display"
+              onClick={() => data.path && api.revealInExplorer(data.path)}
+              title="Click to reveal in file explorer"
+            >
+              {data.path || data.filename}
+            </div>
           </div>
-          <div 
-            className="file-path-display"
-            onClick={() => data.path && api.revealInExplorer(data.path)}
-            title="Click to reveal in file explorer"
-          >
-            {data.path || data.filename}
-          </div>
-        </div>
+        )}
 
         {/* External Links */}
         {(data.tmdb_id || data.imdb_id) && (
@@ -877,6 +994,82 @@ const MovieDetailView = ({ itemId, onBack, onPersonClick }) => {
           </div>
         )}
       </div>
+
+      {/* ===== POSTER LIGHTBOX MODAL ===== */}
+      {isLightboxOpen && posterUrl && (
+        <div 
+          onClick={() => setIsLightboxOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(10, 10, 12, 0.95)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            animation: 'fadeIn 0.25s ease-out',
+            cursor: 'zoom-out',
+          }}
+        >
+          {/* Close button */}
+          <button
+            onClick={() => setIsLightboxOpen(false)}
+            style={{
+              position: 'absolute',
+              top: '25px',
+              right: '25px',
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '50%',
+              width: '44px',
+              height: '44px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#fff',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+            onMouseOver={e => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+              e.currentTarget.style.transform = 'scale(1.05)';
+            }}
+            onMouseOut={e => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+          >
+            <X size={20} />
+          </button>
+
+          {/* Large image wrapper */}
+          <div 
+            onClick={e => e.stopPropagation()}
+            style={{
+              position: 'relative',
+              maxWidth: '90%',
+              maxHeight: '90%',
+              borderRadius: '20px',
+              overflow: 'hidden',
+              boxShadow: '0 30px 100px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.1)',
+              animation: 'scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+            }}
+          >
+            <img 
+              src={posterUrl} 
+              alt={data.title} 
+              style={{
+                display: 'block',
+                maxWidth: '100%',
+                maxHeight: '85vh',
+                objectFit: 'contain',
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

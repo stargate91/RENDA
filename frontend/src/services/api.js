@@ -66,8 +66,9 @@ export const api = {
     return response.json();
   },
 
-  clearDatabase: () => fetchJson('/api/database/clear', {
+  clearDatabase: (options) => fetchJson('/api/database/clear', {
     method: 'POST',
+    body: options ? JSON.stringify(options) : undefined,
   }),
   
   deleteItems: (itemIds, extraIds) => fetchJson('/api/discovery/delete', {
@@ -154,6 +155,11 @@ export const api = {
   updateItemStatus: (itemId, updates) => fetchJson(`/api/item/${itemId}/status`, {
     method: 'POST',
     body: JSON.stringify(updates),
+  }),
+  
+  bulkUpdateItemTags: (payload) => fetchJson('/api/media/bulk-tags', {
+    method: 'POST',
+    body: JSON.stringify(payload),
   }),
   
   playMedia: (itemId) => fetchJson('/api/media/play', {
