@@ -372,14 +372,78 @@ const LibraryView = ({ T }) => {
 
   if (loading) {
     return (
-      <div className="library-loading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-        <Loader2 className="animate-spin" size={48} color="var(--accent-blue)" />
+      <div className="library-view-container" style={{ padding: '30px', opacity: 0.85 }}>
+        <style>{`
+          @keyframes skeleton-shimmer {
+            0% {
+              background-position: -200% 0;
+            }
+            100% {
+              background-position: 200% 0;
+            }
+          }
+          .skeleton-pulse {
+            background: linear-gradient(90deg, #18181b 25%, #27272a 37%, #18181b 63%);
+            background-size: 200% 100%;
+            animation: skeleton-shimmer 1.5s infinite linear;
+          }
+        `}</style>
+        
+        {/* Header Skeleton */}
+        <header className="library-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '40px' }}>
+          <div className="header-left" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div className="skeleton-pulse" style={{ width: '240px', height: '38px', borderRadius: '10px' }} />
+            <div className="skeleton-pulse" style={{ width: '160px', height: '18px', borderRadius: '6px', marginTop: '6px' }} />
+          </div>
+          <div className="header-right">
+            <div className="skeleton-pulse" style={{ width: '280px', height: '40px', borderRadius: '12px' }} />
+          </div>
+        </header>
+
+        {/* Tab Row Skeleton */}
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '30px' }}>
+          <div className="skeleton-pulse" style={{ width: '130px', height: '44px', borderRadius: '12px' }} />
+          <div className="skeleton-pulse" style={{ width: '130px', height: '44px', borderRadius: '12px' }} />
+          <div className="skeleton-pulse" style={{ width: '130px', height: '44px', borderRadius: '12px' }} />
+        </div>
+
+        {/* Grid Skeletons */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+          gap: '30px'
+        }}>
+          {Array.from({ length: 12 }).map((_, idx) => (
+            <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div className="skeleton-pulse" style={{
+                width: '100%',
+                aspectRatio: '2/3',
+                borderRadius: '20px',
+                border: '1px solid rgba(255,255,255,0.03)'
+              }} />
+              <div className="skeleton-pulse" style={{ width: '75%', height: '16px', borderRadius: '4px' }} />
+              <div className="skeleton-pulse" style={{ width: '40%', height: '12px', borderRadius: '4px' }} />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="library-view-container" style={{ padding: '30px', animation: 'fadeIn 0.5s ease-out' }}>
+    <div className="library-view-container" style={{ padding: '30px' }}>
+      <style>{`
+        @keyframes staggerFadeIn {
+          0% {
+            opacity: 0;
+            transform: translateY(20px) scale(0.96);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+      `}</style>
       <header className="library-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '40px' }}>
         <div className="header-left">
           <h1 style={{ fontSize: '32px', fontWeight: '900', marginBottom: '8px', letterSpacing: '-0.5px' }}>
@@ -601,7 +665,7 @@ const LibraryView = ({ T }) => {
             gridTemplateColumns: viewMode === 'episodes' ? 'repeat(auto-fill, minmax(250px, 1fr))' : 'repeat(auto-fill, minmax(180px, 1fr))',
             gap: '30px'
           }}>
-            {renderItems.slice(0, visibleCount).map(item => (
+            {renderItems.slice(0, visibleCount).map((item, index) => (
               <div key={item.id} className="poster-card" style={{
                 position: 'relative',
                 borderRadius: '20px',
@@ -611,6 +675,8 @@ const LibraryView = ({ T }) => {
                 aspectRatio: viewMode === 'episodes' ? '16/9' : '2/3',
                 cursor: 'pointer',
                 transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease',
+                animation: 'staggerFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both',
+                animationDelay: `${index * 20}ms`,
               }}
               onClick={() => {
                 if (item.isSeriesNode || item.isEpisodeNode) {
