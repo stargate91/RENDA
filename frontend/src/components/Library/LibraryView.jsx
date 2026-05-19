@@ -5,6 +5,7 @@ import MovieDetailView from './MovieDetailView';
 import SeriesDetailView from './SeriesDetailView';
 import PersonDetailView from './PersonDetailView';
 import '../../styles/components/library.css';
+import { useAppContext } from '../../context/AppContext';
 
 const LibraryView = ({ T }) => {
   const [data, setData] = useState({ movies: [], series: [], adult: [], counts: { movies: 0, series: 0, adult: 0 } });
@@ -262,8 +263,8 @@ const LibraryView = ({ T }) => {
   ].filter(tab => {
     if (tab.id === 'tags') return true;
     if (tab.id === 'actors' || tab.id === 'directors') {
-      // Show Actors and Directors tabs as long as we have movies or series, so the user can manage them!
-      return (data.counts.movies || 0) > 0 || (data.counts.series || 0) > 0;
+      // Always show Actors and Directors tabs so users can manage them even before organizing media
+      return true;
     }
     return tab.count > 0;
   });
@@ -1378,126 +1379,263 @@ const LibraryView = ({ T }) => {
   );
 };
 
-const TagsManagerView = ({ tags, searchQuery, navigateTo }) => {
+const TagsManagerView = ({ tags, searchQuery, navigateTo, onTagsChanged }) => {
+  const { confirmAction } = useAppContext();
   const [expandedTag, setExpandedTag] = useState(null);
+  const [globalTags, setGlobalTags] = useState([]);
+  const [editingId, setEditingId] = useState(null);
+  const [editName, setEditName] = useState('');
+  const [editColor, setEditColor] = useState('#a78bfa');
 
-  const filteredTags = tags.filter(tag =>
-    tag.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const fetchGlobalTags = async () => {
+    try {
+      const res = await api.getTags();
+      setGlobalTags(res || []);
+    } catch (e) { console.error(e); }
+  };
 
-  if (filteredTags.length === 0) {
-    return (
-      <div className="library-empty" style={{ 
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', 
-        height: '400px', color: 'var(--text-dim)' 
-      }}>
-        <Tag size={64} style={{ opacity: 0.1, marginBottom: '20px' }} />
-        <h3 style={{ color: '#fff', fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>
-          No Tags Found
-        </h3>
-        <p style={{ color: 'var(--text-dim)', fontSize: '14px', maxWidth: '300px', textAlign: 'center' }}>
-          {searchQuery ? `No tags matching "${searchQuery}".` : 'Add custom tags to your movies, series, or people to see them here!'}
-        </p>
-      </div>
+  useEffect(() => {
+    fetchGlobalTags();
+  }, []);
+
+  const handleCreate = async () => {
+    try {
+      await api.createTag({ name: 'New Tag ' + Math.floor(Math.random() * 100), color: '#3b82f6' });
+      fetchGlobalTags();
+      if (onTagsChanged) onTagsChanged();
+    } catch (e) { alert("Failed to create tag"); }
+  };
+
+  const handleUpdate = async (id, e) => {
+    if (e) e.stopPropagation();
+    try {
+      await api.updateTag(id, { name: editName, color: editColor });
+      setEditingId(null);
+      fetchGlobalTags();
+      if (onTagsChanged) onTagsChanged();
+    } catch (e) { alert("Failed to update tag"); }
+  };
+
+  const handleDeleteClick = (id, e) => {
+    if (e) e.stopPropagation();
+    confirmAction(
+      "Delete Global Tag?",
+      "Are you sure you want to delete this tag? It will be permanently removed from all your associated movies, series, and people.",
+      async () => {
+        try {
+          await api.deleteTag(id);
+          fetchGlobalTags();
+          if (expandedTag && globalTags.find(t => t.id === id)?.name === expandedTag) {
+              setExpandedTag(null);
+          }
+          if (onTagsChanged) onTagsChanged();
+        } catch (err) { alert("Failed to delete tag"); }
+      }
     );
-  }
+  };
+
+  const startEditing = (tag, e) => {
+    e.stopPropagation();
+    setEditingId(tag.id);
+    setEditName(tag.name);
+    setEditColor(tag.color || '#a78bfa');
+  };
+
+  // Strict Array checks to prevent runtime crashes (White/Black Screen of Death)
+  const safeGlobalTags = Array.isArray(globalTags) ? globalTags : [];
+  const safeLocalTags = Array.isArray(tags) ? tags : [];
+
+  // Merge global tags with local usage data
+  const mergedTags = safeGlobalTags.map(gt => {
+    const local = safeLocalTags.find(t => (t.name || '') === (gt.name || '')) || { 
+      total_count: 0, movies: [], series: [], adult: [], actors: [], directors: [] 
+    };
+    return { ...local, ...gt, color: gt.color || '#a78bfa' }; // fallback color injected here
+  });
+
+  const filteredTags = mergedTags.filter(tag =>
+    (tag.name || '').toLowerCase().includes((searchQuery || '').toLowerCase())
+  );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '25px', animation: 'fadeIn 0.4s ease-out' }}>
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-        gap: '20px'
-      }}>
-        {filteredTags.map(tag => {
-          const isExpanded = expandedTag === tag.name;
-          return (
-            <div 
-              key={tag.name}
-              style={{
-                background: 'var(--bg-card)',
-                border: isExpanded ? '1px solid rgba(139, 92, 246, 0.4)' : '1px solid var(--border-card)',
-                borderRadius: '16px',
-                padding: '20px',
-                cursor: 'pointer',
-                transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
-                boxShadow: isExpanded ? '0 10px 30px rgba(139, 92, 246, 0.15)' : 'none',
-                transform: isExpanded ? 'translateY(-4px)' : 'none',
-              }}
-              onClick={() => setExpandedTag(isExpanded ? null : tag.name)}
-              onMouseOver={e => {
-                if (!isExpanded) {
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                }
-              }}
-              onMouseOut={e => {
-                if (!isExpanded) {
-                  e.currentTarget.style.borderColor = 'var(--border-card)';
-                  e.currentTarget.style.transform = 'none';
-                }
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '10px',
-                    background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(59, 130, 246, 0.2) 100%)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    border: '1px solid rgba(139, 92, 246, 0.3)'
-                  }}>
-                    <Tag size={16} color="#a78bfa" />
-                  </div>
-                  <span style={{ fontSize: '18px', fontWeight: '800', color: '#fff' }}>{tag.name}</span>
-                </div>
-                <span style={{
-                  fontSize: '11px',
-                  fontWeight: '800',
-                  color: '#fff',
-                  background: 'rgba(139, 92, 246, 0.2)',
-                  border: '1px solid rgba(139, 92, 246, 0.4)',
-                  padding: '3px 8px',
-                  borderRadius: '20px'
-                }}>
-                  {tag.total_count} item{tag.total_count !== 1 ? 's' : ''}
-                </span>
-              </div>
-
-              {/* Counts Breakdown pills */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', fontSize: '11px', color: 'var(--text-dim)' }}>
-                {tag.movies.length > 0 && (
-                  <span style={{ background: 'rgba(255,255,255,0.03)', padding: '3px 8px', borderRadius: '8px' }}>
-                    🎬 {tag.movies.length} Movie{tag.movies.length !== 1 ? 's' : ''}
-                  </span>
-                )}
-                {tag.series.length > 0 && (
-                  <span style={{ background: 'rgba(255,255,255,0.03)', padding: '3px 8px', borderRadius: '8px' }}>
-                    📺 {tag.series.length} Series
-                  </span>
-                )}
-                {tag.adult.length > 0 && (
-                  <span style={{ background: 'rgba(255,255,255,0.03)', padding: '3px 8px', borderRadius: '8px' }}>
-                    🔞 {tag.adult.length} Adult
-                  </span>
-                )}
-                {(tag.actors.length > 0 || tag.directors.length > 0) && (
-                  <span style={{ background: 'rgba(255,255,255,0.03)', padding: '3px 8px', borderRadius: '8px' }}>
-                    👥 {tag.actors.length + tag.directors.length} Person{tag.actors.length + tag.directors.length !== 1 ? 's' : ''}
-                  </span>
-                )}
-              </div>
-
-              <div style={{ marginTop: '12px', fontSize: '11px', color: '#a78bfa', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                {isExpanded ? 'Click to collapse details' : 'Click to show tagged items'}
-              </div>
-            </div>
-          );
-        })}
+      
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+        <button
+          onClick={handleCreate}
+          style={{
+            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+            border: 'none',
+            color: '#fff',
+            padding: '10px 20px',
+            borderRadius: '12px',
+            fontWeight: '700',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: '0 4px 15px rgba(59, 130, 246, 0.3)',
+          }}
+        >
+          <Plus size={16} /> Create Tag
+        </button>
       </div>
+
+      {filteredTags.length === 0 ? (
+        <div className="library-empty" style={{ 
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', 
+          height: '300px', color: 'var(--text-dim)' 
+        }}>
+          <Tag size={64} style={{ opacity: 0.1, marginBottom: '20px' }} />
+          <h3 style={{ color: '#fff', fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>
+            No Tags Found
+          </h3>
+          <p style={{ color: 'var(--text-dim)', fontSize: '14px', maxWidth: '300px', textAlign: 'center' }}>
+            {searchQuery ? `No tags matching "${searchQuery}".` : "You don't have any custom tags yet."}
+          </p>
+        </div>
+      ) : (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+          gap: '20px'
+        }}>
+          {filteredTags.map(tag => {
+            const isExpanded = expandedTag === tag.name;
+            const isEditingThis = editingId === tag.id;
+
+            return (
+              <div 
+                key={tag.id}
+                style={{
+                  background: 'var(--bg-card)',
+                  border: isExpanded ? `1px solid ${tag.color}88` : '1px solid var(--border-card)',
+                  borderRadius: '16px',
+                  padding: '20px',
+                  cursor: isEditingThis ? 'default' : 'pointer',
+                  transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                  boxShadow: isExpanded ? `0 10px 30px ${tag.color}22` : 'none',
+                  transform: isExpanded && !isEditingThis ? 'translateY(-4px)' : 'none',
+                  position: 'relative',
+                }}
+                onClick={() => !isEditingThis && setExpandedTag(isExpanded ? null : tag.name)}
+                onMouseOver={e => {
+                  if (!isExpanded && !isEditingThis) {
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }
+                }}
+                onMouseOut={e => {
+                  if (!isExpanded && !isEditingThis) {
+                    e.currentTarget.style.borderColor = 'var(--border-card)';
+                    e.currentTarget.style.transform = 'none';
+                  }
+                }}
+              >
+                
+                {/* Actions Top Right */}
+                {!isEditingThis && (
+                  <div style={{ position: 'absolute', top: '15px', right: '15px', display: 'flex', gap: '5px' }}>
+                    <button 
+                      onClick={(e) => startEditing(tag, e)}
+                      style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: '5px' }}
+                      title="Edit Tag"
+                    >
+                      ✎
+                    </button>
+                    <button 
+                      onClick={(e) => handleDeleteClick(tag.id, e)}
+                      style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: '5px' }}
+                      title="Delete Tag"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+
+                {isEditingThis ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }} onClick={e => e.stopPropagation()}>
+                    <div>
+                      <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-dim)', marginBottom: '5px', display: 'block' }}>TAG NAME</label>
+                      <input 
+                        type="text" 
+                        value={editName}
+                        onChange={e => setEditName(e.target.value)}
+                        autoFocus
+                        style={{
+                          width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)',
+                          color: '#fff', padding: '8px 12px', borderRadius: '8px', fontSize: '14px', outline: 'none'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-dim)', marginBottom: '5px', display: 'block' }}>COLOR</label>
+                      <input 
+                        type="color" 
+                        value={editColor}
+                        onChange={e => setEditColor(e.target.value)}
+                        style={{
+                          width: '100%', height: '40px', background: 'none', border: 'none', cursor: 'pointer'
+                        }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', gap: '10px', marginTop: '5px' }}>
+                      <button onClick={(e) => handleUpdate(tag.id, e)} style={{ flex: 1, background: '#3b82f6', color: '#fff', border: 'none', padding: '8px', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}>
+                        Save
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); setEditingId(null); }} style={{ flex: 1, background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', padding: '8px', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}>
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{
+                          width: '36px', height: '36px', borderRadius: '10px',
+                          background: `linear-gradient(135deg, ${tag.color}33 0%, ${tag.color}11 100%)`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          border: `1px solid ${tag.color}55`
+                        }}>
+                          <Tag size={16} color={tag.color} />
+                        </div>
+                        <span style={{ fontSize: '18px', fontWeight: '800', color: '#fff', maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {tag.name}
+                        </span>
+                      </div>
+                    </div>
+
+                    <span style={{
+                      fontSize: '11px', fontWeight: '800', color: '#fff',
+                      background: `rgba(255, 255, 255, 0.05)`, border: `1px solid rgba(255, 255, 255, 0.1)`,
+                      padding: '3px 8px', borderRadius: '20px', display: 'inline-block', marginBottom: '15px'
+                    }}>
+                      {tag.total_count} tagged item{tag.total_count !== 1 ? 's' : ''}
+                    </span>
+
+                    {/* Counts Breakdown pills */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', fontSize: '11px', color: 'var(--text-dim)' }}>
+                      {tag.movies?.length > 0 && <span style={{ background: 'rgba(255,255,255,0.03)', padding: '3px 8px', borderRadius: '8px' }}>🎬 {tag.movies.length}</span>}
+                      {tag.series?.length > 0 && <span style={{ background: 'rgba(255,255,255,0.03)', padding: '3px 8px', borderRadius: '8px' }}>📺 {tag.series.length}</span>}
+                      {tag.adult?.length > 0 && <span style={{ background: 'rgba(255,255,255,0.03)', padding: '3px 8px', borderRadius: '8px' }}>🔞 {tag.adult.length}</span>}
+                      {((tag.actors?.length || 0) + (tag.directors?.length || 0)) > 0 && (
+                        <span style={{ background: 'rgba(255,255,255,0.03)', padding: '3px 8px', borderRadius: '8px' }}>
+                          👥 {(tag.actors?.length || 0) + (tag.directors?.length || 0)}
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ marginTop: '12px', fontSize: '11px', color: tag.color, fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      {isExpanded ? 'Click to collapse details' : 'Click to show tagged items'}
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Expanded tag list */}
       {expandedTag && (
@@ -1514,16 +1652,20 @@ const TagsManagerView = ({ tags, searchQuery, navigateTo }) => {
           </h3>
 
           {(() => {
-            const tagObj = tags.find(t => t.name === expandedTag);
+            const tagObj = mergedTags.find(t => t.name === expandedTag);
             if (!tagObj) return null;
 
             const allTaggedItems = [
-              ...tagObj.movies.map(m => ({ ...m, category: 'Movie', folder: 'posters' })),
-              ...tagObj.series.map(s => ({ ...s, category: 'Series', folder: 'posters', isSeriesNode: true })),
-              ...tagObj.adult.map(a => ({ ...a, category: 'Adult', folder: 'posters' })),
-              ...tagObj.actors.map(ac => ({ ...ac, category: 'Actor', folder: 'persons' })),
-              ...tagObj.directors.map(d => ({ ...d, category: 'Director', folder: 'persons' }))
+              ...(tagObj.movies || []).map(m => ({ ...m, category: 'Movie', folder: 'posters' })),
+              ...(tagObj.series || []).map(s => ({ ...s, category: 'Series', folder: 'posters', isSeriesNode: true })),
+              ...(tagObj.adult || []).map(a => ({ ...a, category: 'Adult', folder: 'posters' })),
+              ...(tagObj.actors || []).map(ac => ({ ...ac, category: 'Actor', folder: 'persons' })),
+              ...(tagObj.directors || []).map(d => ({ ...d, category: 'Director', folder: 'persons' }))
             ];
+
+            if (allTaggedItems.length === 0) {
+                return <div style={{ color: 'var(--text-dim)' }}>No items associated with this tag yet.</div>;
+            }
 
             return (
               <div style={{
@@ -1567,15 +1709,8 @@ const TagsManagerView = ({ tags, searchQuery, navigateTo }) => {
                         </div>
                       )}
                       <span style={{
-                        position: 'absolute',
-                        bottom: '5px',
-                        left: '5px',
-                        fontSize: '9px',
-                        fontWeight: '800',
-                        color: '#fff',
-                        background: 'rgba(0,0,0,0.8)',
-                        padding: '2px 6px',
-                        borderRadius: '4px'
+                        position: 'absolute', bottom: '5px', left: '5px', fontSize: '9px', fontWeight: '800',
+                        color: '#fff', background: 'rgba(0,0,0,0.8)', padding: '2px 6px', borderRadius: '4px'
                       }}>
                         {item.category}
                       </span>
@@ -1590,6 +1725,7 @@ const TagsManagerView = ({ tags, searchQuery, navigateTo }) => {
           })()}
         </div>
       )}
+
     </div>
   );
 };

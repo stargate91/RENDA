@@ -58,6 +58,7 @@ class MetadataLocalization(Base):
     backdrop_path: Mapped[Optional[str]] = mapped_column(String)
     local_backdrop_path: Mapped[Optional[str]] = mapped_column(String)
     still_path: Mapped[Optional[str]] = mapped_column(String)
+    trailer_url: Mapped[Optional[str]] = mapped_column(String)
     local_still_path: Mapped[Optional[str]] = mapped_column(String)
     all_stills: Mapped[Optional[List[str]]] = mapped_column(JSON) # JSON list of paths
     local_all_stills: Mapped[Optional[List[str]]] = mapped_column(JSON)

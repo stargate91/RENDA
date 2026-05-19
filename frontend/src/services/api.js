@@ -160,4 +160,28 @@ export const api = {
     method: 'POST',
     body: JSON.stringify({ item_id: itemId })
   }),
+
+  // Global Tags API
+  getTags: () => fetchJson('/api/tags'),
+  
+  createTag: (tagData) => fetchJson('/api/tags', {
+    method: 'POST',
+    body: JSON.stringify(tagData)
+  }),
+
+  updateTag: (tagId, tagData) => fetchJson(`/api/tags/${tagId}`, {
+    method: 'PUT',
+    body: JSON.stringify(tagData)
+  }),
+
+  deleteTag: (tagId) => fetchJson(`/api/tags/${tagId}`, {
+    method: 'DELETE'
+  }),
+
+  // Trailer API (yt-dlp based)
+  requestTrailerDownload: (trailerKey) => fetchJson(`/api/trailer/${trailerKey}`, {
+    method: 'POST'
+  }),
+
+  getTrailerUrl: (trailerKey) => `${API_BASE}/api/trailer/${trailerKey}`,
 };

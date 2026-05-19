@@ -42,8 +42,13 @@ class MetadataEnrichmentService:
         self.db.commit()
 
     def _enrich_movie(self, match: MediaMatch, language: str):
-        details: TMDBMovie = self.resolver.get_details(match.tmdb_id, ItemType.MOVIE, language=language)
-        if not details: return
+        raw_data = self.resolver.api.get_details(match.tmdb_id, "movie", language=language)
+        if not raw_data: return
+        try:
+            details = TMDBMovie(**raw_data)
+        except Exception as e:
+            logger.error(f"Failed to parse TMDBMovie: {e}")
+            return
 
         # Update core match properties
         self._update_match_common(match, details)
@@ -67,10 +72,22 @@ class MetadataEnrichmentService:
         loc.genres = [g.name for g in details.genres]
         loc.original_title = details.original_title
         loc.original_language = details.original_language
+        
+        # Extract trailer
+        if details.videos and details.videos.results:
+            trailers = [v for v in details.videos.results if v.site == "YouTube" and v.type == "Trailer"]
+            if trailers:
+                official = next((v for v in trailers if v.official), None)
+                loc.trailer_url = official.key if official else trailers[0].key
 
     def _enrich_tv(self, match: MediaMatch, language: str):
-        series: TMDBSeries = self.resolver.get_details(match.tmdb_id, ItemType.SERIES, language=language)
-        if not series: return
+        raw_data = self.resolver.api.get_details(match.tmdb_id, "tv", language=language)
+        if not raw_data: return
+        try:
+            series = TMDBSeries(**raw_data)
+        except Exception as e:
+            logger.error(f"Failed to parse TMDBSeries: {e}")
+            return
 
         # Update series-level properties
         self._update_match_common(match, series)
@@ -95,6 +112,13 @@ class MetadataEnrichmentService:
         loc.genres = [g.name for g in series.genres]
         loc.origin_country = series.origin_country
         loc.original_language = series.original_language
+        
+        # Extract trailer
+        if series.videos and series.videos.results:
+            trailers = [v for v in series.videos.results if v.site == "YouTube" and v.type == "Trailer"]
+            if trailers:
+                official = next((v for v in trailers if v.official), None)
+                loc.trailer_url = official.key if official else trailers[0].key
 
         if match.season_number is not None:
             self._enrich_tv_hierarchy(match, series, language)
@@ -113,7 +137,14 @@ class MetadataEnrichmentService:
             titles, overviews, stills = [], [], []
             
             for enum in ep_nums:
-                ep: TMDBEpisode = self.resolver.get_episode_details(match.tmdb_id, match.season_number, enum, language=language)
+                raw_ep = self.resolver.api.get_episode_details(match.tmdb_id, match.season_number, enum, language=language)
+                ep = None
+                if raw_ep:
+                    try:
+                        ep = TMDBEpisode(**raw_data) if 'raw_data' in locals() else TMDBEpisode(**raw_ep)
+                    except Exception as e:
+                        logger.error(f"Failed to parse TMDBEpisode: {e}")
+
                 if ep:
                     titles.append(ep.name or f"Episode {enum}")
                     if ep.overview: overviews.append(ep.overview)

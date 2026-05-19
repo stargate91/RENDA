@@ -6,13 +6,92 @@ router = APIRouter()
 
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 import os
 import logging
 import platform
 import subprocess
+import threading
 from pathlib import Path
 logger = logging.getLogger(__name__)
+
+
+# ─── Trailer Endpoints ───────────────────────────────────────────────
+@router.get("/trailer/{trailer_key}")
+def get_trailer(trailer_key: str):
+    """
+    Stream a locally cached trailer. If not yet downloaded, returns 202 with status.
+    If ready, returns the video file for direct <video> playback.
+    """
+    from app.services.trailer_service import get_trailer_path, is_downloading
+
+    path = get_trailer_path(trailer_key)
+    if path:
+        return FileResponse(
+            path=str(path),
+            media_type="video/mp4",
+            filename=f"{trailer_key}.mp4"
+        )
+    
+    if is_downloading(trailer_key):
+        return JSONResponse(
+            status_code=202,
+            content={"status": "downloading", "message": "Trailer is being downloaded..."}
+        )
+    
+    return JSONResponse(
+        status_code=404,
+        content={"status": "not_found", "message": "Trailer not cached. Call POST /api/trailer/{key} to start download."}
+    )
+
+
+@router.get("/trailer/{trailer_key}/status")
+def check_trailer_status(trailer_key: str):
+    """
+    Lightweight status check for a trailer to see if it is cached, downloading, or not found.
+    Used by the frontend polling mechanism to avoid downloading the video file.
+    """
+    from app.services.trailer_service import get_trailer_path, is_downloading
+    
+    path = get_trailer_path(trailer_key)
+    if path:
+        return {"status": "ready"}
+    if is_downloading(trailer_key):
+        return {"status": "downloading"}
+    return {"status": "not_found"}
+
+
+@router.post("/trailer/{trailer_key}")
+def request_trailer_download(trailer_key: str):
+    """
+    Trigger an on-demand trailer download via yt-dlp.
+    Returns immediately; the download happens in a background thread.
+    """
+    from app.services.trailer_service import get_trailer_path, download_trailer, is_downloading
+
+    # Already downloaded?
+    path = get_trailer_path(trailer_key)
+    if path:
+        return {"status": "ready", "url": f"/api/trailer/{trailer_key}"}
+    
+    # Already downloading?
+    if is_downloading(trailer_key):
+        return JSONResponse(
+            status_code=202,
+            content={"status": "downloading", "message": "Download already in progress."}
+        )
+    
+    # Start background download
+    def _bg_download():
+        download_trailer(trailer_key)
+    
+    thread = threading.Thread(target=_bg_download, daemon=True)
+    thread.start()
+    
+    return JSONResponse(
+        status_code=202,
+        content={"status": "downloading", "message": "Trailer download started."}
+    )
 
 @router.get("/stats")
 def get_stats():
@@ -376,7 +455,7 @@ def get_library_item_detail(item_id: int):
     """Returns comprehensive detail data for a single library item (movie detail page)."""
     db = Session()
     try:
-        from app.db.models import MediaItem, MediaMatch, UserSetting, Person, MediaPersonLink, PersonLocalization
+        from app.db.models import MediaItem, MediaMatch, UserSetting, Person, MediaPersonLink, PersonLocalization, TMDBCache
 
         item = db.query(MediaItem).options(
             joinedload(MediaItem.matches).joinedload(MediaMatch.localizations),
@@ -442,6 +521,9 @@ def get_library_item_detail(item_id: int):
             "source": item.source.value if item.source else None,
             "edition": item.edition.value if item.edition else None,
         }
+        
+        # Extract Trailer Key from Localization
+        trailer_key = loc.trailer_url if loc else None
 
         result = {
             "id": item.id,
@@ -478,11 +560,13 @@ def get_library_item_detail(item_id: int):
             "is_adult": active_match.is_adult,
             "is_favorite": item.is_favorite or False,
             "user_rating": item.user_rating,
-            "custom_tags": item.custom_tags or [],
+            "custom_tags": [t.name for t in item.tags] if item.tags else [],
+            "tags": [{"id": t.id, "name": t.name, "color": t.color} for t in item.tags],
             "watch_count": getattr(item, "watch_count", 0),
             "is_watched": getattr(item, "is_watched", False),
             "resume_position": getattr(item, "resume_position", 0),
             "last_watched_at": getattr(item, "last_watched_at").isoformat() if getattr(item, "last_watched_at", None) else None,
+            "trailer_key": trailer_key,
         }
 
         return JSONResponse(content=result, media_type="application/json; charset=utf-8")
@@ -608,7 +692,8 @@ def get_library_series_detail(series_tmdb_id: int):
             "seasons": {},
             "is_favorite": base_item.is_favorite or False,
             "user_rating": base_item.user_rating,
-            "custom_tags": base_item.custom_tags or [],
+            "custom_tags": [t.name for t in base_item.tags] if base_item.tags else [],
+            "trailer_key": base_loc.trailer_url if base_loc else None,
         }
 
         series_cast_map = {}
@@ -1322,14 +1407,32 @@ def update_item_status(item_id: int, payload: dict):
             rating = payload["user_rating"]
             item.user_rating = int(rating) if rating is not None else None
         if "custom_tags" in payload:
-            item.custom_tags = payload["custom_tags"]
-
+            from app.db.models.media import Tag
+            new_tag_names = [str(t).strip() for t in payload["custom_tags"] if str(t).strip()]
+            
+            # Create missing tags
+            for name in new_tag_names:
+                existing = db.query(Tag).filter(Tag.name == name).first()
+                if not existing:
+                    new_tag = Tag(name=name)
+                    db.add(new_tag)
+            db.commit()
+            
+            # Fetch tags and associate
+            if new_tag_names:
+                actual_tags = db.query(Tag).filter(Tag.name.in_(new_tag_names)).all()
+                item.tags = actual_tags
+            else:
+                item.tags = []
+            # Legacy fallback removed
+                
         db.commit()
         return JSONResponse(content={
             "id": item.id,
             "is_favorite": item.is_favorite,
             "user_rating": item.user_rating,
-            "custom_tags": item.custom_tags or []
+            "custom_tags": [t.name for t in item.tags] if item.tags else [],
+            "tags": [{"id": t.id, "name": t.name, "color": t.color} for t in item.tags]
         })
     except Exception as e:
         db.rollback()

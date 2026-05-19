@@ -111,6 +111,14 @@ class MetadataEnricher:
         loc.original_title = details.get("original_title")
         loc.original_language = details.get("original_language")
 
+        # 3. Trailer
+        videos = details.get("videos", {}).get("results", [])
+        if videos:
+            trailers = [v for v in videos if v.get("site") == "YouTube" and v.get("type") == "Trailer"]
+            if trailers:
+                official = next((v for v in trailers if v.get("official")), None)
+                loc.trailer_url = official.get("key") if official else trailers[0].get("key")
+
     def _enrich_tv(self, match: MediaMatch, language: str):
         """Sorozatok és epizódok gazdagítása (Sorozat -> Szezon -> Epizód lánc)."""
         # A. SOROZAT SZINT
@@ -137,6 +145,14 @@ class MetadataEnricher:
         loc.genres = [g["name"] for g in series_details.get("genres", [])]
         loc.origin_country = series_details.get("origin_country")
         loc.original_language = series_details.get("original_language")
+
+        # Trailer
+        videos = series_details.get("videos", {}).get("results", [])
+        if videos:
+            trailers = [v for v in videos if v.get("site") == "YouTube" and v.get("type") == "Trailer"]
+            if trailers:
+                official = next((v for v in trailers if v.get("official")), None)
+                loc.trailer_url = official.get("key") if official else trailers[0].get("key")
 
         # B. SZEZON SZINT (Ha van szezon szám)
         if match.season_number is not None:

@@ -29,6 +29,15 @@ class TMDBCredits(BaseModel):
     cast: List[TMDBPerson] = []
     crew: List[TMDBPerson] = []
 
+class TMDBVideo(BaseModel):
+    key: str
+    site: str
+    type: str
+    official: bool = False
+
+class TMDBVideosResponse(BaseModel):
+    results: List[TMDBVideo] = []
+
 class TMDBBase(BaseModel):
     id: int
     overview: Optional[str] = None
@@ -42,6 +51,7 @@ class TMDBBase(BaseModel):
     original_language: Optional[str] = None
     origin_country: List[str] = []
     credits: Optional[TMDBCredits] = None
+    videos: Optional[TMDBVideosResponse] = None
 
     class Config:
         populate_by_name = True

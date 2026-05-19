@@ -98,7 +98,7 @@ class MediaLibraryService:
                 "episode_title": loc.episode_title if loc else None,
                 "is_favorite": item.is_favorite or False,
                 "user_rating": item.user_rating,
-                "custom_tags": item.custom_tags or [],
+                "custom_tags": [t.name for t in item.tags] if item.tags else [],
                 "watch_count": getattr(item, "watch_count", 0),
                 "is_watched": getattr(item, "is_watched", False),
                 "resume_position": getattr(item, "resume_position", 0),

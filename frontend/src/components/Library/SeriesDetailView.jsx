@@ -1,10 +1,39 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Monitor, Play, Clapperboard, Users, User, ChevronDown, ChevronUp, FolderOpen, ExternalLink, Star, Heart, RefreshCcw, Tag, Check, Plus, X } from 'lucide-react';
+import { ArrowLeft, Monitor, Play, Clapperboard, Users, User, ChevronDown, ChevronUp, FolderOpen, ExternalLink, Star, Heart, RefreshCcw, Tag, Check, Plus, X, Film } from 'lucide-react';
 import { api, API_BASE } from '../../services/api';
 
 const CustomTagsList = ({ tags, onAddTag, onRemoveTag }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [newTag, setNewTag] = useState('');
+  const [globalTags, setGlobalTags] = useState([]);
+  const containerRef = React.useRef(null);
+
+  useEffect(() => {
+    if (isEditing) {
+      api.getTags().then(res => setGlobalTags(res || [])).catch(console.error);
+    }
+  }, [isEditing]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsEditing(false);
+      }
+    };
+    if (isEditing) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isEditing]);
+
+  const handleSelectTag = (tagName) => {
+    if (!tags.includes(tagName)) {
+      onAddTag(tagName);
+    }
+    setIsEditing(false);
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -16,122 +45,202 @@ const CustomTagsList = ({ tags, onAddTag, onRemoveTag }) => {
     setIsEditing(false);
   };
 
-  return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', marginTop: '15px' }}>
-      {tags.map((tag) => (
-        <span
-          key={tag}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            fontSize: '12px',
-            fontWeight: '600',
-            color: '#fff',
-            background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(59, 130, 246, 0.2) 100%)',
-            border: '1px solid rgba(139, 92, 246, 0.35)',
-            padding: '4px 10px',
-            borderRadius: '12px',
-            transition: 'all 0.2s ease',
-            boxShadow: '0 4px 10px rgba(0, 0, 0, 0.1)',
-          }}
-        >
-          <Tag size={12} color="#a78bfa" />
-          {tag}
-          <button
-            onClick={() => onRemoveTag(tag)}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'rgba(255, 255, 255, 0.4)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: 0,
-              marginLeft: '2px',
-              transition: 'color 0.15s ease',
-            }}
-            onMouseOver={e => e.currentTarget.style.color = '#ef4444'}
-            onMouseOut={e => e.currentTarget.style.color = 'rgba(255, 255, 255, 0.4)'}
-          >
-            <X size={12} />
-          </button>
-        </span>
-      ))}
+  const availableTags = globalTags.filter(t => !tags.includes(t.name));
+  const filteredTags = newTag.trim() 
+    ? availableTags.filter(t => t.name.toLowerCase().includes(newTag.toLowerCase()))
+    : availableTags;
 
-      {isEditing ? (
-        <form onSubmit={handleSubmit} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          <input
-            type="text"
-            placeholder="Add tag..."
-            value={newTag}
-            onChange={(e) => setNewTag(e.target.value)}
-            autoFocus
-            onBlur={() => setTimeout(() => setIsEditing(false), 200)}
-            onKeyDown={(e) => { if (e.key === 'Escape') setIsEditing(false); }}
+  return (
+    <div ref={containerRef} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', marginTop: '15px', position: 'relative' }}>
+      {tags.map((tag) => {
+        const globalTag = globalTags.find(t => t.name === tag);
+        const tagColor = globalTag ? globalTag.color : '#a78bfa';
+        
+        return (
+          <span
+            key={tag}
             style={{
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              borderRadius: '10px',
-              padding: '4px 8px',
-              color: '#fff',
-              fontSize: '12px',
-              outline: 'none',
-              width: '100px',
-              transition: 'all 0.2s',
-            }}
-          />
-          <button
-            type="submit"
-            style={{
-              background: 'rgba(59, 130, 246, 0.2)',
-              border: '1px solid rgba(59, 130, 246, 0.4)',
-              color: '#3b82f6',
-              borderRadius: '6px',
-              width: '24px',
-              height: '24px',
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
+              gap: '6px',
+              fontSize: '12px',
+              fontWeight: '600',
+              color: '#fff',
+              background: `linear-gradient(135deg, ${tagColor}33 0%, ${tagColor}11 100%)`,
+              border: `1px solid ${tagColor}55`,
+              padding: '4px 10px',
+              borderRadius: '12px',
+              transition: 'all 0.2s ease',
+              boxShadow: '0 4px 10px rgba(0, 0, 0, 0.1)',
             }}
           >
-            <Check size={12} />
-          </button>
-        </form>
-      ) : (
+            <Tag size={12} color={tagColor} />
+            {tag}
+            <button
+              onClick={() => onRemoveTag(tag)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'rgba(255, 255, 255, 0.4)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 0,
+                marginLeft: '2px',
+                transition: 'color 0.15s ease',
+              }}
+              onMouseOver={e => e.currentTarget.style.color = '#ef4444'}
+              onMouseOut={e => e.currentTarget.style.color = 'rgba(255, 255, 255, 0.4)'}
+            >
+              <X size={12} />
+            </button>
+          </span>
+        );
+      })}
+
+      <div style={{ position: 'relative' }}>
         <button
-          onClick={() => setIsEditing(true)}
+          onClick={() => setIsEditing(!isEditing)}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
             gap: '4px',
             fontSize: '11px',
             fontWeight: '700',
-            color: 'rgba(255, 255, 255, 0.6)',
-            background: 'rgba(255, 255, 255, 0.03)',
-            border: '1px dashed rgba(255, 255, 255, 0.2)',
+            color: isEditing ? '#fff' : 'rgba(255, 255, 255, 0.6)',
+            background: isEditing ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.03)',
+            border: isEditing ? '1px solid rgba(255, 255, 255, 0.4)' : '1px dashed rgba(255, 255, 255, 0.2)',
             padding: '4px 10px',
             borderRadius: '12px',
             cursor: 'pointer',
             transition: 'all 0.2s ease',
           }}
           onMouseOver={e => {
-            e.currentTarget.style.color = '#fff';
-            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.4)';
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+            if (!isEditing) {
+              e.currentTarget.style.color = '#fff';
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.4)';
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+            }
           }}
           onMouseOut={e => {
-            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.6)';
-            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+            if (!isEditing) {
+              e.currentTarget.style.color = 'rgba(255, 255, 255, 0.6)';
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+            }
           }}
         >
-          <Plus size={12} />
-          Add Tag
+          {isEditing ? <X size={12} /> : <Plus size={12} />}
+          {isEditing ? 'Cancel' : 'Add Tag'}
         </button>
-      )}
+
+        {isEditing && (
+          <div style={{
+            position: 'absolute',
+            top: '30px',
+            left: 0,
+            zIndex: 1000,
+            width: '240px',
+            background: '#18181b',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '12px',
+            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.5)',
+            padding: '10px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px'
+          }}>
+            <form onSubmit={handleSubmit} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <input
+                type="text"
+                placeholder="Search or create tag..."
+                value={newTag}
+                onChange={(e) => setNewTag(e.target.value)}
+                autoFocus
+                style={{
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  borderRadius: '8px',
+                  padding: '6px 10px',
+                  color: '#fff',
+                  fontSize: '12px',
+                  outline: 'none',
+                  flex: 1,
+                  transition: 'all 0.2s',
+                }}
+              />
+              <button
+                type="submit"
+                style={{
+                  background: 'rgba(59, 130, 246, 0.2)',
+                  border: '1px solid rgba(59, 130, 246, 0.4)',
+                  color: '#3b82f6',
+                  borderRadius: '8px',
+                  width: '28px',
+                  height: '28px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                <Check size={14} />
+              </button>
+            </form>
+
+            <div style={{ 
+              maxHeight: '160px', 
+              overflowY: 'auto', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '4px',
+              paddingRight: '2px'
+            }}>
+              <div style={{ fontSize: '10px', fontWeight: '800', color: 'rgba(255, 255, 255, 0.4)', padding: '4px 2px 2px 2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Available Tags
+              </div>
+              {filteredTags.length > 0 ? (
+                filteredTags.map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => handleSelectTag(t.name)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      width: '100%',
+                      background: 'none',
+                      border: 'none',
+                      color: '#fff',
+                      padding: '6px 8px',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseOver={e => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                    }}
+                    onMouseOut={e => {
+                      e.currentTarget.style.background = 'none';
+                    }}
+                  >
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: t.color || '#3b82f6' }} />
+                    {t.name}
+                  </button>
+                ))
+              ) : (
+                <div style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.4)', padding: '10px 4px', textAlign: 'center', fontStyle: 'italic' }}>
+                  {newTag.trim() ? 'Press enter to create new tag' : 'No pre-created tags available'}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
@@ -142,6 +251,12 @@ const SeriesDetailView = ({ seriesTmdbId, onBack, onPersonClick }) => {
   const [activeSeasonNum, setActiveSeasonNum] = useState(1);
   const [expandedEpisodeId, setExpandedEpisodeId] = useState(null);
   const [hoverRating, setHoverRating] = useState(0);
+
+  const handlePlayTrailer = () => {
+    if (data?.trailer_key) {
+      window.open(`https://www.youtube.com/watch?v=${data.trailer_key}`, '_blank');
+    }
+  };
 
   const handleToggleFavorite = async () => {
     if (!data) return;
@@ -262,8 +377,14 @@ const SeriesDetailView = ({ seriesTmdbId, onBack, onPersonClick }) => {
         </button>
 
         {backdropUrl && (
-          <img className="detail-hero-backdrop" src={backdropUrl} alt="" />
+          <img 
+            className="detail-hero-backdrop" 
+            src={backdropUrl} 
+            alt="" 
+          />
         )}
+        
+
         <div className="detail-hero-gradient" />
 
         <div className="detail-hero-content">
@@ -280,43 +401,82 @@ const SeriesDetailView = ({ seriesTmdbId, onBack, onPersonClick }) => {
           <div className="detail-info">
             <h1 className="detail-title">{data.title}</h1>
 
-            {/* Premium Continue Watching Banner */}
-            {continueEpisode && (
-              <button 
-                onClick={() => handlePlayMedia(continueEpisode.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  margin: '15px 0',
-                  padding: '12px 24px',
-                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(139, 92, 246, 0.2))',
-                  border: '1px solid rgba(59, 130, 246, 0.5)',
-                  borderRadius: '30px',
-                  color: '#fff',
-                  fontSize: '15px',
-                  fontWeight: '800',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  boxShadow: '0 4px 15px rgba(59, 130, 246, 0.2)',
-                  backdropFilter: 'blur(10px)',
-                  letterSpacing: '0.5px'
-                }}
-                onMouseOver={e => {
-                  e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
-                  e.currentTarget.style.boxShadow = '0 8px 25px rgba(59, 130, 246, 0.4)';
-                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(139, 92, 246, 0.3))';
-                }}
-                onMouseOut={e => {
-                  e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                  e.currentTarget.style.boxShadow = '0 4px 15px rgba(59, 130, 246, 0.2)';
-                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(139, 92, 246, 0.2))';
-                }}
-              >
-                <Play size={18} fill="currentColor" />
-                Continue: Episode {continueEpisode.episode_number}
-              </button>
-            )}
+            {/* Premium Continue Watching Banner & Trailer */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
+              {continueEpisode && (
+                <button 
+                  onClick={() => handlePlayMedia(continueEpisode.id)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    margin: '15px 0',
+                    padding: '12px 24px',
+                    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(139, 92, 246, 0.2))',
+                    border: '1px solid rgba(59, 130, 246, 0.5)',
+                    borderRadius: '30px',
+                    color: '#fff',
+                    fontSize: '15px',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    boxShadow: '0 4px 15px rgba(59, 130, 246, 0.2)',
+                    backdropFilter: 'blur(10px)',
+                    letterSpacing: '0.5px'
+                  }}
+                  onMouseOver={e => {
+                    e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
+                    e.currentTarget.style.boxShadow = '0 8px 25px rgba(59, 130, 246, 0.4)';
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(139, 92, 246, 0.3))';
+                  }}
+                  onMouseOut={e => {
+                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(59, 130, 246, 0.2)';
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(139, 92, 246, 0.2))';
+                  }}
+                >
+                  <Play size={18} fill="currentColor" />
+                  Continue: Episode {continueEpisode.episode_number}
+                </button>
+              )}
+              
+              {data.trailer_key && (
+                <button 
+                  onClick={handlePlayTrailer}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    margin: continueEpisode ? '15px 0 15px 15px' : '15px 0',
+                    padding: '12px 24px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    borderRadius: '30px',
+                    color: '#fff',
+                    fontSize: '15px',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '1px',
+                    backdropFilter: 'blur(12px)',
+                  }}
+                  onMouseOver={e => {
+                    e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                  }}
+                  onMouseOut={e => {
+                    e.currentTarget.style.transform = 'none';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                  }}
+                >
+                  <Film size={16} />
+                  Play Trailer
+                </button>
+              )}
+            </div>
 
             {/* Premium Glassmorphic User Interaction Bar */}
             <div style={{ 

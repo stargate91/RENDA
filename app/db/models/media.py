@@ -1,9 +1,24 @@
 from datetime import datetime
 from typing import List, Optional
-from sqlalchemy import String, Integer, Float, DateTime, Enum as SQLEnum, JSON, Boolean, BigInteger, ForeignKey
+from sqlalchemy import String, Integer, Float, DateTime, Enum as SQLEnum, JSON, Boolean, BigInteger, ForeignKey, Table, Column
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 from .enums import ItemType, ItemStatus, MovieEdition, MediaSource, MediaAudioType, PartType, PartStyle, ExtraCategory, ExtraSubtype
+
+media_item_tags = Table(
+    "media_item_tags",
+    Base.metadata,
+    Column("media_item_id", Integer, ForeignKey("media_items.id", ondelete="CASCADE"), primary_key=True),
+    Column("tag_id", Integer, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True)
+)
+
+class Tag(Base):
+    """Global user-defined tags."""
+    __tablename__ = "tags"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String, unique=True, index=True)
+    color: Mapped[Optional[str]] = mapped_column(String, default="#3b82f6")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 class MediaItem(Base):
     """Level 1: The physical file on the disk."""
@@ -43,7 +58,7 @@ class MediaItem(Base):
     category: Mapped[str] = mapped_column(String, default="video", index=True); created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     is_favorite: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", index=True)
     user_rating: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    custom_tags: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    tags: Mapped[List["Tag"]] = relationship("Tag", secondary=media_item_tags, backref="media_items")
     last_watched_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, index=True)
     resume_position: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=0)
     watch_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0", index=True)

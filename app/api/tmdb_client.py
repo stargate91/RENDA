@@ -166,7 +166,7 @@ class TMDBClient:
         params = {
             "api_key": self._api_key,
             "language": language,
-            "append_to_response": "credits,external_ids,images,translations"
+            "append_to_response": "credits,external_ids,images,translations,videos"
         }
         return self._call_api(endpoint, params)
 
@@ -178,7 +178,7 @@ class TMDBClient:
         params = {
             "api_key": self._api_key,
             "language": language,
-            "append_to_response": "credits,external_ids,images,translations"
+            "append_to_response": "credits,external_ids,images,translations,videos"
         }
         return self._call_api(endpoint, params)
 
@@ -190,7 +190,7 @@ class TMDBClient:
         params = {
             "api_key": self._api_key,
             "language": language,
-            "append_to_response": "external_ids"
+            "append_to_response": "external_ids,videos"
         }
         return self._call_api(endpoint, params)
 

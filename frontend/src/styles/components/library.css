@@ -20,6 +20,11 @@
   to { opacity: 1; transform: scale(1); }
 }
 
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* ----- Hero Section ----- */
 .detail-hero {
   position: relative;
@@ -37,11 +42,12 @@
   height: 100%;
   object-fit: cover;
   filter: brightness(0.35) saturate(1.2);
-  transition: transform 8s ease;
+  animation: heroZoomIn 20s ease-out forwards;
 }
 
-.detail-hero:hover .detail-hero-backdrop {
-  transform: scale(1.03);
+@keyframes heroZoomIn {
+  from { transform: scale(1); }
+  to { transform: scale(1.08); }
 }
 
 .detail-hero-gradient {
