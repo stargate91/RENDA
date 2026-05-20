@@ -158,6 +158,7 @@ const SeriesDetailView = ({ seriesTmdbId, onBack, onPersonClick }) => {
       {/* ===== HERO ===== */}
       <SeriesDetailHero
         data={data}
+        itemId={seriesTmdbId}
         continueEpisode={continueEpisode}
         onBack={onBack}
         onPlayMedia={handlePlayMedia}

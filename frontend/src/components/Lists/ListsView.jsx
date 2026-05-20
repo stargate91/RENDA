@@ -242,7 +242,7 @@ const ListsView = ({ T }) => {
                 <div className="active-list-stats">
                   <span>Created {new Date(activeListDetails.created_at).toLocaleDateString()}</span>
                   <span className="divider">•</span>
-                  <span>{activeListDetails.items?.length || 0} movies</span>
+                  <span>{activeListDetails.items?.length || 0} items</span>
                 </div>
               </div>
 
@@ -280,6 +280,9 @@ const ListsView = ({ T }) => {
                           
                           {/* Floating badges */}
                           <div className="movie-card-badge-row">
+                            {item.media_type === 'tv' && (
+                              <span className="card-badge tv-badge">Series</span>
+                            )}
                             {isVirtual ? (
                               <span className="card-badge virtual-badge">Virtual</span>
                             ) : (
@@ -316,7 +319,7 @@ const ListsView = ({ T }) => {
                 <div className="list-movies-empty">
                   <FolderOpen size={48} />
                   <h3>This list is empty</h3>
-                  <p>Browse films in the Library or Discovery, click on a movie detail page, and toggle the Lists button to add movies here!</p>
+                  <p>Browse titles in the Library or Discovery, click on a detail page, and toggle the Lists button to add them here!</p>
                 </div>
               )}
             </div>
