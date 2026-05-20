@@ -25,8 +25,8 @@ class DecisionEngine:
         if fn.get('season') == 10 and fn.get('episode') == 80:
             fn_type = 'movie'
 
-        raw_fn_lower = filename.lower()
-        raw_fd_lower = folder_name.lower()
+        raw_fn_lower = (filename or "").lower()
+        raw_fd_lower = (folder_name or "").lower()
         
         # Check for strong series indicators
         is_forced_series = False

@@ -1,8 +1,8 @@
-from app.db.base import SessionLocal
+from app.db.base import Session
 from app.resolver.resolver import Resolver
 from app.db.models import MediaItem, ItemType
 
-db = SessionLocal()
+db = Session()
 resolver = Resolver(db)
 
 title = "Journey to the Center of the Earth Mini-Series"

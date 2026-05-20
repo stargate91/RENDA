@@ -45,7 +45,7 @@ def test_ffprobe_internal_title_parsing(enricher):
         assert item.internal_title == "Braveheart.1995.DIRECTORS.CUT"
         assert item.it_title == "Braveheart"
         assert item.it_year == 1995
-        assert item.resolution == "1920x1080"
+        assert item.resolution == "1080p"
 
 def test_triple_parsing_from_folder_only(enricher):
     """Teszt: Ha a fájlnév semmitmondó, a mappanév menti meg a helyzetet."""

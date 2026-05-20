@@ -1,7 +1,7 @@
 import os
 import sys
 from sqlalchemy.orm import Session
-from app.db.base import SessionLocal, engine, Base
+from app.db.base import Session, engine, Base
 from app.db.models import UserSetting, MediaItem, MediaMatch, ItemType, ItemStatus, MetadataLocalization, Person, MediaPersonLink
 from app.scanner.metadata_enricher import MetadataEnricher
 from app.resolver.resolver import Resolver
@@ -12,9 +12,11 @@ if sys.platform == "win32":
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 def setup_db():
-    if os.path.exists("renda.db"): os.remove("renda.db")
     Base.metadata.create_all(bind=engine)
-    db = SessionLocal()
+    db = Session()
+    for table in reversed(Base.metadata.sorted_tables):
+        db.execute(table.delete())
+    db.commit()
     db.add(UserSetting(key="tmdb_api_key", value="f1065eab900ebbda0e3d09f948d581e0"))
     db.add(UserSetting(key="omdb_api_key", value="1da6f98c"))
     db.commit()

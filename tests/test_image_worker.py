@@ -8,12 +8,19 @@ from pathlib import Path
 if sys.platform == "win32":
     import io; sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
+from unittest.mock import patch
 from app.db.models import Base, MediaMatch, MetadataLocalization, Person, ImageStatus, ItemType
 from app.scanner.image_worker import ImageWorker
 
 def run_image_test():
     # 1. Ideiglenes adatbázis létrehozása a teszthez
-    engine = create_engine("sqlite:///:memory:")
+    test_db_path = "data/test_renda.db"
+    if os.path.exists(test_db_path): 
+        try:
+            os.remove(test_db_path)
+        except:
+            pass
+    engine = create_engine(f"sqlite:///{test_db_path}")
     Base.metadata.create_all(engine)
     Session = sessionmaker(bind=engine)
     db = Session()
@@ -27,7 +34,7 @@ def run_image_test():
     db.flush()
     loc1 = MetadataLocalization(
         match_id=m1.id, 
-        language="en", 
+        target_language="en", 
         title="The Matrix",
         poster_path="/yEFCKWpWTH3r5ZeJAwTjxfGhdMd.jpg",
         backdrop_path="/lh50BpiR9pt9nnb6uY6G9YSafeM.jpg"
@@ -40,7 +47,7 @@ def run_image_test():
     db.flush()
     loc2 = MetadataLocalization(
         match_id=m2.id,
-        language="en",
+        target_language="en",
         title="When You're Lost in the Darkness",
         still_path="/aRquEWm8wWF1dfa9uZ1TXLvVrKD.jpg"
     )
@@ -58,13 +65,11 @@ def run_image_test():
     # 3. ImageWorker indítása
     storage = Path("./test_media").absolute()
     print(f"Letöltés indítása ide: {storage}")
-    worker = ImageWorker(db, str(storage))
-    
-    print("\nMédiumok feldolgozása...")
-    worker.process_pending_media()
-    
-    print("Személyek feldolgozása...")
-    worker.process_pending_persons()
+    with patch("app.db.base.Session", Session):
+        worker = ImageWorker(db, str(storage))
+        
+        print("\nFeldolgozás indítása...")
+        worker.process_all()
 
     # 4. Eredmények ellenőrzése
     print("\n=== EREDMÉNYEK ===\n")
@@ -89,6 +94,13 @@ def run_image_test():
             print(f"OK: Fájl létezik: {Path(path).name}")
         else:
             print(f"HIBA: Fájl nem található: {path}")
+
+    db.close()
+    engine.dispose()
+    try:
+        os.remove(test_db_path)
+    except:
+        pass
 
 if __name__ == "__main__":
     run_image_test()

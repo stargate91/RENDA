@@ -2,7 +2,7 @@ import os
 import sys
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-from app.db.base import SessionLocal, engine, Base
+from app.db.base import Session, engine, Base
 from app.db.models import UserSetting, MediaItem, ItemType, ItemStatus
 from app.resolver.resolver import Resolver
 from app.scanner.analyzer import Analyzer
@@ -41,11 +41,11 @@ def reconstruct_title(guess, raw):
     return res
 
 def run_final_boss_tests():
-    if os.path.exists("renda.db"):
-        os.remove("renda.db")
-    
     Base.metadata.create_all(bind=engine)
-    db = SessionLocal()
+    db = Session()
+    for table in reversed(Base.metadata.sorted_tables):
+        db.execute(table.delete())
+    db.commit()
     setup_api_key(db, "f1065eab900ebbda0e3d09f948d581e0")
     
     resolver = Resolver(db)

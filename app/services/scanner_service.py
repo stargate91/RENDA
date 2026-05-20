@@ -101,8 +101,8 @@ class ScannerService:
             from app.db.base import Session
             db = Session()
             try:
-                min_size = config_manager.get_int("min_video_size_mb", 500)
-                scanner = ScannerManager(db, min_video_size_mb=min_size)
+                min_duration = config_manager.get_int("min_video_duration_minutes", 12)
+                scanner = ScannerManager(db, min_video_duration_minutes=min_duration)
                 scanner.scan_and_save(paths)
                 logger.info("Background scan task completed successfully.")
             except Exception as e:

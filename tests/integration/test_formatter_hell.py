@@ -84,11 +84,11 @@ def run_hell_test():
     from app.db.models import PartStyle, PartType
     item_roman = MockItem(part=14, part_style=PartStyle.ROMAN, part_type=PartType.PART)
     ctx_roman = f.build_movie_context(item_roman, match, loc)
-    print(f"  Part 14 (ROMAN): {ctx_roman['part_type']} {ctx_roman['part']}")
+    print(f"  Part 14 (ROMAN): {ctx_roman['PartType']} {ctx_roman['Part']}")
     
     item_alpha = MockItem(part=27, part_style=PartStyle.ALPHA, part_type=PartType.PART)
     ctx_alpha = f.build_movie_context(item_alpha, match, loc)
-    print(f"  Part 27 (ALPHA): {ctx_alpha['part_type']} {ctx_alpha['part']}")
+    print(f"  Part 27 (ALPHA): {ctx_alpha['PartType']} {ctx_alpha['Part']}")
 
     # 3. TV Hierarchia - A futó sorozat csapdája
     print("\n3. Futó sorozat (Nincs last_air_year):")
@@ -105,8 +105,8 @@ def run_hell_test():
     print("\n4. Extrák szűrője (Redundáns Metadata):")
     @dataclass
     class MockExtra:
-        category: str = "Metadata"
-        sub_category: str = "nfo"
+        category: Any = field(default_factory=lambda: MockEnum("metadata"))
+        subtype: Any = field(default_factory=lambda: MockEnum("nfo"))
         extension: str = ".nfo"
         language: str = ""
 

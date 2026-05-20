@@ -52,7 +52,7 @@ const DEFAULT_SETTINGS = {
   default_scan_dir: '',
   primary_metadata_language: 'en',
   fallback_metadata_language: 'none',
-  min_video_size_mb: 300,
+  min_video_duration_minutes: 12,
   naming_filename_casing: 'title',
   naming_word_separator: 'space',
   naming_movie_template: '{{Title}} ({{Year}}) {{Resolution}}',

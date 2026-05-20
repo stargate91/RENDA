@@ -124,15 +124,15 @@ const GeneralSettings = ({ settings, setSettings, T, availableLocales }) => {
 
       <div className="form-group split">
         <div className="form-group-info">
-          <label>Minimum Video Size (MB)</label>
-          <div className="input-hint">Files smaller than this will be ignored during the scan (filters out samples/extras).</div>
+          <label>Minimum Video Duration (minutes)</label>
+          <div className="input-hint">Videos shorter than this will be categorized as extras/samples (trailers, deleted scenes, etc.).</div>
         </div>
         <div className="form-group-input">
           <input
             type="number"
             className="form-input"
-            value={settings.min_video_size_mb || 300}
-            onChange={e => setSettings({ ...settings, min_video_size_mb: parseInt(e.target.value) || 0 })}
+            value={settings.min_video_duration_minutes !== undefined ? settings.min_video_duration_minutes : 12}
+            onChange={e => setSettings({ ...settings, min_video_duration_minutes: parseInt(e.target.value) || 0 })}
           />
         </div>
       </div>

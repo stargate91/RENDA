@@ -5,7 +5,9 @@ from app.db.models import MediaItem, ItemStatus, MediaMatch
 
 @pytest.fixture
 def mock_db():
-    return MagicMock()
+    db = MagicMock()
+    db.query.return_value.filter.return_value.first.return_value = None
+    return db
 
 @pytest.fixture
 def resolver(mock_db):
@@ -32,7 +34,7 @@ def test_resolve_single_match(resolver):
 
 def test_resolve_multiple_matches(resolver):
     """Teszt: Ha több különböző találat érkezik."""
-    item = MediaItem(id=1, fn_title="Avatar")
+    item = MediaItem(id=1, fn_title="Avatar Collection")
     
     # Két különböző Avatar film
     mock_results = [
@@ -71,7 +73,7 @@ def test_resolve_by_imdb_id(resolver):
 
 def test_resolve_uncertain_match(resolver):
     """Teszt: Ha 1 találat van, de az évszám nem stimmel."""
-    item = MediaItem(id=1, fn_title="Avatar", fn_year=2000) # Elírt évszám
+    item = MediaItem(id=1, fn_title="Avatar Movie", fn_year=2000) # Elírt évszám
     
     # TMDB 2009-es Avatart ad vissza
     mock_results = [{"id": 19995, "title": "Avatar", "release_date": "2009-12-18"}]

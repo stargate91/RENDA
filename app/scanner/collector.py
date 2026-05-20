@@ -14,16 +14,17 @@ class Collector:
     AUDIO_EXTS = {'.ac3', '.dts', '.flac', '.mp3', '.aac', '.m4a'}
     META_EXTS = {'.nfo', '.xml', '.json', '.txt'}
 
-    def __init__(self, min_video_size_mb: int = 500):
-        self.min_video_size = min_video_size_mb * 1024 * 1024 # Convert MB to Bytes
+    def __init__(self, min_video_size_mb: float = 50.0):
+        # We now use a hybrid fast-track threshold (defaults to 50MB) to instantly filter out tiny video clips
+        self.fast_track_size = min_video_size_mb * 1024 * 1024
 
     def collect(self, paths: List[str]) -> Dict[str, List[Path]]:
         """
         Recursively traverses directories and groups files into categories.
         """
         results = {
-            "potential_media": [], # Primary video files exceeding the size threshold
-            "potential_extras": [], # Smaller videos, images, subtitles, etc.
+            "potential_media": [], # Primary video files exceeding the 50MB threshold
+            "potential_extras": [], # Smaller videos (<50MB), images, subtitles, etc.
             "ignored": []
         }
 
@@ -35,10 +36,10 @@ class Collector:
 
             ext = file_path.suffix.lower()
             
-            # Filter video files by size to distinguish primary media from extras
+            # Filter video files by size: videos smaller than 50MB are fast-tracked as extras
             if ext in self.VIDEO_EXTS:
                 size = file_path.stat().st_size
-                if size >= self.min_video_size:
+                if size >= self.fast_track_size:
                     results["potential_media"].append(file_path)
                 else:
                     results["potential_extras"].append(file_path)
