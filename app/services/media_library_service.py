@@ -173,7 +173,8 @@ class MediaLibraryService:
                 "is_active": p.is_active,
                 "is_favorite": p.is_favorite,
                 "user_rating": p.user_rating,
-                "custom_tags": p.custom_tags or []
+                "custom_tags": p.custom_tags or [],
+                "gender": p.gender
             })
             library["counts"]["actors"] += 1
             
@@ -193,7 +194,8 @@ class MediaLibraryService:
                 "is_active": p.is_active,
                 "is_favorite": p.is_favorite,
                 "user_rating": p.user_rating,
-                "custom_tags": p.custom_tags or []
+                "custom_tags": p.custom_tags or [],
+                "gender": p.gender
             })
             library["counts"]["directors"] += 1
 

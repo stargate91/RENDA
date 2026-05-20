@@ -3,7 +3,7 @@ import { Tag, X, Plus, Check } from 'lucide-react';
 import { api } from '../../../services/api';
 import { useAppContext } from '../../../context/AppContext';
 
-export const TagsManagerView = ({ tags = [], searchQuery = '', navigateTo, onTagsChanged }) => {
+export const TagsManagerView = ({ tags = [], searchQuery = '', navigateTo, onTagsChanged, sortBy = 'title_asc' }) => {
   const { T, confirmAction } = useAppContext();
   const [expandedTag, setExpandedTag] = useState(null);
   const [globalTags, setGlobalTags] = useState([]);
@@ -89,6 +89,23 @@ export const TagsManagerView = ({ tags = [], searchQuery = '', navigateTo, onTag
     const filteredTags = mergedTags.filter(tagItem =>
       tagItem && (tagItem.name || '').toLowerCase().includes((searchQuery || '').toLowerCase())
     );
+
+    // Apply sorting to tag cards
+    filteredTags.sort((a, b) => {
+      if (sortBy === 'title_asc') {
+        return (a.name || '').localeCompare(b.name || '');
+      }
+      if (sortBy === 'title_desc') {
+        return (b.name || '').localeCompare(a.name || '');
+      }
+      if (sortBy === 'count_desc') {
+        return (b.total_count || 0) - (a.total_count || 0);
+      }
+      if (sortBy === 'count_asc') {
+        return (a.total_count || 0) - (b.total_count || 0);
+      }
+      return 0;
+    });
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '25px', animation: 'fadeIn 0.4s ease-out' }}>

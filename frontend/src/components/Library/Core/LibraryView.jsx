@@ -27,6 +27,12 @@ const LibraryView = ({ T }) => {
   const [navigationStack, setNavigationStack] = useState([]);
   const { pendingDetailId, setPendingDetailId } = useAppContext();
 
+  // Dynamic sorting and filtering states
+  const [sortBy, setSortBy] = useState('title_asc');
+  const [filterGender, setFilterGender] = useState('all');
+  const [filterFavorite, setFilterFavorite] = useState('all');
+  const [filterWatched, setFilterWatched] = useState('all');
+
   // Drawer state for performer drawer manager modal
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
@@ -115,6 +121,10 @@ const LibraryView = ({ T }) => {
     setActiveTab(id);
     setSearchQuery('');
     setSelectedTags([]);
+    setSortBy(id === 'actors' || id === 'directors' ? 'rating_desc' : 'title_asc');
+    setFilterGender('all');
+    setFilterFavorite('all');
+    setFilterWatched('all');
   };
 
   const fetchLibrary = useCallback(async () => {
@@ -187,16 +197,44 @@ const LibraryView = ({ T }) => {
   }, [currentItems]);
 
   let filteredItems = currentItems.filter(item => {
-    const matchesSearch = !searchQuery || (item.title && item.title.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesSearch = !searchQuery || (
+      (item.title && item.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (item.displayTitle && item.displayTitle.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
     const matchesTags = selectedTags.length === 0 || (
       item.custom_tags && 
       Array.isArray(item.custom_tags) && 
       selectedTags.every(tag => item.custom_tags.includes(tag))
     );
-    return matchesSearch && matchesTags;
+    
+    // Gender filter (for actors/directors, female = 1, male = 2)
+    let matchesGender = true;
+    if (activeTab === 'actors' || activeTab === 'directors') {
+      if (filterGender === 'female') {
+        matchesGender = item.gender === 1;
+      } else if (filterGender === 'male') {
+        matchesGender = item.gender === 2;
+      }
+    }
+    
+    // Favorite filter
+    let matchesFavorite = true;
+    if (filterFavorite === 'favorites') {
+      matchesFavorite = item.is_favorite === true;
+    }
+    
+    // Watched filter
+    let matchesWatched = true;
+    if (filterWatched === 'unwatched') {
+      matchesWatched = item.is_watched === false;
+    } else if (filterWatched === 'watched') {
+      matchesWatched = item.is_watched === true;
+    }
+    
+    return matchesSearch && matchesTags && matchesGender && matchesFavorite && matchesWatched;
   });
 
-  let renderItems = filteredItems;
+  let renderItems = [];
   let viewMode = 'grid'; // grid (posters) or list (episodes)
   
   if (activeTab === 'series') {
@@ -227,6 +265,32 @@ const LibraryView = ({ T }) => {
       displayPosterFolder: (item.type === 'actor' || item.type === 'director') ? 'persons' : 'posters'
     }));
   }
+
+  // Apply sorting on the grouped/prepared renderItems list
+  renderItems.sort((a, b) => {
+    if (sortBy === 'title_asc') {
+      return (a.displayTitle || '').localeCompare(b.displayTitle || '');
+    }
+    if (sortBy === 'title_desc') {
+      return (b.displayTitle || '').localeCompare(a.displayTitle || '');
+    }
+    if (sortBy === 'year_desc') {
+      const ya = a.year || 0;
+      const yb = b.year || 0;
+      return yb - ya;
+    }
+    if (sortBy === 'year_asc') {
+      const ya = a.year || 0;
+      const yb = b.year || 0;
+      return ya - yb;
+    }
+    if (sortBy === 'rating_desc') {
+      const ra = a.rating || 0;
+      const rb = b.rating || 0;
+      return rb - ra;
+    }
+    return 0;
+  });
 
   // If a detail item is selected, show the detail page
   if (detailSeriesTmdbId) {
@@ -488,6 +552,154 @@ const LibraryView = ({ T }) => {
         </div>
       )}
 
+      {/* Custom Controls Bar */}
+      <div className="library-controls-bar animate-fade-in" style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '16px',
+        alignItems: 'center',
+        padding: '16px 20px',
+        background: 'rgba(255, 255, 255, 0.02)',
+        border: '1px solid rgba(255, 255, 255, 0.05)',
+        borderRadius: '16px',
+        marginBottom: '20px',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)'
+      }}>
+        {/* Sort Select */}
+        <div className="control-group" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-dim)' }}>Sort:</span>
+          <select 
+            value={sortBy} 
+            onChange={e => setSortBy(e.target.value)}
+            style={{
+              background: 'rgba(0, 0, 0, 0.3)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '10px',
+              padding: '8px 16px',
+              color: '#fff',
+              fontSize: '13px',
+              fontWeight: '600',
+              outline: 'none',
+              cursor: 'pointer'
+            }}
+          >
+            {(activeTab === 'movies' || activeTab === 'series' || activeTab === 'adult') && (
+              <>
+                <option value="title_asc">Alphabetical (A-Z)</option>
+                <option value="title_desc">Alphabetical (Z-A)</option>
+                <option value="year_desc">Year (Newest)</option>
+                <option value="year_asc">Year (Oldest)</option>
+                <option value="rating_desc">Rating (Highest)</option>
+              </>
+            )}
+            {(activeTab === 'actors' || activeTab === 'directors') && (
+              <>
+                <option value="rating_desc">Popularity</option>
+                <option value="title_asc">Alphabetical (A-Z)</option>
+                <option value="title_desc">Alphabetical (Z-A)</option>
+              </>
+            )}
+            {activeTab === 'tags' && (
+              <>
+                <option value="title_asc">Alphabetical (A-Z)</option>
+                <option value="title_desc">Alphabetical (Z-A)</option>
+                <option value="count_desc">Item Count (Highest)</option>
+                <option value="count_asc">Item Count (Lowest)</option>
+              </>
+            )}
+          </select>
+        </div>
+
+        {/* Watch Status Filter (only for Movies/Series/Adult) */}
+        {(activeTab === 'movies' || activeTab === 'series' || activeTab === 'adult') && (
+          <div className="control-group" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-dim)' }}>Watch Status:</span>
+            <div style={{ display: 'flex', background: 'rgba(0,0,0,0.2)', padding: '3px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              {['all', 'unwatched', 'watched'].map(status => (
+                <button
+                  key={status}
+                  onClick={() => setFilterWatched(status)}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: filterWatched === status ? 'var(--accent-gradient)' : 'transparent',
+                    color: filterWatched === status ? '#fff' : 'var(--text-dim)',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    boxShadow: filterWatched === status ? '0 4px 10px rgba(139, 92, 246, 0.2)' : 'none'
+                  }}
+                >
+                  {status === 'all' ? 'All' : status === 'unwatched' ? 'Unwatched' : 'Watched'}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Gender Filter (only for Actors/Directors) */}
+        {(activeTab === 'actors' || activeTab === 'directors') && (
+          <div className="control-group" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-dim)' }}>Gender:</span>
+            <div style={{ display: 'flex', background: 'rgba(0,0,0,0.2)', padding: '3px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              {[
+                { value: 'all', label: 'All' },
+                { value: 'female', label: 'Female' },
+                { value: 'male', label: 'Male' }
+              ].map(gender => (
+                <button
+                  key={gender.value}
+                  onClick={() => setFilterGender(gender.value)}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: filterGender === gender.value ? 'var(--accent-gradient)' : 'transparent',
+                    color: filterGender === gender.value ? '#fff' : 'var(--text-dim)',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    boxShadow: filterGender === gender.value ? '0 4px 10px rgba(139, 92, 246, 0.2)' : 'none'
+                  }}
+                >
+                  {gender.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Favorites Filter (for everything except tags) */}
+        {activeTab !== 'tags' && (
+          <div className="control-group" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginLeft: 'auto' }}>
+            <button
+              onClick={() => setFilterFavorite(prev => prev === 'favorites' ? 'all' : 'favorites')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 16px',
+                borderRadius: '10px',
+                border: '1px solid',
+                borderColor: filterFavorite === 'favorites' ? '#f43f5e' : 'rgba(255, 255, 255, 0.1)',
+                background: filterFavorite === 'favorites' ? 'rgba(244, 63, 94, 0.15)' : 'rgba(0, 0, 0, 0.2)',
+                color: filterFavorite === 'favorites' ? '#f43f5e' : 'var(--text-dim)',
+                fontSize: '13px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              ❤️ Favorites Only
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Custom Tags Filter Row */}
       <LibraryFilterBar
         uniqueTags={uniqueTags}
@@ -502,6 +714,7 @@ const LibraryView = ({ T }) => {
           searchQuery={searchQuery}
           navigateTo={navigateTo}
           onTagsChanged={fetchLibrary}
+          sortBy={sortBy}
         />
       ) : renderItems.length > 0 ? (
         <LibraryGrid
