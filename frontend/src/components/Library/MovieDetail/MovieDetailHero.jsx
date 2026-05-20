@@ -24,14 +24,14 @@ const MovieDetailHero = ({
   const hasRatings = data.rating_tmdb || data.rating_imdb || data.rating_rotten || data.rating_meta;
 
   const backdropUrl = data.backdrop_path 
-    ? (data.in_library === false 
-        ? `https://image.tmdb.org/t/p/w1280${data.backdrop_path}`
+    ? (data.backdrop_path.startsWith('http') 
+        ? data.backdrop_path 
         : `${API_BASE}/media/images/backdrops${data.backdrop_path}`)
     : null;
 
   const posterUrl = data.poster_path 
-    ? (data.in_library === false 
-        ? `https://image.tmdb.org/t/p/w500${data.poster_path}`
+    ? (data.poster_path.startsWith('http') 
+        ? data.poster_path 
         : `${API_BASE}/media/images/posters${data.poster_path}`)
     : null;
 

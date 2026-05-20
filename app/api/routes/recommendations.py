@@ -18,6 +18,70 @@ from app.db.models import *
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+MEDIA_IMAGE_ROOT = Path("data/media/images")
+
+
+def _public_image_path(path: Optional[str], subfolder: str) -> Optional[str]:
+    if not path or path.startswith("http://") or path.startswith("https://"):
+        return None
+
+    clean_path = path.replace("\\", "/")
+    marker = f"media/images/{subfolder}/"
+    filename = clean_path.split(marker, 1)[1] if marker in clean_path else clean_path.lstrip("/")
+    local_file = MEDIA_IMAGE_ROOT / subfolder / filename
+    if local_file.exists() and local_file.stat().st_size > 100:
+        return f"/{filename}"
+    return None
+
+
+def _with_local_recommendation_images(items):
+    annotated = []
+    for item in items or []:
+        item_data = dict(item)
+        item_data["local_poster_path"] = _public_image_path(item.get("poster_path"), "posters")
+        item_data["local_backdrop_path"] = _public_image_path(item.get("backdrop_path"), "backdrops")
+        annotated.append(item_data)
+    return annotated
+
+
+def _cache_recommendation_images(items):
+    from concurrent.futures import ThreadPoolExecutor
+    from app.services.asset_service import AssetService
+
+    tasks = []
+    for item in items or []:
+        poster_path = item.get("poster_path")
+        if poster_path and not _public_image_path(poster_path, "posters"):
+            tasks.append(("posters", poster_path, "w500"))
+
+        backdrop_path = item.get("backdrop_path")
+        if backdrop_path and not _public_image_path(backdrop_path, "backdrops"):
+            tasks.append(("backdrops", backdrop_path, "w1280"))
+
+    if not tasks:
+        return
+
+    seen = set()
+    unique_tasks = []
+    for task in tasks:
+        key = (task[0], task[1])
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_tasks.append(task)
+
+    asset_service = AssetService()
+
+    def _download_task(args):
+        subfolder, tmdb_path, size = args
+        try:
+            asset_service.download_image(tmdb_path, subfolder, size=size)
+        except Exception as e:
+            logger.error(f"Failed recommendation image cache download ({tmdb_path}): {e}")
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        list(executor.map(_download_task, unique_tasks))
+
 
 @router.get("/recommendations")
 def get_recommendations(background_tasks: BackgroundTasks):
@@ -104,11 +168,13 @@ def get_recommendations(background_tasks: BackgroundTasks):
                     bg_db.commit()
                     
                     bg_tmdb = TMDBClient(bg_db)
-                    bg_tmdb.get_trending("all", "day")
+                    bg_trending = bg_tmdb.get_trending("all", "day")
                     if genre_id:
-                        bg_tmdb.discover("movie", with_genres=genre_id)
+                        bg_discover = bg_tmdb.discover("movie", with_genres=genre_id)
                     else:
-                        bg_tmdb.get_trending("movie", "week")
+                        bg_discover = bg_tmdb.get_trending("movie", "week")
+
+                    _cache_recommendation_images([*bg_trending, *bg_discover])
                 except Exception as e:
                     logger.error(f"Error updating recommendations in background: {e}")
                 finally:
@@ -118,9 +184,12 @@ def get_recommendations(background_tasks: BackgroundTasks):
 
         # If cache exists, return it immediately for instant page load
         if trending_cache and discover_cache:
+            trending_items = trending_cache.raw_data.get("results", []) if isinstance(trending_cache.raw_data, dict) else trending_cache.raw_data
+            discover_items = discover_cache.raw_data.get("results", []) if isinstance(discover_cache.raw_data, dict) else discover_cache.raw_data
+            background_tasks.add_task(_cache_recommendation_images, [*(trending_items or []), *(discover_items or [])])
             return {
-                "trending": trending_cache.raw_data.get("results", []) if isinstance(trending_cache.raw_data, dict) else trending_cache.raw_data,
-                "discover": discover_cache.raw_data.get("results", []) if isinstance(discover_cache.raw_data, dict) else discover_cache.raw_data,
+                "trending": _with_local_recommendation_images(trending_items),
+                "discover": _with_local_recommendation_images(discover_items),
                 "top_genre": top_genre,
                 "watchlist_item_ids": watchlist_tmdb_ids
             }
@@ -128,9 +197,10 @@ def get_recommendations(background_tasks: BackgroundTasks):
         # Otherwise (first run or one of the caches is missing), fetch synchronously
         trending = tmdb.get_trending("all", "day")
         discover = tmdb.discover("movie", with_genres=genre_id) if genre_id else tmdb.get_trending("movie", "week")
+        background_tasks.add_task(_cache_recommendation_images, [*trending, *discover])
         return {
-            "trending": trending,
-            "discover": discover,
+            "trending": _with_local_recommendation_images(trending),
+            "discover": _with_local_recommendation_images(discover),
             "top_genre": top_genre,
             "watchlist_item_ids": watchlist_tmdb_ids
         }

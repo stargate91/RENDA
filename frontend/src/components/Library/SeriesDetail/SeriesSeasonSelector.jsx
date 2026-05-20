@@ -8,9 +8,7 @@ const SeriesSeasonSelector = ({ seasons, activeSeasonNum, onSeasonChange, poster
       <div className="season-cards-scroll" style={{ display: 'flex', gap: '15px', overflowX: 'auto', padding: '10px 4px' }}>
         {seasons.map(season => {
           const sPosterUrl = season.poster_path 
-            ? (inLibrary === false 
-                ? `https://image.tmdb.org/t/p/w342${season.poster_path}`
-                : `${API_BASE}/media/images/posters${season.poster_path}`)
+            ? `${API_BASE}/media/images/posters${season.poster_path}`
             : posterUrl;
           const isActive = activeSeasonNum === season.season_number;
           return (

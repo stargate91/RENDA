@@ -16,6 +16,28 @@ from app.db.models import *
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+MEDIA_IMAGE_ROOT = Path("data/media/images")
+
+
+def _is_remote_image_path(path: Optional[str]) -> bool:
+    return bool(path and (path.startswith("http://") or path.startswith("https://")))
+
+
+def _public_image_path(path: Optional[str], subfolder: str) -> Optional[str]:
+    """Returns the /filename form the frontend expects, if the local file exists."""
+    if not path:
+        return None
+    if _is_remote_image_path(path):
+        return path
+
+    clean_path = path.replace("\\", "/")
+    marker = f"media/images/{subfolder}/"
+    filename = clean_path.split(marker, 1)[1] if marker in clean_path else clean_path.lstrip("/")
+    local_file = MEDIA_IMAGE_ROOT / subfolder / filename
+    if local_file.exists() and local_file.stat().st_size > 100:
+        return f"/{filename}"
+    return None
+
 
 @router.get("/library/stats")
 def get_stats():
@@ -39,6 +61,73 @@ def get_library_items():
         return library.model_dump() if hasattr(library, "model_dump") else (library.dict() if hasattr(library, "dict") else library)
     finally:
         db.close()
+
+def _resolve_person_profile_path(person) -> Optional[str]:
+    """Resolves the best profile path to return for a person, prioritizing custom and local images."""
+    if not person:
+        return None
+    local_path = _public_image_path(person.local_profile_path, "persons")
+    if local_path:
+        return local_path
+    profile_path = _public_image_path(person.profile_path, "persons")
+    if profile_path:
+        return profile_path
+    return person.profile_path if _is_remote_image_path(person.profile_path) else None
+
+def _download_media_assets_sync(
+    poster_path: Optional[str] = None,
+    backdrop_path: Optional[str] = None,
+    cast_profiles: Optional[list] = None,
+    season_posters: Optional[list] = None,
+    stills: Optional[list] = None
+):
+    """
+    Downloads media assets in parallel using ThreadPoolExecutor.
+    Blocks until all downloads are completed or timed out.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+    from app.services.asset_service import AssetService
+    
+    asset_service = AssetService()
+    tasks = []
+    
+    # 1. Poster
+    if poster_path and not poster_path.startswith("http"):
+        tasks.append(("posters", poster_path, "w500"))
+        
+    # 2. Backdrop
+    if backdrop_path and not backdrop_path.startswith("http"):
+        tasks.append(("backdrops", backdrop_path, "w1280"))
+        
+    # 3. Cast/Crew profiles
+    if cast_profiles:
+        for profile in cast_profiles:
+            if profile and not profile.startswith("http"):
+                tasks.append(("persons", profile, "h632"))
+                
+    # 4. Season posters
+    if season_posters:
+        for sp in season_posters:
+            if sp and not sp.startswith("http"):
+                tasks.append(("posters", sp, "w500"))
+
+    if stills:
+        for still in stills:
+            if still and not still.startswith("http"):
+                tasks.append(("stills", still, "w400"))
+                
+    if not tasks:
+        return
+        
+    def _download_task(args):
+        subfolder, tmdb_path, size = args
+        try:
+            asset_service.download_image(tmdb_path, subfolder, size=size)
+        except Exception as e:
+            logger.error(f"Failed sync download of {tmdb_path} to {subfolder}: {e}")
+            
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        executor.map(_download_task, tasks)
 
 def _ensure_person_cached(db, actor_id: int, actor_name: str, actor_profile_path: Optional[str], actor_popularity: Optional[float], ui_lang: str) -> Optional[str]:
     """
@@ -64,6 +153,14 @@ def _ensure_person_cached(db, actor_id: int, actor_name: str, actor_profile_path
                 image_status=ImageStatus.PENDING,
                 is_active=False
             )
+            
+            # If the image was downloaded synchronously, mark as downloaded immediately
+            if actor_profile_path:
+                local_file_path = os.path.join("data", "media", "images", "persons", actor_profile_path.lstrip("/"))
+                if os.path.exists(local_file_path):
+                    person.local_profile_path = actor_profile_path
+                    person.image_status = ImageStatus.COMPLETED
+
             db.add(person)
             
             # Create Localization
@@ -90,6 +187,14 @@ def _ensure_person_cached(db, actor_id: int, actor_name: str, actor_profile_path
             person.image_status = ImageStatus.PENDING
             updated = True
         
+        # If image was downloaded synchronously, update local profile path and status
+        if person.profile_path and person.image_status != ImageStatus.COMPLETED:
+            local_file_path = os.path.join("data", "media", "images", "persons", person.profile_path.lstrip("/"))
+            if os.path.exists(local_file_path):
+                person.local_profile_path = person.profile_path
+                person.image_status = ImageStatus.COMPLETED
+                updated = True
+
         if updated:
             try:
                 db.commit()
@@ -98,14 +203,13 @@ def _ensure_person_cached(db, actor_id: int, actor_name: str, actor_profile_path
                 logger.error(f"Error updating Person profile: {e}")
 
     # Check if local image is available
-    if person and person.local_profile_path:
-        # Check if file actually exists on disk
-        local_file_path = os.path.join("data", "media", "images", "persons", actor_profile_path.lstrip("/"))
-        if os.path.exists(local_file_path):
-            return actor_profile_path # Return relative path (e.g. /qA2...jpg)
+    resolved = _resolve_person_profile_path(person)
+    if resolved:
+        if resolved.startswith("http://") or resolved.startswith("https://") or resolved.startswith("/"):
+            return resolved
+        return f"/{resolved.lstrip('/')}"
             
-    # Otherwise, return full TMDB URL
-    return f"https://image.tmdb.org/t/p/h632{actor_profile_path}"
+    return None
 
 @router.get("/library/item/{item_id}")
 def get_library_item_detail(item_id: str):
@@ -132,9 +236,32 @@ def get_library_item_detail(item_id: str):
                 return JSONResponse(status_code=404, content={"error": "Movie not found on TMDB"})
                 
             credits = tmdb_data.get("credits", {})
+            
+            # Gather assets to download synchronously
+            poster_path = tmdb_data.get("poster_path")
+            backdrop_path = tmdb_data.get("backdrop_path")
+            
+            cast_profiles = []
+            raw_directors = [c for c in credits.get("crew", []) if c.get("job") in ("Director", "Creator")][:2]
+            for crew in raw_directors:
+                if crew.get("profile_path"):
+                    cast_profiles.append(crew.get("profile_path"))
+                    
+            director_ids = {d["id"] for d in raw_directors}
+            raw_cast = [a for a in credits.get("cast", []) if a.get("id") not in director_ids][:10]
+            for actor in raw_cast:
+                if actor.get("profile_path"):
+                    cast_profiles.append(actor.get("profile_path"))
+                    
+            # Synchronously download posters, backdrops, and cast profile images in parallel!
+            _download_media_assets_sync(
+                poster_path=poster_path,
+                backdrop_path=backdrop_path,
+                cast_profiles=cast_profiles
+            )
+
             cast = []
             directors = []
-            raw_directors = [c for c in credits.get("crew", []) if c.get("job") in ("Director", "Creator")][:2]
             for crew in raw_directors:
                 profile_path = _ensure_person_cached(
                     db,
@@ -201,8 +328,8 @@ def get_library_item_detail(item_id: str):
                 "vote_count_tmdb": tmdb_data.get("vote_count"),
                 "budget": tmdb_data.get("budget"),
                 "revenue": tmdb_data.get("revenue"),
-                "poster_path": tmdb_data.get("poster_path"),
-                "backdrop_path": tmdb_data.get("backdrop_path"),
+                "poster_path": _public_image_path(tmdb_data.get("poster_path"), "posters"),
+                "backdrop_path": _public_image_path(tmdb_data.get("backdrop_path"), "backdrops"),
                 "original_language": tmdb_data.get("original_language"),
                 "type": "movie",
                 "tmdb_id": tmdb_id,
@@ -252,6 +379,63 @@ def get_library_item_detail(item_id: str):
             if not loc:
                 loc = next((l for l in active_match.localizations if l.is_primary), active_match.localizations[0])
 
+        if loc:
+            # Synchronously download missing media assets for local/missing movie
+            missing_poster = None
+            missing_backdrop = None
+            
+            if loc.poster_path and not _public_image_path(loc.local_poster_path, "posters"):
+                local_p = os.path.join("data", "media", "images", "posters", loc.poster_path.lstrip("/"))
+                if not os.path.exists(local_p):
+                    missing_poster = loc.poster_path
+                    
+            if loc.backdrop_path and not _public_image_path(loc.local_backdrop_path, "backdrops"):
+                local_b = os.path.join("data", "media", "images", "backdrops", loc.backdrop_path.lstrip("/"))
+                if not os.path.exists(local_b):
+                    missing_backdrop = loc.backdrop_path
+                    
+            missing_profiles = []
+            for link in active_match.people:
+                person = link.person
+                if person.profile_path and not _public_image_path(person.local_profile_path, "persons"):
+                    local_p = os.path.join("data", "media", "images", "persons", person.profile_path.lstrip("/"))
+                    if not os.path.exists(local_p):
+                        missing_profiles.append(person.profile_path)
+                        
+            if missing_poster or missing_backdrop or missing_profiles:
+                _download_media_assets_sync(
+                    poster_path=missing_poster,
+                    backdrop_path=missing_backdrop,
+                    cast_profiles=missing_profiles
+                )
+                
+                # Update DB paths immediately!
+                try:
+                    updated = False
+                    if missing_poster:
+                        local_p_rel = f"data/media/images/posters/{missing_poster.lstrip('/')}"
+                        if os.path.exists(local_p_rel):
+                            loc.local_poster_path = local_p_rel
+                            updated = True
+                    if missing_backdrop:
+                        local_b_rel = f"data/media/images/backdrops/{missing_backdrop.lstrip('/')}"
+                        if os.path.exists(local_b_rel):
+                            loc.local_backdrop_path = local_b_rel
+                            updated = True
+                    for link in active_match.people:
+                        person = link.person
+                        if person.profile_path and person.profile_path in missing_profiles:
+                            local_p_rel = f"data/media/images/persons/{person.profile_path.lstrip('/')}"
+                            if os.path.exists(local_p_rel):
+                                person.local_profile_path = local_p_rel
+                                person.image_status = ImageStatus.COMPLETED
+                                updated = True
+                    if updated:
+                        db.commit()
+                except Exception as e:
+                    db.rollback()
+                    logger.error(f"Error updating local image paths in DB: {e}")
+
         # Build cast list with person images
         cast = []
         directors = []
@@ -269,7 +453,7 @@ def get_library_item_detail(item_id: str):
                 "name": p_loc.name if p_loc else "Unknown",
                 "character": link.character_name,
                 "job": link.job,
-                "profile_path": person.profile_path,
+                "profile_path": _resolve_person_profile_path(person),
                 "popularity": person.popularity or 0
             }
 
@@ -315,8 +499,8 @@ def get_library_item_detail(item_id: str):
             "budget": active_match.budget,
             "revenue": active_match.revenue,
             "collection": active_match.collection,
-            "poster_path": loc.poster_path if loc else None,
-            "backdrop_path": loc.backdrop_path if loc else None,
+            "poster_path": _public_image_path(loc.poster_path, "posters") if loc else None,
+            "backdrop_path": _public_image_path(loc.backdrop_path, "backdrops") if loc else None,
             "origin_country": loc.origin_country if loc else None,
             "original_language": loc.original_language if loc else None,
             "spoken_languages": loc.spoken_languages if loc else None,
@@ -405,9 +589,37 @@ def get_library_series_detail(series_tmdb_id: str, background_tasks: BackgroundT
             if not credits or not credits.get("cast"):
                 credits = tmdb_data.get("credits", {})
                 
+            # Gather assets to download synchronously
+            poster_path = tmdb_data.get("poster_path")
+            backdrop_path = tmdb_data.get("backdrop_path")
+            
+            cast_profiles = []
+            raw_directors = [c for c in credits.get("crew", []) if c.get("job") in ("Director", "Creator", "Executive Producer")][:2]
+            for crew in raw_directors:
+                if crew.get("profile_path"):
+                    cast_profiles.append(crew.get("profile_path"))
+                    
+            director_ids = {d["id"] for d in raw_directors}
+            raw_cast = [a for a in credits.get("cast", []) if a.get("id") not in director_ids][:10]
+            for actor in raw_cast:
+                if actor.get("profile_path"):
+                    cast_profiles.append(actor.get("profile_path"))
+                    
+            season_posters = []
+            for s in tmdb_data.get("seasons", []):
+                if s.get("poster_path"):
+                    season_posters.append(s.get("poster_path"))
+                    
+            # Synchronously download posters, backdrops, season posters, and cast profile images in parallel!
+            _download_media_assets_sync(
+                poster_path=poster_path,
+                backdrop_path=backdrop_path,
+                cast_profiles=cast_profiles,
+                season_posters=season_posters
+            )
+            
             cast = []
             directors = []
-            raw_directors = [c for c in credits.get("crew", []) if c.get("job") in ("Director", "Creator", "Executive Producer")][:2]
             for crew in raw_directors:
                 profile_path = _ensure_person_cached(
                     db,
@@ -462,6 +674,7 @@ def get_library_series_detail(series_tmdb_id: str, background_tasks: BackgroundT
                     pass
 
             seasons_list = []
+            still_paths = []
             for s in sorted(tmdb_data.get("seasons", []), key=lambda x: x.get("season_number") or 0):
                 s_num = s.get("season_number")
                 if s_num is None:
@@ -475,6 +688,8 @@ def get_library_series_detail(series_tmdb_id: str, background_tasks: BackgroundT
                     
                 episodes_list = []
                 for ep in season_detail.get("episodes", []):
+                    if ep.get("still_path"):
+                        still_paths.append(ep.get("still_path"))
                     episodes_list.append({
                         "id": f"tmdb_{series_tmdb_id_int}_{s_num}_{ep.get('episode_number')}",
                         "episode_number": ep.get("episode_number"),
@@ -503,12 +718,20 @@ def get_library_series_detail(series_tmdb_id: str, background_tasks: BackgroundT
                     "episodes": episodes_list
                 })
 
+            if still_paths:
+                _download_media_assets_sync(stills=still_paths)
+
+            for season in seasons_list:
+                season["poster_path"] = _public_image_path(season.get("poster_path"), "posters")
+                for episode in season["episodes"]:
+                    episode["still_path"] = _public_image_path(episode.get("still_path"), "stills")
+
             result = {
                 "id": f"tmdb_{series_tmdb_id_int}",
                 "series_tmdb_id": series_tmdb_id_int,
                 "title": tmdb_data.get("name") or tmdb_data.get("original_name") or "Unknown Series",
-                "backdrop_path": tmdb_data.get("backdrop_path"),
-                "poster_path": tmdb_data.get("poster_path"),
+                "backdrop_path": _public_image_path(tmdb_data.get("backdrop_path"), "backdrops"),
+                "poster_path": _public_image_path(tmdb_data.get("poster_path"), "posters"),
                 "year": year,
                 "overview": tmdb_data.get("overview"),
                 "rating_tmdb": tmdb_data.get("vote_average"),
@@ -565,12 +788,123 @@ def get_library_series_detail(series_tmdb_id: str, background_tasks: BackgroundT
             if not base_loc:
                 base_loc = next((l for l in base_match.localizations if l.is_primary), base_match.localizations[0])
 
+        # Synchronously download missing media assets for local/missing series
+        missing_poster = None
+        missing_backdrop = None
+        missing_season_posters = []
+        missing_profiles = []
+        missing_stills = []
+
+        if base_match and base_loc:
+            poster_p = base_loc.series_poster_path if base_loc.series_poster_path else base_loc.poster_path
+            if poster_p and not _public_image_path(base_loc.local_series_poster_path, "posters"):
+                local_p = os.path.join("data", "media", "images", "posters", poster_p.lstrip("/"))
+                if not os.path.exists(local_p):
+                    missing_poster = poster_p
+                    
+            if base_loc.backdrop_path and not _public_image_path(base_loc.local_backdrop_path, "backdrops"):
+                local_b = os.path.join("data", "media", "images", "backdrops", base_loc.backdrop_path.lstrip("/"))
+                if not os.path.exists(local_b):
+                    missing_backdrop = base_loc.backdrop_path
+
+        # Gather season posters and performer profiles from DB matches
+        seen_seasons = set()
+        seen_persons = set()
+        for item in episodes_only:
+            match = next((m for m in item.matches if m.is_active), None)
+            if not match: continue
+
+            s_num = match.season_number if match.season_number is not None else item.fn_season
+            if s_num is None: s_num = 1
+            try: s_num = int(s_num)
+            except: s_num = 1
+
+            if s_num not in seen_seasons:
+                seen_seasons.add(s_num)
+                c_season = cached_seasons.get(s_num, {})
+                loc = None
+                if match.localizations:
+                    if ui_lang:
+                        loc = next((l for l in match.localizations if l.target_language == ui_lang), None)
+                    if not loc:
+                        loc = next((l for l in match.localizations if l.is_primary), match.localizations[0])
+                s_poster = c_season.get("poster_path") or (loc.poster_path if loc else None)
+                if s_poster:
+                    local_s_post = os.path.join("data", "media", "images", "posters", s_poster.lstrip("/"))
+                    if not os.path.exists(local_s_post):
+                        missing_season_posters.append(s_poster)
+
+            loc = None
+            if match.localizations:
+                if ui_lang:
+                    loc = next((l for l in match.localizations if l.target_language == ui_lang), None)
+                if not loc:
+                    loc = next((l for l in match.localizations if l.is_primary), match.localizations[0])
+            if loc and loc.still_path:
+                local_still = os.path.join("data", "media", "images", "stills", loc.still_path.lstrip("/"))
+                if not os.path.exists(local_still):
+                    missing_stills.append(loc.still_path)
+
+            for link in match.people:
+                person = link.person
+                if person.id not in seen_persons:
+                    seen_persons.add(person.id)
+                    if person.profile_path and not _public_image_path(person.local_profile_path, "persons"):
+                        local_p = os.path.join("data", "media", "images", "persons", person.profile_path.lstrip("/"))
+                        if not os.path.exists(local_p):
+                            missing_profiles.append(person.profile_path)
+
+        if missing_poster or missing_backdrop or missing_season_posters or missing_profiles or missing_stills:
+            _download_media_assets_sync(
+                poster_path=missing_poster,
+                backdrop_path=missing_backdrop,
+                cast_profiles=missing_profiles,
+                season_posters=missing_season_posters,
+                stills=missing_stills
+            )
+
+            # Update DB paths and statuses immediately!
+            try:
+                updated = False
+                if base_loc:
+                    if missing_poster:
+                        local_p_rel = f"data/media/images/posters/{missing_poster.lstrip('/')}"
+                        if os.path.exists(local_p_rel):
+                            base_loc.local_series_poster_path = local_p_rel
+                            base_loc.local_poster_path = local_p_rel
+                            updated = True
+                    if missing_backdrop:
+                        local_b_rel = f"data/media/images/backdrops/{missing_backdrop.lstrip('/')}"
+                        if os.path.exists(local_b_rel):
+                            base_loc.local_backdrop_path = local_b_rel
+                            updated = True
+
+                for item in episodes_only:
+                    match = next((m for m in item.matches if m.is_active), None)
+                    if not match: continue
+                    for link in match.people:
+                        person = link.person
+                        if person.profile_path and person.profile_path in missing_profiles:
+                            local_p_rel = f"data/media/images/persons/{person.profile_path.lstrip('/')}"
+                            if os.path.exists(local_p_rel):
+                                person.local_profile_path = local_p_rel
+                                person.image_status = ImageStatus.COMPLETED
+                                updated = True
+                if updated:
+                    db.commit()
+            except Exception as e:
+                db.rollback()
+                logger.error(f"Error updating local series image paths: {e}")
+
         series_data = {
             "id": base_item.id,
             "series_tmdb_id": series_tmdb_id,
             "title": base_loc.series_title if base_loc else (base_loc.title if base_loc else "Unknown Series"),
-            "backdrop_path": base_loc.backdrop_path if base_loc else None,
-            "poster_path": base_loc.series_poster_path if base_loc and base_loc.series_poster_path else (base_loc.poster_path if base_loc else None),
+            "backdrop_path": _public_image_path(base_loc.backdrop_path, "backdrops") if base_loc else None,
+            "poster_path": _public_image_path(
+                base_loc.series_poster_path if base_loc and base_loc.series_poster_path else (base_loc.poster_path if base_loc else None),
+                "posters"
+            ) if base_loc else None,
             "year": base_item.fn_year,
             "overview": cached_series.get("overview") or (base_loc.overview if base_loc else None),
             "rating_tmdb": cached_series.get("vote_average") or (base_match.rating_tmdb if base_match else None),
@@ -618,7 +952,7 @@ def get_library_series_detail(series_tmdb_id: str, background_tasks: BackgroundT
 
             if s_num not in series_data["seasons"]:
                 c_season = cached_seasons.get(s_num, {})
-                s_poster = c_season.get("poster_path") or (loc.poster_path if loc else None)
+                s_poster = _public_image_path(c_season.get("poster_path") or (loc.poster_path if loc else None), "posters")
                 s_overview = c_season.get("overview")
                 
                 series_data["seasons"][s_num] = {
@@ -648,7 +982,7 @@ def get_library_series_detail(series_tmdb_id: str, background_tasks: BackgroundT
                 "episode_number": e_num,
                 "title": loc.episode_title if loc else (item.fn_title or f"Episode {e_num}"),
                 "overview": loc.overview if loc else None,
-                "still_path": loc.still_path if loc else None,
+                "still_path": _public_image_path(loc.still_path, "stills") if loc else None,
                 "runtime": match.runtime,
                 "rating_tmdb": match.rating_tmdb,
                 "vote_count_tmdb": match.vote_count_tmdb,
@@ -672,25 +1006,13 @@ def get_library_series_detail(series_tmdb_id: str, background_tasks: BackgroundT
                         "name": p_loc.name if p_loc else "Unknown",
                         "character": link.character_name,
                         "job": link.job,
-                        "profile_path": person.profile_path,
+                        "profile_path": _resolve_person_profile_path(person),
                         "popularity": person.popularity or 0,
                         "order": link.order
                     }
                     series_cast_map[person.id] = person_data
 
-        # Check and download missing season posters
-        for s_info in series_data["seasons"].values():
-            s_poster = s_info.get("poster_path")
-            if s_poster:
-                filename = s_poster.lstrip("/")
-                local_file = Path("data/media/images/posters") / filename
-                if not local_file.exists() or local_file.stat().st_size < 100:
-                    def download_missing_poster(poster_path):
-                        from app.services.asset_service import AssetService
-                        asset_service = AssetService()
-                        asset_service.download_image(poster_path, "posters", size="w500")
-                    
-                    background_tasks.add_task(download_missing_poster, s_poster)
+        # Seasons and episodes are now synchronously downloaded beforehand, so no background tasks needed here.
 
         # Sort seasons and episodes
         series_data["seasons"] = [series_data["seasons"][k] for k in sorted(series_data["seasons"].keys())]

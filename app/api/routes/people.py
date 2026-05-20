@@ -18,6 +18,132 @@ from app.db.models import *
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+MEDIA_IMAGE_ROOT = Path("data/media/images")
+
+
+def _is_remote_image_path(path: Optional[str]) -> bool:
+    return bool(path and (path.startswith("http://") or path.startswith("https://")))
+
+
+def _public_image_path(path: Optional[str], subfolder: str) -> Optional[str]:
+    """Returns the /filename form the frontend expects, if the local file exists."""
+    if not path:
+        return None
+    if _is_remote_image_path(path):
+        return path
+
+    clean_path = path.replace("\\", "/")
+    marker = f"media/images/{subfolder}/"
+    filename = clean_path.split(marker, 1)[1] if marker in clean_path else clean_path.lstrip("/")
+    local_file = MEDIA_IMAGE_ROOT / subfolder / filename
+    if local_file.exists() and local_file.stat().st_size > 100:
+        return f"/{filename}"
+    return None
+
+
+def _has_local_image(path: Optional[str], subfolder: str) -> bool:
+    return _public_image_path(path, subfolder) is not None
+
+def _resolve_person_profile_path(person) -> Optional[str]:
+    """Resolves the best profile path to return for a person, prioritizing custom and local images."""
+    if not person:
+        return None
+    local_path = _public_image_path(person.local_profile_path, "persons")
+    if local_path:
+        return local_path
+    profile_path = _public_image_path(person.profile_path, "persons")
+    if profile_path:
+        return profile_path
+    return person.profile_path if _is_remote_image_path(person.profile_path) else None
+
+def _get_or_create_person_db(db, person_id: int) -> Optional[Person]:
+    """Retrieves a person from the DB, or dynamically fetches and ingests them from TMDB if not present."""
+    from app.db.models import Person
+    person = db.query(Person).filter(Person.id == person_id).first()
+    if person:
+        return person
+        
+    try:
+        from app.api.tmdb_client import TMDBClient
+        from app.services.person_service import PersonService
+        from app.db.models import UserSetting
+
+        primary_lang = db.query(UserSetting).filter(UserSetting.key == "metadata_primary_language").first()
+        fallback_lang = db.query(UserSetting).filter(UserSetting.key == "metadata_fallback_language").first()
+        
+        langs = []
+        if primary_lang and primary_lang.value:
+            langs.append(primary_lang.value)
+        if fallback_lang and fallback_lang.value and fallback_lang.value not in langs:
+            langs.append(fallback_lang.value)
+        if not langs:
+            langs = ["en-US"]
+        
+        client = TMDBClient(db)
+        person_service = PersonService(db)
+        
+        tmdb_data = client.get_person_details(person_id, language=langs[0])
+        if tmdb_data and "id" in tmdb_data:
+            person = person_service.get_or_create_person(tmdb_data)
+            person.is_active = True
+            db.commit()
+            
+            person_service.enrich_person_metadata(person.id, languages=langs)
+            
+            # Re-query
+            person = db.query(Person).filter(Person.id == person_id).first()
+            return person
+    except Exception as e:
+        logger.error(f"Failed to auto-ingest person {person_id} from TMDB: {e}")
+        db.rollback()
+        
+    return None
+
+
+def _download_person_detail_assets(person, movies: list, series: list, backdrop_path: Optional[str] = None) -> None:
+    """Blocks the person detail response until profile and credit posters are local."""
+    from concurrent.futures import ThreadPoolExecutor
+    from app.services.asset_service import AssetService
+
+    tasks = []
+    if person.profile_path and not _is_remote_image_path(person.profile_path) and not _public_image_path(person.profile_path, "persons"):
+        tasks.append(("persons", person.profile_path, "h632"))
+
+    for img in person.images or []:
+        if img and not _is_remote_image_path(img) and not _public_image_path(img, "persons"):
+            tasks.append(("persons", img, "h632"))
+
+    for item in [*(movies or []), *(series or [])]:
+        poster_path = item.get("poster_path")
+        if poster_path and not _is_remote_image_path(poster_path) and not _public_image_path(poster_path, "posters"):
+            tasks.append(("posters", poster_path, "w500"))
+
+    if backdrop_path and not _is_remote_image_path(backdrop_path) and not _public_image_path(backdrop_path, "backdrops"):
+        tasks.append(("backdrops", backdrop_path, "w1280"))
+
+    if not tasks:
+        return
+
+    seen = set()
+    unique_tasks = []
+    for task in tasks:
+        key = (task[0], task[1])
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_tasks.append(task)
+
+    asset_service = AssetService()
+
+    def _download_task(args):
+        subfolder, tmdb_path, size = args
+        try:
+            asset_service.download_image(tmdb_path, subfolder, size=size)
+        except Exception as e:
+            logger.error(f"Failed sync person detail asset download ({tmdb_path}): {e}")
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        list(executor.map(_download_task, unique_tasks))
 
 @router.get("/people")
 def get_people(
@@ -76,7 +202,7 @@ def get_people(
             people_list.append({
                 "id": person.id,
                 "name": name,
-                "profile_path": person.profile_path,
+                "profile_path": _resolve_person_profile_path(person),
                 "popularity": person.popularity or 0.0,
                 "is_active": person.is_active,
                 "is_favorite": person.is_favorite,
@@ -205,6 +331,14 @@ def get_person_detail(person_id: int):
             joinedload(Person.localizations)
         ).filter(Person.id == person_id).first()
         
+        if not person:
+            person = _get_or_create_person_db(db, person_id)
+            if person:
+                # Re-query with localizations loaded
+                person = db.query(Person).options(
+                    joinedload(Person.localizations)
+                ).filter(Person.id == person_id).first()
+                
         if not person:
             return JSONResponse(status_code=404, content={"error": "Person not found"})
             
@@ -416,6 +550,31 @@ def get_person_detail(person_id: int):
         # Sort films and series by year descending
         all_movies.sort(key=lambda x: x.get("year") or 0, reverse=True)
         all_series.sort(key=lambda x: x.get("year") or 0, reverse=True)
+
+        _download_person_detail_assets(person, all_movies, all_series, person_backdrop)
+
+        if person.profile_path and not _resolve_person_profile_path(person):
+            person.image_status = ImageStatus.FAILED
+        elif person.profile_path:
+            person.local_profile_path = _resolve_person_profile_path(person)
+            person.image_status = ImageStatus.COMPLETED
+
+        local_images = []
+        for image_path in person.images or []:
+            local_image = _public_image_path(image_path, "persons")
+            if local_image:
+                local_images.append(local_image)
+
+        for item in all_movies:
+            local_poster = _public_image_path(item.get("poster_path"), "posters")
+            item["poster_path"] = local_poster
+            item["has_local_poster"] = bool(local_poster)
+        for item in all_series:
+            local_poster = _public_image_path(item.get("poster_path"), "posters")
+            item["poster_path"] = local_poster
+            item["has_local_poster"] = bool(local_poster)
+
+        db.commit()
         
         result = {
             "id": person.id,
@@ -427,13 +586,13 @@ def get_person_detail(person_id: int):
             "gender": person.gender,
             "popularity": person.popularity or 0.0,
             "known_for_department": person.known_for_department,
-            "profile_path": person.profile_path,
-            "backdrop_path": person_backdrop,
+            "profile_path": _resolve_person_profile_path(person),
+            "backdrop_path": _public_image_path(person_backdrop, "backdrops"),
             "is_active": person.is_active,
             "is_favorite": person.is_favorite,
             "user_rating": person.user_rating,
             "custom_tags": person.custom_tags or [],
-            "images": person.images or [],
+            "images": local_images,
             "movies": all_movies,
             "series": all_series
         }
@@ -453,7 +612,7 @@ def update_person_status(person_id: int, payload: dict):
     db = Session()
     try:
         from app.db.models import Person
-        person = db.query(Person).filter(Person.id == person_id).first()
+        person = _get_or_create_person_db(db, person_id)
         if not person:
             return JSONResponse(status_code=404, content={"error": "Person not found"})
             
@@ -490,7 +649,7 @@ def update_person_profile(person_id: int, payload: dict):
         from app.db.models import Person, ImageStatus
         from app.services.asset_service import AssetService
         
-        person = db.query(Person).filter(Person.id == person_id).first()
+        person = _get_or_create_person_db(db, person_id)
         if not person:
             return JSONResponse(status_code=404, content={"error": "Person not found"})
             
@@ -526,7 +685,7 @@ def upload_person_profile(person_id: int, file: UploadFile = File(...)):
     db = Session()
     try:
         from app.db.models import Person, ImageStatus
-        person = db.query(Person).filter(Person.id == person_id).first()
+        person = _get_or_create_person_db(db, person_id)
         if not person:
             return JSONResponse(status_code=404, content={"error": "Person not found"})
             

@@ -198,6 +198,7 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
           onCustomUpload={handleCustomUpload}
           onCustomUrl={handleCustomUrl}
           T={T}
+          API_BASE={API_BASE}
         />
       )}
 

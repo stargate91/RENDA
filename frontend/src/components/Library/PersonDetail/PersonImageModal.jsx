@@ -8,7 +8,8 @@ const PersonImageModal = ({
   onSelectImage,
   onCustomUpload,
   onCustomUrl,
-  T
+  T,
+  API_BASE
 }) => {
   const fileInputRef = useRef(null);
 
@@ -89,7 +90,9 @@ const PersonImageModal = ({
             {data.images && data.images.map((img, idx) => {
               const isCurrent = data.profile_path === img;
               const isUpdating = updatingProfile === img;
-              const tmdbImgUrl = `https://image.tmdb.org/t/p/w185${img}`;
+              const imageUrl = img.startsWith('http')
+                ? img
+                : `${API_BASE}/media/images/persons${img}`;
               
               return (
                 <div 
@@ -110,7 +113,7 @@ const PersonImageModal = ({
                   className="modal-image-card"
                 >
                   <img 
-                    src={tmdbImgUrl} 
+                    src={imageUrl} 
                     alt="" 
                     style={{ 
                       width: '100%', 

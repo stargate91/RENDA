@@ -19,9 +19,7 @@ const SeriesEpisodeList = ({ activeSeason, activeSeasonNum, inLibrary, onPlayMed
       {activeSeason.episodes.map(episode => {
         const isExpanded = expandedEpisodeId === episode.id;
         const thumbUrl = episode.still_path 
-          ? (inLibrary === false 
-              ? `https://image.tmdb.org/t/p/w300${episode.still_path}`
-              : `${API_BASE}/media/images/stills${episode.still_path}`)
+          ? `${API_BASE}/media/images/stills${episode.still_path}`
           : null;
         const tech = episode.technical || {};
 

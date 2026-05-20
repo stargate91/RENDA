@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Loader2, Play, X } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
-import { api } from '../../services/api';
+import { api, API_BASE } from '../../services/api';
 
 const COLORS = ['#8b5cf6', '#3b82f6', '#ec4899', '#f59e0b', '#10b981', '#ef4444', '#6366f1', '#14b8a6', '#f43f5e', '#84cc16'];
 
@@ -97,9 +97,19 @@ const TimeTravelTimeline = ({ decades, T }) => {
   );
 };
 
+const getRecommendationImageUrl = (item, kind, size) => {
+  const localPath = kind === 'poster' ? item.local_poster_path : item.local_backdrop_path;
+  const remotePath = kind === 'poster' ? item.poster_path : item.backdrop_path;
+  const folder = kind === 'poster' ? 'posters' : 'backdrops';
+
+  if (localPath) return `${API_BASE}/media/images/${folder}${localPath}`;
+  if (remotePath) return `https://image.tmdb.org/t/p/${size}${remotePath}`;
+  return null;
+};
+
 const SpotlightBanner = ({ item, watchlistIds = [], onWatchlist, T }) => {
   if (!item) return null;
-  const imageUrl = `https://image.tmdb.org/t/p/original${item.backdrop_path}`;
+  const imageUrl = getRecommendationImageUrl(item, 'backdrop', 'original');
   const title = item.title || item.name;
   const isWatchlisted = watchlistIds.includes(item.id);
   
@@ -108,7 +118,7 @@ const SpotlightBanner = ({ item, watchlistIds = [], onWatchlist, T }) => {
       width: '100%', height: '400px', borderRadius: '24px', position: 'relative', overflow: 'hidden', marginBottom: '40px',
       boxShadow: '0 20px 40px rgba(0,0,0,0.5)', background: '#000'
     }}>
-      <img src={imageUrl} alt={title} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8, filter: 'blur(2px) contrast(1.1)' }} />
+      {imageUrl && <img src={imageUrl} alt={title} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8, filter: 'blur(2px) contrast(1.1)' }} />}
       <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.4) 50%, transparent 100%)' }} />
       <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 40%)' }} />
       
@@ -243,6 +253,7 @@ const RecommendationCarousel = ({ title, items, watchlistIds = [], onWatchlist, 
           `}</style>
           {items.map(item => {
             const isWatchlisted = watchlistIds.includes(item.id);
+            const posterUrl = getRecommendationImageUrl(item, 'poster', 'w500');
             return (
               <div key={item.id} style={{
                 minWidth: '200px', width: '200px', position: 'relative', borderRadius: '16px', overflow: 'hidden',
@@ -254,7 +265,7 @@ const RecommendationCarousel = ({ title, items, watchlistIds = [], onWatchlist, 
               onMouseOut={e => e.currentTarget.style.transform = 'scale(1) translateY(0)'}
               >
                 <div style={{ paddingBottom: '150%' }}>
-                  <img src={`https://image.tmdb.org/t/p/w500${item.poster_path}`} alt={item.title || item.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                  {posterUrl && <img src={posterUrl} alt={item.title || item.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
                 </div>
                 
                 <div className="rec-overlay" style={{
@@ -413,7 +424,7 @@ const DashboardView = ({ settings, stats, T }) => {
 
                 {item.still_path || item.backdrop_path ? (
                   <img 
-                    src={`http://localhost:8000/media/images/${item.still_path ? 'stills' : 'backdrops'}${item.still_path || item.backdrop_path}`} 
+                    src={`${API_BASE}/media/images/${item.still_path ? 'stills' : 'backdrops'}${item.still_path || item.backdrop_path}`} 
                     alt=""
                     style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.7 }}
                   />

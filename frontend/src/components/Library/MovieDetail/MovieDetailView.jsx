@@ -121,8 +121,8 @@ const MovieDetailView = ({ itemId, onBack, onPersonClick }) => {
   }
 
   const posterUrl = data.poster_path 
-    ? (data.in_library === false 
-        ? `https://image.tmdb.org/t/p/w500${data.poster_path}`
+    ? (data.poster_path.startsWith('http') 
+        ? data.poster_path 
         : `${API_BASE}/media/images/posters${data.poster_path}`)
     : null;
 

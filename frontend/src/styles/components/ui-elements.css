@@ -18,7 +18,7 @@
 .main-content {
   flex: 1;
   padding: 60px;
-  overflow-y: auto;
+  overflow-y: scroll;
   scrollbar-gutter: stable;
   position: relative;
 }
