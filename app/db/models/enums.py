@@ -8,7 +8,7 @@ class ItemStatus(enum.Enum):
     MATCHED = "matched"; ORGANIZED = "organized"; RENAMED = "renamed"; ERROR = "error"
 
 class ImageStatus(enum.Enum):
-    PENDING = "pending"; DOWNLOADING = "downloading"; COMPLETED = "completed"; FAILED = "failed"
+    NONE = "none"; PENDING = "pending"; DOWNLOADING = "downloading"; COMPLETED = "completed"; FAILED = "failed"
 
 class MovieEdition(enum.Enum):
     NONE = "none"; THEATRICAL = "theatrical"; DIRECTORS_CUT = "directors_cut"

@@ -107,6 +107,7 @@ class MetadataService:
         if not match:
             match = MediaMatch(
                 media_item_id=item_id, tmdb_id=target.tmdb_id, item_type=m_type,
+                series_tmdb_id=target.tmdb_id if m_type in [ItemType.SERIES, ItemType.SEASON, ItemType.EPISODE] else None,
                 season_number=target.season, episode_number=target_episode,
                 is_active=True, confidence_score=1.0
             )
@@ -116,6 +117,8 @@ class MetadataService:
             match.item_type = m_type
             match.episode_number = target_episode
             match.season_number = target.season
+            if m_type in [ItemType.SERIES, ItemType.SEASON, ItemType.EPISODE]:
+                match.series_tmdb_id = target.tmdb_id
         return match
 
     def _trigger_enrichment(self, item: MediaItem):

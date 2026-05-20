@@ -5,7 +5,6 @@ const AdvancedSettings = ({ wipeDatabase, T }) => {
   const [options, setOptions] = useState({
     discovery: true,
     library: true,
-    cache: true,
     tags: true,
     history: true,
     all: true
@@ -19,13 +18,12 @@ const AdvancedSettings = ({ wipeDatabase, T }) => {
         next.all = newVal;
         next.discovery = newVal;
         next.library = newVal;
-        next.cache = newVal;
         next.tags = newVal;
         next.history = newVal;
       } else {
         next[key] = !prev[key];
         // If all sub-options are checked, 'all' is true, else false
-        next.all = next.discovery && next.library && next.cache && next.tags && next.history;
+        next.all = next.discovery && next.library && next.tags && next.history;
       }
       return next;
     });
@@ -33,14 +31,14 @@ const AdvancedSettings = ({ wipeDatabase, T }) => {
 
   const handleWipe = () => {
     // If no option is selected, return
-    if (!options.discovery && !options.library && !options.cache && !options.tags && !options.history && !options.all) {
+    if (!options.discovery && !options.library && !options.tags && !options.history && !options.all) {
       return;
     }
     // Pass selected options to wipeDatabase context function
     wipeDatabase(options);
   };
 
-  const isAnySelected = options.discovery || options.library || options.cache || options.tags || options.history || options.all;
+  const isAnySelected = options.discovery || options.library || options.tags || options.history || options.all;
 
   return (
     <div className="settings-card">
@@ -120,7 +118,7 @@ const AdvancedSettings = ({ wipeDatabase, T }) => {
               {options.all ? <CheckSquare size={18} color="#ff4d4d" /> : <Square size={18} color="rgba(255,255,255,0.3)" />}
               <div>
                 <div style={{ color: options.all ? '#ff4d4d' : '#fff', fontWeight: '700', fontSize: '14px' }}>Wipe Everything (All database data)</div>
-                <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', marginTop: '2px' }}>Wipe all media, library items, metadata cache, custom tags and historical logs. Local physical media files and settings are preserved.</div>
+                <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', marginTop: '2px' }}>Wipe all media, library items, custom tags and historical logs. Local physical media files and settings are preserved.</div>
               </div>
             </div>
 
@@ -167,28 +165,6 @@ const AdvancedSettings = ({ wipeDatabase, T }) => {
               <div>
                 <div style={{ color: '#fff', fontWeight: '600', fontSize: '13px' }}>Organized Library & Performers</div>
                 <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', marginTop: '2px' }}>Clear the organized Movie, Series, Episode and Actor/Director catalog.</div>
-              </div>
-            </div>
-
-            {/* Option: Cache */}
-            <div 
-              onClick={() => handleToggle('cache')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                padding: '8px 12px',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-              }}
-              onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
-              onMouseOut={e => e.currentTarget.style.background = 'transparent'}
-            >
-              {options.cache ? <CheckSquare size={18} color="rgba(255,255,255,0.8)" /> : <Square size={18} color="rgba(255,255,255,0.2)" />}
-              <div>
-                <div style={{ color: '#fff', fontWeight: '600', fontSize: '13px' }}>Metadata API Cache</div>
-                <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', marginTop: '2px' }}>Clear the cached TMDB & OMDb API metadata query payloads to force fresh fetches.</div>
               </div>
             </div>
 

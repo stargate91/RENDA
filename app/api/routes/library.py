@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+@router.get("/library/stats")
 def get_stats():
     """Returns library statistics for the dashboard."""
     from app.services.media_library_service import MediaLibraryService
@@ -28,6 +29,7 @@ def get_stats():
     finally:
         db.close()
 
+@router.get("/library")
 def get_library_items():
     """Returns grouped organized items for the Library view."""
     from app.services.media_library_service import MediaLibraryService
@@ -105,6 +107,7 @@ def _ensure_person_cached(db, actor_id: int, actor_name: str, actor_profile_path
     # Otherwise, return full TMDB URL
     return f"https://image.tmdb.org/t/p/h632{actor_profile_path}"
 
+@router.get("/library/item/{item_id}")
 def get_library_item_detail(item_id: str):
     """Returns comprehensive detail data for a single library item (movie detail page)."""
     db = Session()
@@ -346,6 +349,7 @@ def get_library_item_detail(item_id: str):
     finally:
         db.close()
 
+@router.get("/library/series/{series_tmdb_id}")
 def get_library_series_detail(series_tmdb_id: str):
     """Returns comprehensive detail data for a full series, including seasons and episodes."""
     db = Session()
@@ -397,7 +401,10 @@ def get_library_series_detail(series_tmdb_id: str):
             if not tmdb_data:
                 return JSONResponse(status_code=404, content={"error": "Series not found on TMDB"})
                 
-            credits = tmdb_data.get("credits", {})
+            credits = tmdb_data.get("aggregate_credits", {})
+            if not credits or not credits.get("cast"):
+                credits = tmdb_data.get("credits", {})
+                
             cast = []
             directors = []
             raw_directors = [c for c in credits.get("crew", []) if c.get("job") in ("Director", "Creator", "Executive Producer")][:2]
@@ -429,10 +436,11 @@ def get_library_series_detail(series_tmdb_id: str):
                     actor.get("popularity", 0),
                     ui_lang
                 )
+                char = actor.get("roles", [{}])[0].get("character") if "roles" in actor else actor.get("character")
                 cast.append({
                     "id": actor.get("id"),
                     "name": actor.get("name"),
-                    "character": actor.get("character"),
+                    "character": char,
                     "job": "Actor",
                     "profile_path": profile_path,
                     "popularity": actor.get("popularity", 0)

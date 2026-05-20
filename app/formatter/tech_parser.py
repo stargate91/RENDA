@@ -51,14 +51,27 @@ class TechParser:
     @staticmethod
     def get_tech_context(item: Any) -> Dict[str, Any]:
         """Returns a standardized technical context dictionary."""
-        res = TechParser.parse_resolution(item.resolution or "")
+        res = TechParser.parse_resolution(getattr(item, "resolution", ""))
+        bit_depth = getattr(item, "bit_depth", None)
+        framerate = getattr(item, "framerate", None)
+        video_bitrate = getattr(item, "video_bitrate", None)
+        
+        # We populate both CamelCase (expected by templates) and lowercase (expected by some code/tests) keys
         return {
             "Resolution": res,
-            "VideoCodec": item.video_codec or "",
-            "AudioCodec": item.audio_codec or "",
-            "AudioChannels": item.audio_channels or "",
-            "BitDepth": f"{item.bit_depth}bit" if item.bit_depth else "",
-            "HDR": item.hdr_type or "",
-            "Framerate": str(item.framerate) if item.framerate else "",
-            "VideoBitrate": f"{round(item.video_bitrate / 1000)}kbps" if item.video_bitrate else "",
+            "resolution": res,
+            "VideoCodec": getattr(item, "video_codec", "") or "",
+            "video_codec": getattr(item, "video_codec", "") or "",
+            "AudioCodec": getattr(item, "audio_codec", "") or "",
+            "audio_codec": getattr(item, "audio_codec", "") or "",
+            "AudioChannels": getattr(item, "audio_channels", "") or "",
+            "audio_channels": getattr(item, "audio_channels", "") or "",
+            "BitDepth": f"{bit_depth}bit" if bit_depth else "",
+            "bit_depth": f"{bit_depth}bit" if bit_depth else "",
+            "HDR": getattr(item, "hdr_type", "") or "",
+            "hdr": getattr(item, "hdr_type", "") or "",
+            "Framerate": str(framerate) if framerate else "",
+            "framerate": str(framerate) if framerate else "",
+            "VideoBitrate": f"{round(video_bitrate / 1000)}kbps" if video_bitrate else "",
+            "video_bitrate": f"{round(video_bitrate / 1000)}kbps" if video_bitrate else "",
         }

@@ -162,11 +162,17 @@ class TMDBClient:
         """Részletes adatok lekérése."""
         if not self._api_key: return {}
 
-        endpoint = f"/movie/{tmdb_id}" if item_type == "movie" else f"/tv/{tmdb_id}"
+        if item_type == "movie":
+            endpoint = f"/movie/{tmdb_id}"
+            append = "credits,external_ids,images,translations,videos"
+        else:
+            endpoint = f"/tv/{tmdb_id}"
+            append = "credits,aggregate_credits,external_ids,images,translations,videos"
+
         params = {
             "api_key": self._api_key,
             "language": language,
-            "append_to_response": "credits,external_ids,images,translations,videos"
+            "append_to_response": append
         }
         return self._call_api(endpoint, params)
 

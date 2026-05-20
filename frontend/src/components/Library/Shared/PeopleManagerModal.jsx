@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, Loader2, User, Check, Plus, Minus, Heart, X } from 'lucide-react';
-import { api } from '../../../services/api';
+import { api, API_BASE } from '../../../services/api';
 
 const PeopleManagerModal = ({
   activeTab, // 'actors' | 'directors'
@@ -521,7 +521,7 @@ const PeopleManagerModal = ({
                           }}>
                             {hasPortrait ? (
                               <img 
-                                src={`http://localhost:8000/media/images/persons${person.profile_path}`} 
+                                src={`${API_BASE}/media/images/persons${person.profile_path}`} 
                                 alt={person.name} 
                                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                               />

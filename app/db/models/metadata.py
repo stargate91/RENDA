@@ -8,8 +8,8 @@ from .enums import ItemType, ImageStatus
 class MediaMatch(Base):
     """Level 2: Global metadata match (e.g., TMDB result)."""
     __tablename__ = "media_matches"
-    id: Mapped[int] = mapped_column(primary_key=True); media_item_id: Mapped[Optional[int]] = mapped_column(ForeignKey("media_items.id"), index=True)
-    parent_id: Mapped[Optional[int]] = mapped_column(ForeignKey("media_matches.id"), index=True); tmdb_id: Mapped[int] = mapped_column(Integer, index=True)
+    id: Mapped[int] = mapped_column(primary_key=True); media_item_id: Mapped[Optional[int]] = mapped_column(ForeignKey("media_items.id", ondelete="CASCADE"), index=True)
+    parent_id: Mapped[Optional[int]] = mapped_column(ForeignKey("media_matches.id", ondelete="CASCADE"), index=True); tmdb_id: Mapped[int] = mapped_column(Integer, index=True)
     imdb_id: Mapped[Optional[str]] = mapped_column(String, index=True); series_tmdb_id: Mapped[Optional[int]] = mapped_column(Integer)
     season_tmdb_id: Mapped[Optional[int]] = mapped_column(Integer); item_type: Mapped[ItemType] = mapped_column(SQLEnum(ItemType))
     season_number: Mapped[Optional[int]] = mapped_column(Integer); episode_number: Mapped[Optional[Any]] = mapped_column(JSON)
@@ -41,7 +41,7 @@ class MediaMatch(Base):
 class MetadataLocalization(Base):
     """Level 3: Language-specific metadata (localized titles, overviews)."""
     __tablename__ = "metadata_localizations"
-    id: Mapped[int] = mapped_column(primary_key=True); match_id: Mapped[int] = mapped_column(ForeignKey("media_matches.id"))
+    id: Mapped[int] = mapped_column(primary_key=True); match_id: Mapped[int] = mapped_column(ForeignKey("media_matches.id", ondelete="CASCADE"))
     target_language: Mapped[str] = mapped_column(String, default="en", index=True); is_primary: Mapped[bool] = mapped_column(Boolean, default=True)
     title: Mapped[str] = mapped_column(String); original_title: Mapped[Optional[str]] = mapped_column(String)
     series_title: Mapped[Optional[str]] = mapped_column(String); original_series_title: Mapped[Optional[str]] = mapped_column(String)

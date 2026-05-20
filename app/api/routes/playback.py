@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+@router.get("/trailer/{trailer_key}")
 def get_trailer(trailer_key: str):
     """
     Stream a locally cached trailer. If not yet downloaded, returns 202 with status.
@@ -43,6 +44,7 @@ def get_trailer(trailer_key: str):
         content={"status": "not_found", "message": "Trailer not cached. Call POST /api/trailer/{key} to start download."}
     )
 
+@router.get("/trailer/{trailer_key}/status")
 def check_trailer_status(trailer_key: str):
     """
     Lightweight status check for a trailer to see if it is cached, downloading, or not found.
@@ -57,6 +59,7 @@ def check_trailer_status(trailer_key: str):
         return {"status": "downloading"}
     return {"status": "not_found"}
 
+@router.post("/trailer/{trailer_key}")
 def request_trailer_download(trailer_key: str):
     """
     Trigger an on-demand trailer download via yt-dlp.
@@ -88,6 +91,7 @@ def request_trailer_download(trailer_key: str):
         content={"status": "downloading", "message": "Trailer download started."}
     )
 
+@router.post("/reveal")
 def reveal_in_explorer(payload: dict):
     """Opens the file's parent folder and selects the file in the OS file explorer."""
     path = payload.get("path")
@@ -216,6 +220,7 @@ def monitor_playback(item_id: int, player_type: str, proc: subprocess.Popen, por
     finally:
         logger.info(f"Playback monitoring thread finished for item_id={item_id}")
 
+@router.post("/media/play")
 def play_media_item(payload: dict):
     """Launches the media file locally using the OS default associated media player."""
     item_id = payload.get("item_id")
@@ -242,7 +247,7 @@ def play_media_item(payload: dict):
         logger.info(f"Launching media file with hybrid tracking: {file_path}")
         
         # 1. Update general stats immediately
-        item.watch_count += 1
+        item.watch_count = (item.watch_count or 0) + 1
         item.last_watched_at = datetime.utcnow()
         
         # Create a new PlaybackLog entry
@@ -304,6 +309,7 @@ def play_media_item(payload: dict):
     finally:
         db.close()
 
+@router.post("/library/item/{item_id}/reset-progress")
 def reset_item_progress(item_id: int):
     """Manually resets the playback progress of an item to 0 and removes the watched flag."""
     db = Session()

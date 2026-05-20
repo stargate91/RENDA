@@ -156,6 +156,7 @@ def resolve_metadata(request: ResolveRequest):
                 match = MediaMatch(
                     media_item_id=item.id,
                     tmdb_id=tmdb_id,
+                    series_tmdb_id=tmdb_id,
                     item_type=m_type,
                     season_number=season,
                     episode_number=target_episode,
@@ -168,6 +169,7 @@ def resolve_metadata(request: ResolveRequest):
                 match.item_type = m_type
                 match.episode_number = target_episode
                 match.season_number = season
+                match.series_tmdb_id = tmdb_id
             
             active_match = match
 

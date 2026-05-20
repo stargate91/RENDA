@@ -77,6 +77,22 @@ class TMDBSeason(BaseModel):
     episode_count: int = 0
     poster_path: Optional[str] = None
 
+class TMDBRole(BaseModel):
+    character: Optional[str] = None
+    episode_count: int = 0
+
+class TMDBAggregatePerson(BaseModel):
+    id: int
+    name: str
+    roles: List[TMDBRole] = []
+    profile_path: Optional[str] = None
+    order: int = 0
+    popularity: float = 0.0
+
+class TMDBAggregateCredits(BaseModel):
+    cast: List[TMDBAggregatePerson] = []
+    crew: List[TMDBPerson] = []
+
 class TMDBSeries(TMDBBase):
     name: str
     original_name: Optional[str] = None
@@ -89,6 +105,7 @@ class TMDBSeries(TMDBBase):
     episode_run_time: List[int] = []
     created_by: List[Dict[str, Any]] = [] # Often simplified persons
     seasons: List[TMDBSeason] = []
+    aggregate_credits: Optional[TMDBAggregateCredits] = None
 
 class TMDBEpisode(BaseModel):
     id: int

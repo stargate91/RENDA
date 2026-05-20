@@ -132,6 +132,7 @@ class MetadataEnricher:
         match.number_of_seasons = series_details.get("number_of_seasons")
         match.number_of_episodes = series_details.get("number_of_episodes")
         match.networks = [n["name"] for n in series_details.get("networks", [])]
+        match.series_tmdb_id = match.tmdb_id
         
         loc = self._get_or_create_loc(match, language)
         loc.title = series_details.get("name")
@@ -307,7 +308,10 @@ class MetadataEnricher:
         """Kinyeri és összeköti a stábtagokat és színészeket."""
         from ..db.models import Person, MediaPersonLink
         
-        credits = details.get("credits", {})
+        credits = details.get("aggregate_credits", {}) if match.item_type != ItemType.MOVIE else details.get("credits", {})
+        if not credits or not credits.get("cast"):
+            credits = details.get("credits", {})
+            
         cast = credits.get("cast", [])[:10] # Top 10 színész
         crew = credits.get("crew", [])
         
@@ -337,7 +341,8 @@ class MetadataEnricher:
         for i, p in enumerate(cast):
             if p["id"] in processed_people: continue
             person = self._get_or_create_person(p)
-            self._link_person(match, person, job="Actor", character=p.get("character"), order=i)
+            char = p.get("roles", [{}])[0].get("character") if "roles" in p else p.get("character")
+            self._link_person(match, person, job="Actor", character=char, order=i)
             processed_people.append(p["id"])
 
     def _get_or_create_person(self, p_data: Dict[str, Any]) -> "Person":

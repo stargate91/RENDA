@@ -170,6 +170,10 @@ const LibraryView = ({ T }) => {
   });
 
   const currentItems = data[activeTab] || [];
+  const mediaItemsForBulk = React.useMemo(
+    () => [...(data.movies || []), ...(data.series || []), ...(data.adult || [])],
+    [data.movies, data.series, data.adult]
+  );
 
   // Extract all unique custom tags from current active tab's items
   const uniqueTags = React.useMemo(() => {
@@ -608,14 +612,14 @@ const LibraryView = ({ T }) => {
         <BulkTagModal
           T={T}
           selectedItemIds={selectedItemIds}
-          currentItems={renderItems}
+          currentItems={mediaItemsForBulk}
           onClose={() => setIsBulkTagModalOpen(false)}
           onApply={async (addTags, removeTags) => {
             const finalItemIds = [];
             selectedItemIds.forEach(id => {
               if (typeof id === 'string' && id.startsWith('series_')) {
                 const tmdbIdStr = id.replace('series_', '');
-                const matches = renderItems.filter(item => String(item.series_tmdb_id) === tmdbIdStr);
+                const matches = mediaItemsForBulk.filter(item => String(item.series_tmdb_id) === tmdbIdStr);
                 matches.forEach(m => { if (!finalItemIds.includes(m.id)) finalItemIds.push(m.id); });
               } else {
                 if (!finalItemIds.includes(id)) finalItemIds.push(id);

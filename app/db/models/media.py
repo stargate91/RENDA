@@ -74,7 +74,7 @@ class MediaItem(Base):
 class ExtraFile(Base):
     """Associated files like subtitles, images, and trailers."""
     __tablename__ = "extra_files"
-    id: Mapped[int] = mapped_column(primary_key=True); parent_item_id: Mapped[int] = mapped_column(ForeignKey("media_items.id"), index=True)
+    id: Mapped[int] = mapped_column(primary_key=True); parent_item_id: Mapped[int] = mapped_column(ForeignKey("media_items.id", ondelete="CASCADE"), index=True)
     category: Mapped[ExtraCategory] = mapped_column(SQLEnum(ExtraCategory), nullable=False)
     subtype: Mapped[Optional[ExtraSubtype]] = mapped_column(SQLEnum(ExtraSubtype), nullable=True)
     original_path: Mapped[str] = mapped_column(String, nullable=False, index=True); current_path: Mapped[str] = mapped_column(String, nullable=False, index=True)

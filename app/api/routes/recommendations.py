@@ -10,6 +10,7 @@ import platform
 from pathlib import Path
 from typing import Optional
 
+from app.db.deletion import delete_extra_files_by_ids, delete_media_items_by_ids
 from app.db.base import Session
 from app.db.models import *
 
@@ -17,6 +18,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+@router.get("/recommendations")
 def get_recommendations():
     from app.services.media_library_service import MediaLibraryService
     from app.api.tmdb_client import TMDBClient
@@ -54,6 +56,7 @@ def get_recommendations():
     finally:
         db.close()
 
+@router.get("/discovery")
 def get_discovery_items():
     """Returns grouped discovery items for the UI."""
     from app.services.media_discovery_service import MediaDiscoveryService
@@ -64,6 +67,7 @@ def get_discovery_items():
     finally:
         db.close()
 
+@router.post("/discovery/delete")
 def delete_discovery_items(payload: dict):
     """Deletes specified media items and extras from the database."""
     item_ids = payload.get("item_ids", [])
@@ -71,9 +75,9 @@ def delete_discovery_items(payload: dict):
     db = Session()
     try:
         if item_ids:
-            db.query(MediaItem).filter(MediaItem.id.in_(item_ids)).delete(synchronize_session=False)
+            delete_media_items_by_ids(db, item_ids)
         if extra_ids:
-            db.query(ExtraFile).filter(ExtraFile.id.in_(extra_ids)).delete(synchronize_session=False)
+            delete_extra_files_by_ids(db, extra_ids)
         db.commit()
         return {"status": "success", "deleted_items": len(item_ids), "deleted_extras": len(extra_ids)}
     except Exception as e:
@@ -83,6 +87,7 @@ def delete_discovery_items(payload: dict):
     finally:
         db.close()
 
+@router.post("/watchlist")
 def add_to_watchlist(payload: dict):
     from app.api.tmdb_client import TMDBClient
     from app.db.models.media import CustomList, CustomListItem

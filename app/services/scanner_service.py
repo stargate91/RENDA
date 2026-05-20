@@ -98,15 +98,17 @@ class ScannerService:
         def run_scan():
             logger.info("Background scan task starting...")
             from app.utils.config_manager import config_manager
-            from app.db.base import SessionFactory
-            with SessionFactory() as db:
-                try:
-                    min_size = config_manager.get_int("min_video_size_mb", 500)
-                    scanner = ScannerManager(db, min_video_size_mb=min_size)
-                    scanner.scan_and_save(paths)
-                    logger.info("Background scan task completed successfully.")
-                except Exception as e:
-                    logger.error(f"Background scan task failed: {e}")
-                    logger.error(traceback.format_exc())
+            from app.db.base import Session
+            db = Session()
+            try:
+                min_size = config_manager.get_int("min_video_size_mb", 500)
+                scanner = ScannerManager(db, min_video_size_mb=min_size)
+                scanner.scan_and_save(paths)
+                logger.info("Background scan task completed successfully.")
+            except Exception as e:
+                logger.error(f"Background scan task failed: {e}")
+                logger.error(traceback.format_exc())
+            finally:
+                Session.remove()
         
         task_manager.run_task("LibraryScan", run_scan)

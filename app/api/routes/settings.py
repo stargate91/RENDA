@@ -1,9 +1,9 @@
 from fastapi import APIRouter
+from app.db.deletion import delete_media_items_by_ids
 from app.db.base import Session
 from app.db.models import *
 
 router = APIRouter()
-
 
 
 @router.get("/settings")
@@ -81,7 +81,6 @@ def clear_database(options: dict = None):
         
     db = Session()
     try:
-        from app.db.base import cache_engine
         import logging
         logger = logging.getLogger(__name__)
 
@@ -90,11 +89,6 @@ def clear_database(options: dict = None):
             for table in reversed(Base.metadata.sorted_tables):
                 if table.name != "user_settings":
                     db.execute(table.delete())
-            # Clear cache database
-            from app.db.base import CacheBase
-            with cache_engine.begin() as conn:
-                for table in reversed(CacheBase.metadata.sorted_tables):
-                    conn.execute(table.delete())
         else:
             # 1. Scanned Files & Discovery
             if options.get("discovery"):
@@ -104,7 +98,8 @@ def clear_database(options: dict = None):
                     ItemStatus.NEW, ItemStatus.NO_MATCH, ItemStatus.UNCERTAIN, 
                     ItemStatus.MULTIPLE, ItemStatus.MATCHED, ItemStatus.ERROR
                 ]
-                db.query(MediaItem).filter(MediaItem.status.in_(disc_statuses)).delete(synchronize_session=False)
+                item_ids = [row.id for row in db.query(MediaItem.id).filter(MediaItem.status.in_(disc_statuses)).all()]
+                delete_media_items_by_ids(db, item_ids)
 
             # 2. Organized Library & Performers
             if options.get("library"):
@@ -112,29 +107,25 @@ def clear_database(options: dict = None):
                 from app.db.models import MediaItem, Person, PersonLocalization, MediaPersonLink
                 lib_statuses = [ItemStatus.ORGANIZED, ItemStatus.RENAMED]
                 # Delete library media items
-                db.query(MediaItem).filter(MediaItem.status.in_(lib_statuses)).delete(synchronize_session=False)
+                item_ids = [row.id for row in db.query(MediaItem.id).filter(MediaItem.status.in_(lib_statuses)).all()]
+                delete_media_items_by_ids(db, item_ids)
                 # Delete all persons (actors / directors database)
                 db.query(MediaPersonLink).delete(synchronize_session=False)
                 db.query(PersonLocalization).delete(synchronize_session=False)
                 db.query(Person).delete(synchronize_session=False)
 
-            # 3. Metadata Cache
-            if options.get("cache"):
-                from app.db.base import CacheBase
-                with cache_engine.begin() as conn:
-                    for table in reversed(CacheBase.metadata.sorted_tables):
-                        conn.execute(table.delete())
-
-            # 4. Custom Tags
+            # 3. Custom Tags
             if options.get("tags"):
-                from app.db.models import Tag
+                from app.db.models import Tag, media_item_tags
                 from app.db.models.person import Person
+                # Clear association rows explicitly; SQLite cascades only work when FK enforcement is on.
+                db.execute(media_item_tags.delete())
                 # Delete all Tag entities from the tags table
                 db.query(Tag).delete(synchronize_session=False)
                 # Clear custom_tags on persons
                 db.query(Person).update({Person.custom_tags: None}, synchronize_session=False)
 
-            # 5. Operation History & logs
+            # 4. Operation History & logs
             if options.get("history"):
                 from app.db.models.action import ActionBatch, ActionLog
                 from app.db.models.media import PlaybackLog
@@ -151,5 +142,3 @@ def clear_database(options: dict = None):
         return {"status": "error", "message": str(e)}
     finally:
         db.close()
-
-

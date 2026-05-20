@@ -93,7 +93,7 @@ class MediaLibraryService:
                 "path": item.current_path,
                 "season_number": active_match.season_number if active_match else None,
                 "episode_number": active_match.episode_number if active_match else None,
-                "series_tmdb_id": active_match.series_tmdb_id if active_match else None,
+                "series_tmdb_id": active_match.series_tmdb_id if (active_match and active_match.series_tmdb_id) else (active_match.tmdb_id if active_match and item.item_type in [ItemType.SERIES, ItemType.EPISODE] else None),
                 "tmdb_id": active_match.tmdb_id if active_match else None,
                 "series_title": loc.series_title if loc else None,
                 "season_title": loc.season_title if loc else None,

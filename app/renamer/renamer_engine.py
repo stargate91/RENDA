@@ -44,6 +44,7 @@ class RenamerEngine:
         item = self.db.query(MediaItem).get(preview.item_id)
         if not item:
             return False
+        batch_id = self._ensure_batch_id(batch_id)
 
         # Track successful moves for rollback
         successful_moves = [] # List[(Path, Path)] - (old_path, target_path)
@@ -64,6 +65,22 @@ class RenamerEngine:
                 raise FileExistsError(f"File exists at target: {target_path}")
 
             # Fizikai mozgatás
+            for extra_preview in preview.extra_previews:
+                extra = self.db.query(ExtraFile).get(extra_preview.extra_id)
+                if not extra:
+                    continue
+
+                e_old = Path(extra.current_path)
+                if not e_old.exists():
+                    raise FileNotFoundError(f"Extra source not found: {e_old}")
+
+                if self._preview_action(extra_preview) != "delete":
+                    e_target = Path(extra_preview.target_path)
+                    if e_target.exists() and e_target != e_old:
+                        if e_target.is_dir():
+                            raise FileExistsError(f"Directory exists at extra target: {e_target}")
+                        raise FileExistsError(f"File exists at extra target: {e_target}")
+
             shutil.move(str(old_path), str(target_path))
             successful_moves.append((old_path, target_path))
             
@@ -77,16 +94,21 @@ class RenamerEngine:
                 if not e_old.exists():
                     raise FileNotFoundError(f"Extra source not found: {e_old}")
 
-                if getattr(extra_preview, "action", "RENAME") == "DELETE":
+                if self._preview_action(extra_preview) == "delete":
                     # Törlés
                     e_old.unlink()
                     successful_moves.append((e_old, None)) # None jelzi, hogy törölve lett
                 else:
                     # Mozgatás
                     e_target = Path(extra_preview.target_path)
+                    if e_target.exists() and e_target != e_old:
+                        if e_target.is_dir():
+                            raise FileExistsError(f"Directory exists at extra target: {e_target}")
+                        raise FileExistsError(f"File exists at extra target: {e_target}")
                     e_target.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.move(str(e_old), str(e_target))
-                    successful_moves.append((e_old, e_target))
+                    if e_target != e_old:
+                        shutil.move(str(e_old), str(e_target))
+                        successful_moves.append((e_old, e_target))
 
             # --- SIKERES MOZGATÁSOK UTÁN: ADATBÁZIS FRISSÍTÉS ---
 
@@ -102,7 +124,7 @@ class RenamerEngine:
                 extra = self.db.query(ExtraFile).get(extra_preview.extra_id)
                 if extra:
                     old_e_path = extra.current_path
-                    if getattr(extra_preview, "action", "RENAME") == "DELETE":
+                    if self._preview_action(extra_preview) == "delete":
                         self.db.delete(extra)
                         self._log_action(batch_id, extra_id=None, action_type=ActionType.DELETE, 
                                         status=ActionStatus.SUCCESS, old_val=old_e_path, new_val=None)
@@ -147,14 +169,33 @@ class RenamerEngine:
         new_path = Path(target_path_str)
         
         if old_path.exists():
+            if new_path.exists() and new_path != old_path:
+                if new_path.is_dir():
+                    raise FileExistsError(f"Directory exists at extra target: {new_path}")
+                raise FileExistsError(f"File exists at extra target: {new_path}")
             new_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.move(str(old_path), str(new_path))
+            if new_path != old_path:
+                shutil.move(str(old_path), str(new_path))
             
             old_current = extra.current_path
             extra.current_path = str(new_path)
             
             self._log_action(batch_id, extra_id=extra.id, action_type=ActionType.RENAME, 
                             status=ActionStatus.SUCCESS, old_val=old_current, new_val=str(new_path))
+
+    def _ensure_batch_id(self, batch_id: Optional[int]) -> int:
+        """Creates an ad-hoc batch when execute_single is called directly."""
+        if batch_id is not None:
+            return batch_id
+
+        batch = ActionBatch(name="Single rename")
+        self.db.add(batch)
+        self.db.commit()
+        return batch.id
+
+    def _preview_action(self, preview: RenamePreview) -> str:
+        """Normalizes preview actions from config/UI values."""
+        return str(getattr(preview, "action", "rename") or "rename").strip().lower()
 
     def _log_action(self, batch_id, item_id=None, extra_id=None, action_type=None, status=None, old_val=None, new_val=None, error=None):
         """Művelet naplózása az adatbázisba."""

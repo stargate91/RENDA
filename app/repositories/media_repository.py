@@ -1,6 +1,7 @@
 from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, or_
+from app.db.deletion import delete_extra_files_by_ids, delete_media_items_by_ids
 from app.db.models import MediaItem, MediaMatch, ExtraFile, ItemStatus, ItemType, MovieEdition, MediaSource, MediaAudioType, PartType, PartStyle, ExtraSubtype, ExtraCategory
 
 class MediaRepository:
@@ -44,11 +45,11 @@ class MediaRepository:
 
     def delete_items(self, item_ids: List[int]):
         if item_ids:
-            self.db.query(MediaItem).filter(MediaItem.id.in_(item_ids)).delete(synchronize_session=False)
+            delete_media_items_by_ids(self.db, item_ids)
 
     def delete_extras(self, extra_ids: List[int]):
         if extra_ids:
-            self.db.query(ExtraFile).filter(ExtraFile.id.in_(extra_ids)).delete(synchronize_session=False)
+            delete_extra_files_by_ids(self.db, extra_ids)
 
     def get_stats(self) -> Dict[str, Any]:
         # Movies count

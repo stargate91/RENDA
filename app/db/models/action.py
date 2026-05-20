@@ -17,8 +17,8 @@ class ActionLog(Base):
     """Audit log for individual file operations."""
     __tablename__ = "action_logs"
     id: Mapped[int] = mapped_column(primary_key=True); batch_id: Mapped[int] = mapped_column(ForeignKey("action_batches.id"), index=True)
-    media_item_id: Mapped[Optional[int]] = mapped_column(ForeignKey("media_items.id"), index=True)
-    extra_file_id: Mapped[Optional[int]] = mapped_column(ForeignKey("extra_files.id"), index=True)
+    media_item_id: Mapped[Optional[int]] = mapped_column(ForeignKey("media_items.id", ondelete="SET NULL"), index=True)
+    extra_file_id: Mapped[Optional[int]] = mapped_column(ForeignKey("extra_files.id", ondelete="SET NULL"), index=True)
     action_type: Mapped[ActionType] = mapped_column(SQLEnum(ActionType))
     status: Mapped[ActionStatus] = mapped_column(SQLEnum(ActionStatus), default=ActionStatus.PENDING)
     old_value: Mapped[Optional[str]] = mapped_column(String); new_value: Mapped[Optional[str]] = mapped_column(String)

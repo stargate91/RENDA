@@ -35,7 +35,7 @@ class PersonLocalization(Base):
 class MediaPersonLink(Base):
     """Link table between media matches and people (cast/crew)."""
     __tablename__ = "media_person_links"
-    id: Mapped[int] = mapped_column(primary_key=True); media_match_id: Mapped[int] = mapped_column(ForeignKey("media_matches.id"), index=True)
+    id: Mapped[int] = mapped_column(primary_key=True); media_match_id: Mapped[int] = mapped_column(ForeignKey("media_matches.id", ondelete="CASCADE"), index=True)
     person_id: Mapped[int] = mapped_column(ForeignKey("persons.id"), index=True); job: Mapped[str] = mapped_column(String, index=True)
     character_name: Mapped[Optional[str]] = mapped_column(String); order: Mapped[int] = mapped_column(Integer, default=0)
     media_match: Mapped["MediaMatch"] = relationship(back_populates="people"); person: Mapped["Person"] = relationship(back_populates="media_links")

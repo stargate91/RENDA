@@ -44,7 +44,9 @@ class ContextBuilder:
         """Builds context variables for Series, Seasons, and Episodes."""
         ctx = self.tech_parser.get_tech_context(item)
         if children:
-            ctx["Resolution"] = self.tech_parser.calculate_mixed_resolution(children)
+            mixed_res = self.tech_parser.calculate_mixed_resolution(children)
+            ctx["Resolution"] = mixed_res
+            ctx["resolution"] = mixed_res
 
         ctx.update({
             "SeriesTitle": loc.series_title or loc.title or "",
@@ -74,14 +76,18 @@ class ContextBuilder:
     def build_extra_context(self, extra: Any, parent_formatted_name: str) -> Dict[str, Any]:
         """Builds context variables for Extra files."""
         sub_cat = extra.subtype.value.replace("_", " ").title() if extra.subtype else ""
-        if extra.category == "Metadata" and sub_cat.lower() == (extra.extension or "").lower().strip("."):
+        category = extra.category.value if hasattr(extra.category, "value") else str(extra.category or "")
+        if category.lower() == "metadata" and sub_cat.lower() == (extra.extension or "").lower().strip("."):
             sub_cat = ""
 
         return {
             "ParentName": parent_formatted_name,
-            "Category": extra.category.value if extra.category else "",
+            "Category": category,
+            "category": category,
             "SubCategory": sub_cat,
+            "sub_category": sub_cat,
             "Language": extra.language.upper() if extra.language else "",
+            "language": extra.language.upper() if extra.language else "",
             "ext": extra.extension or "",
             "custom": self.config.custom_text
         }
@@ -97,7 +103,7 @@ class ContextBuilder:
                 label = item.part_type.value
             
             style = item.part_style
-            from .formatter import to_roman, to_alpha
+            from .utils import to_roman, to_alpha
             if style == PartStyle.ROMAN or (not style and self.config.part_numbering == "roman"):
                 val = to_roman(item.part)
             elif style == PartStyle.ALPHA or (not style and self.config.part_numbering == "alpha"):

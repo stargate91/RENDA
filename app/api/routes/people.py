@@ -10,6 +10,7 @@ import subprocess
 import platform
 from pathlib import Path
 from typing import Optional
+import uuid
 
 from app.db.base import Session
 from app.db.models import *
@@ -18,6 +19,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+@router.get("/people")
 def get_people(
     search: str = None,
     role: str = None,
@@ -100,6 +102,7 @@ def get_people(
     finally:
         db.close()
 
+@router.get("/people/search-tmdb")
 def search_people_tmdb(query: str, language: str = None):
     """Searches the TMDB API for people (actors/directors)."""
     db = Session()
@@ -121,6 +124,7 @@ def search_people_tmdb(query: str, language: str = None):
     finally:
         db.close()
 
+@router.post("/people/add-tmdb")
 def add_person_tmdb(payload: dict):
     """Fetches a person by TMDB ID, creates/updates them in the DB, sets as active, and enriches metadata in all configured languages."""
     tmdb_id = payload.get("tmdb_id")
@@ -189,6 +193,7 @@ def add_person_tmdb(payload: dict):
     finally:
         db.close()
 
+@router.get("/people/{person_id}")
 def get_person_detail(person_id: int):
     """Returns comprehensive detail data for a single person, including their biography and associated library items."""
     db = Session()
@@ -276,11 +281,11 @@ def get_person_detail(person_id: int):
                 })
             else:  # Episode or Series
                 series_title = (item_loc.series_title if item_loc else None) or title
-                sid = match.series_tmdb_id or series_title
+                sid = match.series_tmdb_id or match.tmdb_id or series_title
                 if sid not in series_map:
                     series_map[sid] = {
                         "id": f"series_{sid}",
-                        "series_tmdb_id": match.series_tmdb_id,
+                        "series_tmdb_id": match.series_tmdb_id or match.tmdb_id,
                         "title": series_title,
                         "type": "series",
                         "year": match.first_air_date.year if match.first_air_date else (match.release_date.year if match.release_date else None),
@@ -323,12 +328,17 @@ def get_person_detail(person_id: int):
                 local_movies_map = {m.tmdb_id: m.id for m in local_movies if m.tmdb_id}
 
                 # Let's map active series TMDB IDs in library
-                local_series = db.query(MediaMatch.series_tmdb_id).join(MediaMatch.media_item).filter(
+                local_series = db.query(MediaMatch.series_tmdb_id, MediaMatch.tmdb_id).join(MediaMatch.media_item).filter(
                     MediaMatch.is_active == True,
                     MediaItem.status.in_([ItemStatus.RENAMED, ItemStatus.ORGANIZED]),
-                    MediaItem.item_type == ItemType.SERIES
+                    MediaItem.item_type.in_([ItemType.SERIES, ItemType.EPISODE])
                 ).all()
-                local_series_set = {s.series_tmdb_id for s in local_series if s.series_tmdb_id}
+                local_series_set = set()
+                for s in local_series:
+                    if s.series_tmdb_id:
+                        local_series_set.add(s.series_tmdb_id)
+                    if s.tmdb_id:
+                        local_series_set.add(s.tmdb_id)
 
                 combined_credits = {}
                 for credit in cast_list + crew_list:
@@ -437,6 +447,7 @@ def get_person_detail(person_id: int):
     finally:
         db.close()
 
+@router.post("/people/{person_id}/status")
 def update_person_status(person_id: int, payload: dict):
     """Updates the status (is_active, is_favorite, user_rating) of a person."""
     db = Session()
@@ -471,6 +482,7 @@ def update_person_status(person_id: int, payload: dict):
     finally:
         db.close()
 
+@router.post("/people/{person_id}/profile")
 def update_person_profile(person_id: int, payload: dict):
     """Updates the profile picture of a person, downloading it if not present locally."""
     db = Session()
@@ -508,6 +520,7 @@ def update_person_profile(person_id: int, payload: dict):
     finally:
         db.close()
 
+@router.post("/people/{person_id}/upload-profile")
 def upload_person_profile(person_id: int, file: UploadFile = File(...)):
     """Uploads a local image file directly as the person's profile picture."""
     db = Session()

@@ -88,7 +88,7 @@ const PersonMoviesSection = ({
         ) : (
           displayedMovies.map(movie => {
             const posterUrl = movie.poster_path 
-              ? (movie.in_library 
+              ? (movie.has_local_poster 
                   ? `${API_BASE}/media/images/posters${movie.poster_path}`
                   : `https://image.tmdb.org/t/p/w185${movie.poster_path}`)
               : null;

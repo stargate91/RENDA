@@ -125,8 +125,12 @@ class ImageWorker:
         has_media = self.db.query(MediaMatch.id).filter(MediaMatch.image_status == ImageStatus.PENDING).first() is not None
         has_backdrops = self.db.query(MediaMatch.id).filter(MediaMatch.backdrop_status == ImageStatus.PENDING).first() is not None
         has_persons = self.db.query(Person.id).filter(Person.image_status == ImageStatus.PENDING).first() is not None
+        has_alts = self.db.query(Person.id).filter(
+            Person.image_status.in_([ImageStatus.COMPLETED, ImageStatus.FAILED]),
+            Person.images == None
+        ).first() is not None
         
-        if not (has_media or has_backdrops or has_persons):
+        if not (has_media or has_backdrops or has_persons or has_alts):
             return
 
         from concurrent.futures import ThreadPoolExecutor
@@ -148,7 +152,7 @@ class ImageWorker:
                 # 3. Backdrops (Large images)
                 self.process_pending_backdrops(executor)
                 
-        if has_persons:
+        if has_persons or has_alts:
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 # 4. People alternate profiles (Remaining images for top actors)
                 self.process_person_alternate_images(executor)

@@ -39,6 +39,7 @@ class Resolver:
             new_match = MediaMatch(
                 media_item_id=sib.id,
                 tmdb_id=active_match.tmdb_id,
+                series_tmdb_id=active_match.series_tmdb_id,
                 item_type=active_match.item_type,
                 # Fontos: a saját epizód/szezon számait használja, ha vannak!
                 season_number=sib.fn_season or sib.fd_season or active_match.season_number,
@@ -240,6 +241,7 @@ class Resolver:
             match = MediaMatch(
                 media_item_id=item.id,
                 tmdb_id=tmdb_id,
+                series_tmdb_id=tmdb_id if itype == ItemType.SERIES else None,
                 item_type=itype,
                 season_number=item.fn_season or item.fd_season or item.it_season,
                 episode_number=item.fn_episode or item.fd_episode or item.it_episode,

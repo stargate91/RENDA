@@ -28,10 +28,11 @@ def get_image_status():
             return {"active": False, "pending": 0, "downloading": 0, "total": 0, "completed": 0}
             
         completed_tasks = (
-            db.query(MediaMatch).filter(MediaMatch.image_status.in_([ImageStatus.COMPLETED, ImageStatus.FAILED])).count() +
-            db.query(MediaMatch).filter(MediaMatch.backdrop_status.in_([ImageStatus.COMPLETED, ImageStatus.FAILED])).count() +
-            db.query(Person).filter(Person.image_status.in_([ImageStatus.COMPLETED, ImageStatus.FAILED])).count() +
-            db.query(Person).filter(Person.images != None).count()
+            db.query(MediaMatch).filter(MediaMatch.image_status.in_([ImageStatus.COMPLETED, ImageStatus.FAILED, ImageStatus.NONE])).count() +
+            db.query(MediaMatch).filter(MediaMatch.backdrop_status.in_([ImageStatus.COMPLETED, ImageStatus.FAILED, ImageStatus.NONE])).count() +
+            db.query(Person).filter(Person.image_status.in_([ImageStatus.COMPLETED, ImageStatus.FAILED, ImageStatus.NONE])).count() +
+            db.query(Person).filter(Person.images != None).count() +
+            db.query(Person).filter(Person.image_status == ImageStatus.NONE).count()
         )
         
         active = total_tasks > completed_tasks

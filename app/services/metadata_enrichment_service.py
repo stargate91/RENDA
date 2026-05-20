@@ -89,12 +89,12 @@ class MetadataEnrichmentService:
             logger.error(f"Failed to parse TMDBSeries: {e}")
             return
 
-        # Update series-level properties
         self._update_match_common(match, series)
         match.series_type = series.type
         match.number_of_seasons = series.number_of_seasons
         match.number_of_episodes = series.number_of_episodes
         match.networks = [n.name for n in series.networks]
+        match.series_tmdb_id = match.tmdb_id
         
         # Queue images
         if series.poster_path: match.image_status = ImageStatus.PENDING
@@ -182,9 +182,25 @@ class MetadataEnrichmentService:
 
     def _process_people(self, match: MediaMatch, details: Union[TMDBMovie, TMDBSeries]):
         """Extracts and persists cast and crew information."""
-        credits = details.credits
-        cast = credits.cast[:10]
-        crew = credits.crew
+        from ..schemas.tmdb import TMDBPerson
+        
+        if isinstance(details, TMDBSeries) and details.aggregate_credits and details.aggregate_credits.cast:
+            cast = []
+            for p in details.aggregate_credits.cast:
+                char = p.roles[0].character if p.roles else None
+                cast.append(TMDBPerson(
+                    id=p.id,
+                    name=p.name,
+                    character=char,
+                    profile_path=p.profile_path,
+                    order=p.order
+                ))
+            cast = cast[:10]
+            crew = details.aggregate_credits.crew
+        else:
+            credits = details.credits
+            cast = credits.cast[:10] if credits else []
+            crew = credits.crew if credits else []
         
         # Determine directors/creators
         creators = []

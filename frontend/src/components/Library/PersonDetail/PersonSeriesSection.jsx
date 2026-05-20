@@ -88,7 +88,7 @@ const PersonSeriesSection = ({
         ) : (
           displayedSeries.map(show => {
             const posterUrl = show.poster_path 
-              ? (show.in_library 
+              ? (show.has_local_poster 
                   ? `${API_BASE}/media/images/posters${show.poster_path}`
                   : `https://image.tmdb.org/t/p/w185${show.poster_path}`)
               : null;

@@ -2,6 +2,7 @@ import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from sqlalchemy.orm import Session
+from app.db.deletion import delete_media_matches_for_items
 from ..db.models import MediaItem, MediaMatch, MetadataLocalization, ItemStatus, ItemType, ImageStatus
 
 logger = logging.getLogger(__name__)
@@ -18,7 +19,7 @@ class MatchService:
     def save_candidates(self, item: MediaItem, candidates: List[Dict[str, Any]], language: str):
         """Saves a list of match candidates and updates primary match status."""
         # Clear old matches
-        self.db.query(MediaMatch).filter(MediaMatch.media_item_id == item.id).delete()
+        delete_media_matches_for_items(self.db, [item.id])
         
         if not candidates:
             item.status = ItemStatus.NO_MATCH
@@ -54,7 +55,7 @@ class MatchService:
         ).all()
 
         for sib in siblings:
-            self.db.query(MediaMatch).filter(MediaMatch.media_item_id == sib.id).delete()
+            delete_media_matches_for_items(self.db, [sib.id])
             
             new_match = self._clone_match(active_match, sib.id)
             # Adjust season/episode from filename if available
@@ -81,6 +82,7 @@ class MatchService:
 
         return MediaMatch(
             media_item_id=item.id, tmdb_id=data.get("id"), item_type=itype,
+            series_tmdb_id=data.get("id") if itype == ItemType.SERIES else None,
             season_number=item.fn_season or item.fd_season or item.it_season,
             episode_number=item.fn_episode or item.fd_episode or item.it_episode,
             release_date=release_date if itype == ItemType.MOVIE else None,
@@ -94,6 +96,7 @@ class MatchService:
     def _clone_match(self, source: MediaMatch, target_item_id: int) -> MediaMatch:
         return MediaMatch(
             media_item_id=target_item_id, tmdb_id=source.tmdb_id, item_type=source.item_type,
+            series_tmdb_id=source.series_tmdb_id,
             release_date=source.release_date, first_air_date=source.first_air_date,
             confidence_score=source.confidence_score, is_active=True,
             rating_tmdb=source.rating_tmdb, vote_count_tmdb=source.vote_count_tmdb

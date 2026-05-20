@@ -17,12 +17,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+@router.post("/media/update")
 def update_media_item(payload: dict):
     """Updates media item or extra file properties manually."""
     db = Session()
     try:
-        from app.db.models import MediaItem, ExtraFile, MediaMatch, ItemType
-        from app.formatter.formatter import Formatter
+        from app.db.models import MediaItem, ExtraFile, ItemType
+        from app.formatter.formatter import Formatter, FormatterConfig
         
         item_id = payload.get("id")
         item_type = payload.get("type", "media")
@@ -70,11 +71,9 @@ def update_media_item(payload: dict):
             
             item = extra.parent_item
 
-        formatter = Formatter.from_db(db)
+        formatter = Formatter(FormatterConfig.from_db(db))
         active_match = next((m for m in item.matches if m.is_active), None)
         if active_match:
-            from app.scanner.metadata_enricher import MetadataEnricher
-            enricher = MetadataEnricher(db)
             preview = formatter.plan_rename(active_match, "")
             
             # Safe path joining
@@ -94,6 +93,7 @@ def update_media_item(payload: dict):
     finally:
         db.close()
 
+@router.post("/item/{item_id}/status")
 def update_item_status(item_id: int, payload: dict):
     """Updates the status (is_favorite, user_rating) of a media item."""
     db = Session()
@@ -143,6 +143,7 @@ def update_item_status(item_id: int, payload: dict):
     finally:
         db.close()
 
+@router.post("/item/{item_id}/retry-image")
 def retry_item_image(item_id: int):
     """Forces a redownload of the image for a specific item by resetting its local paths and status."""
     from app.db.models import MediaItem, ItemType, ImageStatus
@@ -173,14 +174,22 @@ def retry_item_image(item_id: int):
     finally:
         db.close()
 
+@router.post("/media/bulk-tags")
 def bulk_update_item_tags(payload: dict):
     """Bulk adds or removes tags from multiple media items."""
-    item_ids = payload.get("item_ids", [])
-    add_tag_names = [str(t).strip() for t in payload.get("add_tags", []) if str(t).strip()]
-    remove_tag_names = [str(t).strip() for t in payload.get("remove_tags", []) if str(t).strip()]
+    raw_item_ids = payload.get("item_ids", [])
+    item_ids = []
+    for raw_id in raw_item_ids:
+        try:
+            item_ids.append(int(raw_id))
+        except (TypeError, ValueError):
+            logger.warning(f"Ignoring non-media item id in bulk tag update: {raw_id}")
+
+    add_tag_names = list(dict.fromkeys(str(t).strip() for t in payload.get("add_tags", []) if str(t).strip()))
+    remove_tag_names = list(dict.fromkeys(str(t).strip() for t in payload.get("remove_tags", []) if str(t).strip()))
     
     if not item_ids:
-        return JSONResponse(status_code=400, content={"error": "item_ids list is required"})
+        return JSONResponse(status_code=400, content={"error": "No valid media item ids provided"})
         
     db = Session()
     try:
@@ -200,21 +209,37 @@ def bulk_update_item_tags(payload: dict):
         
         # 2. Update each media item
         items = db.query(MediaItem).filter(MediaItem.id.in_(item_ids)).all()
+        if not items:
+            return JSONResponse(status_code=404, content={"error": "No matching media items found"})
+
+        updated_count = 0
         for item in items:
             current_tags_map = {t.id: t for t in item.tags}
+            changed = False
             
             # Remove tags
             for t_rem in tags_to_remove:
                 if t_rem.id in current_tags_map:
                     item.tags.remove(current_tags_map[t_rem.id])
+                    changed = True
             
             # Add tags
             for t_add in tags_to_add:
                 if t_add.id not in current_tags_map:
                     item.tags.append(t_add)
+                    changed = True
+
+            if changed:
+                updated_count += 1
                     
         db.commit()
-        return {"status": "success", "updated_count": len(items)}
+        return {
+            "status": "success",
+            "matched_count": len(items),
+            "updated_count": updated_count,
+            "added_tags": [t.name for t in tags_to_add],
+            "removed_tags": [t.name for t in tags_to_remove]
+        }
     except Exception as e:
         db.rollback()
         logger.error(f"Error bulk updating item tags: {e}")

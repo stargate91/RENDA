@@ -41,7 +41,7 @@ export const api = {
 
   getLibrarySeriesDetail: (seriesTmdbId) => fetchJson(`/api/library/series/${seriesTmdbId}`),
 
-  getStats: () => fetchJson('/api/stats'),
+  getStats: () => fetchJson('/api/library/stats'),
 
   getScanStatus: () => fetchJson('/api/scan-status'),
 
