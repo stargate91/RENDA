@@ -89,12 +89,17 @@ def start_scan(request: ScanRequest, background_tasks: BackgroundTasks):
         db = Session()
         try:
             min_duration = 12
+            min_size = 50
             try:
                 setting = db.query(UserSetting).filter(UserSetting.key == "min_video_duration_minutes").first()
                 if setting and setting.value: min_duration = int(setting.value)
             except: pass
+            try:
+                setting_size = db.query(UserSetting).filter(UserSetting.key == "min_video_size_mb").first()
+                if setting_size and setting_size.value: min_size = int(setting_size.value)
+            except: pass
             
-            scanner = ScannerManager(db, min_video_duration_minutes=min_duration)
+            scanner = ScannerManager(db, min_video_size_mb=min_size, min_video_duration_minutes=min_duration)
             scanner.scan_and_save(request.paths)
             logger.info("Background scan task completed successfully.")
         except Exception as e:

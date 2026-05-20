@@ -124,8 +124,23 @@ const GeneralSettings = ({ settings, setSettings, T, availableLocales }) => {
 
       <div className="form-group split">
         <div className="form-group-info">
+          <label>Fix Extra Size (MB)</label>
+          <div className="input-hint">Videos smaller than this size are automatically classified as extras. Default is 50 MB.</div>
+        </div>
+        <div className="form-group-input">
+          <input
+            type="number"
+            className="form-input"
+            value={settings.min_video_size_mb !== undefined ? settings.min_video_size_mb : 50}
+            onChange={e => setSettings({ ...settings, min_video_size_mb: parseInt(e.target.value) || 0 })}
+          />
+        </div>
+      </div>
+
+      <div className="form-group split">
+        <div className="form-group-info">
           <label>Minimum Video Duration (minutes)</label>
-          <div className="input-hint">Videos shorter than this will be categorized as extras/samples (trailers, deleted scenes, etc.).</div>
+          <div className="input-hint">For videos larger than the size threshold, those shorter than this duration are moved to extras. Default is 12 minutes.</div>
         </div>
         <div className="form-group-input">
           <input

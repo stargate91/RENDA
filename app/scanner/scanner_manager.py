@@ -46,11 +46,9 @@ class ScannerManager:
     Handles file discovery, technical probing, and metadata extraction.
     """
 
-    def __init__(self, db_session: Session, min_video_size_mb: int = 500, min_video_duration_minutes: int = 12):
+    def __init__(self, db_session: Session, min_video_size_mb: int = 50, min_video_duration_minutes: int = 12):
         self.db = db_session
-        # For hybrid scanning, default to 50MB fast-track unless a smaller/custom size is explicitly requested (e.g. in tests)
-        size_mb = min_video_size_mb if min_video_size_mb != 500 else 50
-        self.collector = Collector(size_mb)
+        self.collector = Collector(min_video_size_mb)
         self.categorizer = Categorizer()
         self.linker = Linker()
         self.prober = TechnicalProber()
