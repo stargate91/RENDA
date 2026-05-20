@@ -21,6 +21,15 @@ const LibraryView = ({ T }) => {
   const [detailSeriesTmdbId, setDetailSeriesTmdbId] = useState(null);
   const [detailPersonId, setDetailPersonId] = useState(null);
   const [navigationStack, setNavigationStack] = useState([]);
+  const { pendingDetailId, setPendingDetailId } = useAppContext();
+
+  // If navigated here from Dashboard with a pending TMDB detail to open
+  useEffect(() => {
+    if (pendingDetailId) {
+      setDetailItemId(pendingDetailId);
+      setPendingDetailId(null);
+    }
+  }, [pendingDetailId]);
 
   const navigateTo = (viewType, id) => {
     let currentState = null;
@@ -829,6 +838,25 @@ const LibraryView = ({ T }) => {
                     backdropFilter: 'blur(4px)',
                   }}>
                     <Star size={10} fill="currentColor" /> {item.user_rating}
+                  </div>
+                )}
+
+                {item.path && item.path.startsWith('watchlist://') && !isSelectionMode && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '10px',
+                    left: item.user_rating > 0 ? '50px' : '10px',
+                    zIndex: 10,
+                    background: 'rgba(59, 130, 246, 0.95)',
+                    color: '#fff',
+                    padding: '4px 8px',
+                    borderRadius: '12px',
+                    fontSize: '11px',
+                    fontWeight: '800',
+                    boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
+                    backdropFilter: 'blur(4px)',
+                  }}>
+                    {T('library.watchlist') || 'Watchlist'}
                   </div>
                 )}
 

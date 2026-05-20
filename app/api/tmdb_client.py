@@ -213,3 +213,32 @@ class TMDBClient:
             "append_to_response": "images,translations,external_ids,combined_credits"
         }
         return self._call_api(endpoint, params)
+
+    def get_trending(self, media_type: str = "all", time_window: str = "day", language: str = "en-US") -> List[Dict[str, Any]]:
+        """Lekéri a napi/heti trending filmeket/sorozatokat."""
+        if not self._api_key: return []
+        
+        endpoint = f"/trending/{media_type}/{time_window}"
+        params = {
+            "api_key": self._api_key,
+            "language": language
+        }
+        data = self._call_api(endpoint, params)
+        return data.get("results", [])
+
+    def discover(self, media_type: str = "movie", with_genres: Optional[str] = None, language: str = "en-US", page: int = 1) -> List[Dict[str, Any]]:
+        """Lekéri a filmeket/sorozatokat különböző szűrők alapján (pl. műfaj)."""
+        if not self._api_key: return []
+
+        endpoint = f"/discover/{media_type}"
+        params = {
+            "api_key": self._api_key,
+            "language": language,
+            "page": page,
+            "sort_by": "popularity.desc"
+        }
+        if with_genres:
+            params["with_genres"] = with_genres
+
+        data = self._call_api(endpoint, params)
+        return data.get("results", [])

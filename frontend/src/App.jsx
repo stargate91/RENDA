@@ -9,6 +9,7 @@ import InspectorPanel from './components/Discovery/InspectorPanel';
 import SettingsView from './components/Settings/SettingsView';
 import DashboardView from './components/Dashboard/DashboardView';
 import LibraryView from './components/Library/LibraryView';
+import ListsView from './components/Lists/ListsView';
 import Layout from './components/Layout/Layout';
 import { useGlobalDragDrop } from './hooks/useGlobalDragDrop';
 import { useAppContext } from './context/AppContext';
@@ -104,6 +105,10 @@ function App() {
 
       {view === 'library' && (
         <LibraryView T={T} />
+      )}
+
+      {view === 'lists' && (
+        <ListsView T={T} />
       )}
 
       <ConfirmModal />

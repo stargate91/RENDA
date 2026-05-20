@@ -27,6 +27,7 @@ const en = {
     "dashboard": "Dashboard",
     "discovery": "Discovery",
     "library": "Library",
+    "lists": "Lists",
     "history": "History",
     "settings": "Settings"
   },
@@ -44,7 +45,18 @@ const en = {
       "storage_used": "Storage Used",
       "storage_sub": "across {{count}} drives",
       "unmatched": "Unmatched",
-      "unmatched_sub": "Pending in Discovery"
+      "unmatched_sub": "Pending in Discovery",
+      "library_dna": "Library DNA",
+      "timeline": "Time-Travel Timeline",
+      "top_decade": "You are a {{decade}} fanatic!"
+    },
+    "watchlist": {
+      "add": "Watchlist",
+      "add_short": "Watch",
+      "success": "Added to your Watchlist!"
+    },
+    "recommendations": {
+      "genre": "Because you like {{genre}}..."
     }
   },
   "discovery": {
@@ -331,6 +343,9 @@ const en = {
     "exit_selection_mode": "Exit Select"
   },
   "detail": {
+    "watchlist": {
+      "desc": "Your default system watchlist for movies and series."
+    },
     "play_trailer": "Play Trailer",
     "cast": "Cast",
     "series_cast": "Series Cast",
@@ -360,6 +375,12 @@ const en = {
       "available": "Available Tags",
       "create_hint": "Press enter to create new tag",
       "none_available": "No pre-created tags available"
+    },
+    "lists": {
+      "title": "Add to Lists",
+      "none": "No custom lists created.",
+      "create_new": "Create New List",
+      "new_placeholder": "Enter list name..."
     }
   },
   "resolver": {

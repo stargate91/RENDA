@@ -26,6 +26,13 @@ export const api = {
 
   syncMetadataLanguage: () => fetchJson('/api/metadata/sync-language', { method: 'POST' }),
 
+  getRecommendations: () => fetchJson('/api/recommendations'),
+
+  addToWatchlist: (tmdbId, type) => fetchJson('/api/watchlist', {
+    method: 'POST',
+    body: JSON.stringify({ tmdb_id: tmdbId, type }),
+  }),
+
   getDiscoveryItems: () => fetchJson('/api/discovery'),
 
   getLibrary: () => fetchJson('/api/library'),
@@ -183,6 +190,39 @@ export const api = {
   deleteTag: (tagId) => fetchJson(`/api/tags/${tagId}`, {
     method: 'DELETE'
   }),
+
+  // Custom Lists API
+  getLists: () => fetchJson('/api/lists'),
+  
+  createList: (listData) => fetchJson('/api/lists', {
+    method: 'POST',
+    body: JSON.stringify(listData)
+  }),
+
+  deleteList: (listId) => fetchJson(`/api/lists/${listId}`, {
+    method: 'DELETE'
+  }),
+
+  getListDetails: (listId) => fetchJson(`/api/lists/${listId}`),
+
+  addToList: (listId, itemData) => fetchJson(`/api/lists/${listId}/items`, {
+    method: 'POST',
+    body: JSON.stringify(itemData)
+  }),
+
+  removeFromList: (listId, itemId) => fetchJson(`/api/lists/${listId}/items/${itemId}`, {
+    method: 'DELETE'
+  }),
+
+  removeFromListByTmdb: (listId, tmdbId) => fetchJson(`/api/lists/${listId}/items/by-tmdb/${tmdbId}`, {
+    method: 'DELETE'
+  }),
+
+  removeFromListByMediaItem: (listId, mediaItemId) => fetchJson(`/api/lists/${listId}/items/by-media-item/${mediaItemId}`, {
+    method: 'DELETE'
+  }),
+
+  getItemMembership: (itemId) => fetchJson(`/api/lists/item-membership/${itemId}`),
 
   // Trailer API (yt-dlp based)
   requestTrailerDownload: (trailerKey) => fetchJson(`/api/trailer/${trailerKey}`, {

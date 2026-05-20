@@ -3,6 +3,7 @@ import {
   LayoutDashboard, 
   Search, 
   Library, 
+  ListVideo,
   History, 
   Settings, 
   RotateCcw, 
@@ -55,6 +56,10 @@ const Sidebar = ({ view, setView, T }) => {
         <div className={`nav-item ${view === 'library' ? 'active' : ''}`} onClick={() => setView('library')} title={isSidebarCollapsed ? T('sidebar.library') : ''}>
           <Library size={20} />
           <span>{T('sidebar.library')}</span>
+        </div>
+        <div className={`nav-item ${view === 'lists' ? 'active' : ''}`} onClick={() => setView('lists')} title={isSidebarCollapsed ? T('sidebar.lists') : ''}>
+          <ListVideo size={20} />
+          <span>{T('sidebar.lists') || 'Lists'}</span>
         </div>
         <div className={`nav-item ${view === 'history' ? 'active' : ''}`} onClick={() => setView('history')} title={isSidebarCollapsed ? T('sidebar.history') : ''}>
           <History size={20} />

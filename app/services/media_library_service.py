@@ -41,7 +41,9 @@ class MediaLibraryService:
             total_episodes=stats["total_episodes"],
             storage=storage_str,
             drive_count=len(drives) if drives else 0,
-            unmatched=stats["unmatched"]
+            unmatched=stats["unmatched"],
+            genre_distribution=stats.get("genre_distribution", {}),
+            decade_distribution=stats.get("decade_distribution", {})
         )
 
     def get_grouped_library(self) -> LibraryGroupedDTO:

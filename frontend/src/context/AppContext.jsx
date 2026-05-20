@@ -100,6 +100,7 @@ const DEFAULT_SETTINGS = {
 
 export const AppProvider = ({ children }) => {
   const [view, setView] = useState('dashboard');
+  const [pendingDetailId, setPendingDetailId] = useState(null);
   const [items, setItems] = useState({ manual: [], movies: [], series: [], extras: [], collisions: [] });
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(null);
@@ -494,6 +495,7 @@ export const AppProvider = ({ children }) => {
   return (
     <AppContext.Provider value={{
       view, setView,
+      pendingDetailId, setPendingDetailId,
       items, setItems,
       loading, setLoading,
       progress, setProgress,

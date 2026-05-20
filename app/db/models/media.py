@@ -91,3 +91,35 @@ class PlaybackLog(Base):
     media_item_id: Mapped[int] = mapped_column(ForeignKey("media_items.id", ondelete="CASCADE"), index=True)
     watched_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
     media_item: Mapped["MediaItem"] = relationship(back_populates="playback_logs")
+
+
+class CustomList(Base):
+    """User-created custom media lists."""
+    __tablename__ = "custom_lists"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    description: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    color: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    icon: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    items: Mapped[List["CustomListItem"]] = relationship(
+        "CustomListItem", back_populates="custom_list", cascade="all, delete-orphan"
+    )
+
+
+class CustomListItem(Base):
+    """Items inside user-created custom lists, can link to physical media or virtual TMDB ID."""
+    __tablename__ = "custom_list_items"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    list_id: Mapped[int] = mapped_column(ForeignKey("custom_lists.id", ondelete="CASCADE"), index=True)
+    tmdb_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    media_item_id: Mapped[Optional[int]] = mapped_column(ForeignKey("media_items.id", ondelete="CASCADE"), nullable=True, index=True)
+    media_type: Mapped[str] = mapped_column(String, default="movie")  # 'movie' or 'tv'
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    poster_path: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    added_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    custom_list: Mapped["CustomList"] = relationship("CustomList", back_populates="items")
+    media_item: Mapped[Optional["MediaItem"]] = relationship("MediaItem")
+

@@ -85,3 +85,5 @@ class LibraryStatsDTO(BaseModel):
     storage: str
     drive_count: int
     unmatched: int
+    genre_distribution: Dict[str, int] = {}
+    decade_distribution: Dict[str, int] = {}

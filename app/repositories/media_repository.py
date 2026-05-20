@@ -84,12 +84,46 @@ class MediaRepository:
             ])
         ).scalar() or 0
 
+        # Genre and Decade distribution
+        library_items = self.db.query(MediaItem).options(
+            joinedload(MediaItem.matches).joinedload(MediaMatch.localizations)
+        ).filter(
+            MediaItem.status.in_([ItemStatus.ORGANIZED, ItemStatus.RENAMED])
+        ).all()
+        
+        genre_dist = {}
+        decade_dist = {}
+        
+        for item in library_items:
+            active_match = next((m for m in item.matches if m.is_active), None)
+            if active_match:
+                # Decade calculation
+                year = None
+                if active_match.release_date:
+                    year = active_match.release_date.year
+                else:
+                    year = item.fn_year or item.fd_year
+                
+                if year and year >= 1900:
+                    decade = (year // 10) * 10
+                    decade_str = f"{decade}s"
+                    decade_dist[decade_str] = decade_dist.get(decade_str, 0) + 1
+                    
+                # Genre calculation (use primary localization or english if possible)
+                if active_match.localizations:
+                    loc = next((l for l in active_match.localizations if l.is_primary), active_match.localizations[0])
+                    if loc.genres:
+                        for g in loc.genres:
+                            genre_dist[g] = genre_dist.get(g, 0) + 1
+
         return {
             "total_movies": total_movies,
             "total_series": total_series,
             "total_episodes": total_episodes,
             "total_bytes": total_bytes,
             "unmatched": unmatched,
+            "genre_distribution": genre_dist,
+            "decade_distribution": decade_dist,
             "items": items
         }
 
