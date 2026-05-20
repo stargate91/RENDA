@@ -4,20 +4,21 @@ import { api } from '../../services/api';
 
 const ManualResolverModal = ({ listDetails, onClose, onItemsUpdated, T }) => {
   const [query, setQuery] = useState('');
+  const [year, setYear] = useState(null);
   const [searchType, setSearchType] = useState('movie'); // 'movie' or 'tv'
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [hoveredItemId, setHoveredItemId] = useState(null);
   const searchTimeoutRef = useRef(null);
 
-  const performSearch = async (searchQuery, type) => {
+  const performSearch = async (searchQuery, type, searchYear) => {
     if (!searchQuery.trim()) {
       setResults([]);
       return;
     }
     setLoading(true);
     try {
-      const data = await api.searchMetadata(searchQuery, type);
+      const data = await api.searchMetadata(searchQuery, type, searchYear);
       setResults(data || []);
     } catch (e) {
       console.error("Error searching TMDB:", e);
@@ -26,7 +27,7 @@ const ManualResolverModal = ({ listDetails, onClose, onItemsUpdated, T }) => {
     }
   };
 
-  // Debounced search on query change
+  // Debounced search on query or year change
   useEffect(() => {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
@@ -38,7 +39,7 @@ const ManualResolverModal = ({ listDetails, onClose, onItemsUpdated, T }) => {
     }
 
     searchTimeoutRef.current = setTimeout(() => {
-      performSearch(query, searchType);
+      performSearch(query, searchType, year);
     }, 450);
 
     return () => {
@@ -46,7 +47,7 @@ const ManualResolverModal = ({ listDetails, onClose, onItemsUpdated, T }) => {
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [query, searchType]);
+  }, [query, searchType, year]);
 
   const handleAdd = async (result) => {
     try {
@@ -79,6 +80,7 @@ const ManualResolverModal = ({ listDetails, onClose, onItemsUpdated, T }) => {
 
   const handleClear = () => {
     setQuery('');
+    setYear(null);
     setResults([]);
   };
 
@@ -114,21 +116,37 @@ const ManualResolverModal = ({ listDetails, onClose, onItemsUpdated, T }) => {
             </button>
           </div>
 
-          {/* Search bar */}
-          <div className="resolver-search-wrapper">
-            <Search className="search-icon" size={18} />
-            <input 
-              type="text" 
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder={searchType === 'movie' ? "Search movie title on TMDB..." : "Search series title on TMDB..."}
-              autoFocus
-            />
-            {query && (
-              <button className="clear-search-btn" onClick={handleClear}>
-                <X size={16} />
-              </button>
-            )}
+          {/* Search bar with year input */}
+          <div className="resolver-search-row">
+            <div className="resolver-search-wrapper">
+              <Search className="search-icon" size={18} />
+              <input 
+                type="text" 
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder={searchType === 'movie' ? "Search movie title on TMDB..." : "Search series title on TMDB..."}
+                autoFocus
+              />
+              {query && (
+                <button className="clear-search-btn" onClick={handleClear}>
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+            
+            <div className="resolver-year-wrapper">
+              <input 
+                type="number" 
+                value={year || ''}
+                onChange={e => {
+                  const val = e.target.value;
+                  setYear(val ? parseInt(val) : null);
+                }}
+                placeholder="Year"
+                min="1900"
+                max={new Date().getFullYear() + 2}
+              />
+            </div>
           </div>
 
           {/* Results list */}
