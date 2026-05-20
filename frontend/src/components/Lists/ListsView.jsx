@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ListVideo, Plus, Trash2, Search, Play, FolderOpen, Heart, Sparkles, X, Eye } from 'lucide-react';
 import { api, API_BASE } from '../../services/api';
 import { useAppContext } from '../../context/AppContext';
+import ManualResolverModal from './ManualResolverModal';
 import '../../styles/components/lists.css';
 
 const ListsView = ({ T }) => {
@@ -12,6 +13,32 @@ const ListsView = ({ T }) => {
   const [loadingLists, setLoadingLists] = useState(true);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showResolverModal, setShowResolverModal] = useState(false);
+
+  const handleItemsUpdated = (updatedItems) => {
+    setActiveListDetails(prev => ({
+      ...prev,
+      items: updatedItems
+    }));
+    
+    // Recalculate up to 4 sample posters from the updated items
+    const newPosters = updatedItems
+      .filter(item => item.poster_path)
+      .slice(0, 4)
+      .map(item => item.poster_path);
+
+    // Update lists counts and posters in sidebar
+    setLists(prev => prev.map(l => {
+      if (l.id === activeListId) {
+        return { 
+          ...l, 
+          item_count: updatedItems.length,
+          sample_posters: newPosters
+        };
+      }
+      return l;
+    }));
+  };
   
   // Modal states
   const [newListName, setNewListName] = useState('');
@@ -246,13 +273,16 @@ const ListsView = ({ T }) => {
                 </div>
               </div>
 
-              {activeListDetails.name !== 'Watchlist' && (
-                <div className="active-list-actions">
+              <div className="active-list-actions" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <button className="manual-resolver-btn" onClick={() => setShowResolverModal(true)}>
+                  <Plus size={16} /> Add Titles
+                </button>
+                {activeListDetails.name !== 'Watchlist' && (
                   <button className="delete-list-btn-text" onClick={() => handleDeleteList(activeListDetails.id)}>
                     <Trash2 size={16} /> Delete List
                   </button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             {/* Movie Grid Area */}
@@ -394,6 +424,16 @@ const ListsView = ({ T }) => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Manual Resolver Modal */}
+      {showResolverModal && activeListDetails && (
+        <ManualResolverModal 
+          listDetails={activeListDetails}
+          onClose={() => setShowResolverModal(false)}
+          onItemsUpdated={handleItemsUpdated}
+          T={T}
+        />
       )}
     </div>
   );
