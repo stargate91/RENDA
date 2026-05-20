@@ -97,7 +97,7 @@ const ListsPopover = ({ itemId, movieTitle, moviePoster, mediaType = 'movie', on
       className="lists-popover-container"
       style={{
         position: 'absolute',
-        top: '42px',
+        top: 'calc(100% + 8px)',
         left: '0',
         zIndex: 1100,
         width: '280px',

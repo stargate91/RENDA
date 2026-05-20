@@ -67,8 +67,8 @@ const SeriesDetailHero = ({
         <div className="detail-info">
           <h1 className="detail-title">{data.title}</h1>
 
-          {/* Premium Continue Watching Banner & Trailer */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* Premium Action Buttons (Play, Trailer, Lists) */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '15px', margin: '15px 0', position: 'relative', zIndex: 100 }}>
             {continueEpisode && (
               <button 
                 onClick={() => onPlayMedia(continueEpisode.id)}
@@ -76,7 +76,6 @@ const SeriesDetailHero = ({
                   display: 'flex',
                   alignItems: 'center',
                   gap: '12px',
-                  margin: '15px 0',
                   padding: '12px 24px',
                   background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(139, 92, 246, 0.2))',
                   border: '1px solid rgba(59, 130, 246, 0.5)',
@@ -113,7 +112,6 @@ const SeriesDetailHero = ({
                   display: 'flex',
                   alignItems: 'center',
                   gap: '12px',
-                  margin: continueEpisode ? '15px 0 15px 15px' : '15px 0',
                   padding: '12px 24px',
                   background: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid rgba(255, 255, 255, 0.15)',
@@ -142,6 +140,65 @@ const SeriesDetailHero = ({
                 {T('detail.play_trailer')}
               </button>
             )}
+
+            {/* Manage Lists Button */}
+            <div style={{ position: 'relative' }}>
+              <button 
+                onClick={() => setIsListsPopoverOpen(!isListsPopoverOpen)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '12px 24px',
+                  background: isListsPopoverOpen 
+                    ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(139, 92, 246, 0.25))'
+                    : 'rgba(255, 255, 255, 0.05)',
+                  border: isListsPopoverOpen
+                    ? '1px solid rgba(59, 130, 246, 0.5)'
+                    : '1px solid rgba(255, 255, 255, 0.15)',
+                  borderRadius: '30px',
+                  color: isListsPopoverOpen ? 'var(--accent-blue)' : '#fff',
+                  fontSize: '15px',
+                  fontWeight: '800',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                  backdropFilter: 'blur(12px)',
+                  boxShadow: isListsPopoverOpen ? '0 4px 15px rgba(59, 130, 246, 0.3)' : 'none',
+                }}
+                onMouseOver={e => {
+                  e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
+                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.15))';
+                  e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.4)';
+                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(59, 130, 246, 0.2)';
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.transform = 'none';
+                  e.currentTarget.style.background = isListsPopoverOpen 
+                    ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(139, 92, 246, 0.25))'
+                    : 'rgba(255, 255, 255, 0.05)';
+                  e.currentTarget.style.borderColor = isListsPopoverOpen
+                    ? '1px solid rgba(59, 130, 246, 0.5)'
+                    : '1px solid rgba(255, 255, 255, 0.15)';
+                  e.currentTarget.style.boxShadow = isListsPopoverOpen ? '0 4px 15px rgba(59, 130, 246, 0.3)' : 'none';
+                }}
+              >
+                <ListVideo size={16} />
+                {T('detail.manage_lists') || 'Lists'}
+              </button>
+              
+              {isListsPopoverOpen && (
+                <ListsPopover 
+                  itemId={itemId}
+                  movieTitle={data.title}
+                  moviePoster={data.poster_path}
+                  mediaType="tv"
+                  onClose={() => setIsListsPopoverOpen(false)}
+                  T={T}
+                />
+              )}
+            </div>
           </div>
 
           {/* Premium Glassmorphic User Interaction Bar */}
@@ -187,48 +244,6 @@ const SeriesDetailHero = ({
             >
               <Heart size={18} fill={data.is_favorite ? "currentColor" : "none"} />
             </button>
-
-            {/* Lists Button */}
-            <div style={{ position: 'relative' }}>
-              <button
-                onClick={() => setIsListsPopoverOpen(!isListsPopoverOpen)}
-                style={{
-                  background: isListsPopoverOpen ? 'rgba(0, 136, 255, 0.2)' : 'transparent',
-                  border: 'none',
-                  borderRadius: '8px',
-                  color: isListsPopoverOpen ? '#0088ff' : 'rgba(255, 255, 255, 0.4)',
-                  width: '32px',
-                  height: '32px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                }}
-                onMouseOver={e => {
-                  e.currentTarget.style.color = '#0088ff';
-                  e.currentTarget.style.background = 'rgba(0, 136, 255, 0.1)';
-                }}
-                onMouseOut={e => {
-                  e.currentTarget.style.color = isListsPopoverOpen ? '#0088ff' : 'rgba(255, 255, 255, 0.4)';
-                  e.currentTarget.style.background = isListsPopoverOpen ? 'rgba(0, 136, 255, 0.2)' : 'transparent';
-                }}
-                title="Manage Custom Lists"
-              >
-                <ListVideo size={18} />
-              </button>
-              
-              {isListsPopoverOpen && (
-                <ListsPopover 
-                  itemId={itemId}
-                  movieTitle={data.title}
-                  moviePoster={data.poster_path}
-                  mediaType="tv"
-                  onClose={() => setIsListsPopoverOpen(false)}
-                  T={T}
-                />
-              )}
-            </div>
 
             <div style={{ width: '1px', height: '16px', background: 'rgba(255, 255, 255, 0.15)' }} />
 
