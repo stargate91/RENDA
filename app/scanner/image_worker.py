@@ -3,7 +3,7 @@ import requests
 from typing import Optional, List
 from pathlib import Path
 from sqlalchemy.orm import Session
-from ..db.models import MediaMatch, MetadataLocalization, Person, ImageStatus
+from ..db.models import MediaMatch, MetadataLocalization, Person, ImageStatus, ItemType
 from ..utils.logger import logger
 
 class ImageWorker:
@@ -253,8 +253,23 @@ class ImageWorker:
                     if updated_stills:
                         loc.local_all_stills = local_stills
                         
-                if not has_any_path:
-                    success = True # Nincs mit letölteni, ez önmagában siker
+            # D. SEASON POSTERS (TV shows only)
+            series_id = match.series_tmdb_id if match.item_type == ItemType.EPISODE else (match.tmdb_id if match.item_type == ItemType.SERIES else None)
+            if series_id:
+                try:
+                    from ..db.models import TMDBCache
+                    tmdb_cache = local_db.query(TMDBCache).filter(
+                        TMDBCache.tmdb_id == series_id,
+                        TMDBCache.cache_key.like(f"/tv/{series_id}%")
+                    ).first()
+                    if tmdb_cache and isinstance(tmdb_cache.raw_data, dict):
+                        seasons = tmdb_cache.raw_data.get("seasons", [])
+                        for s in seasons:
+                            s_poster = s.get("poster_path")
+                            if s_poster:
+                                self.download_image(s_poster, "posters", size="w500")
+                except Exception as e:
+                    logger.error(f"Failed to download season posters for series {series_id}: {e}")
 
             match.image_status = ImageStatus.COMPLETED if success else ImageStatus.FAILED
             local_db.commit()

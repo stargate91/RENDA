@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import JSONResponse, FileResponse
 from sqlalchemy.orm import joinedload
 from sqlalchemy import or_, func
@@ -350,7 +350,7 @@ def get_library_item_detail(item_id: str):
         db.close()
 
 @router.get("/library/series/{series_tmdb_id}")
-def get_library_series_detail(series_tmdb_id: str):
+def get_library_series_detail(series_tmdb_id: str, background_tasks: BackgroundTasks):
     """Returns comprehensive detail data for a full series, including seasons and episodes."""
     db = Session()
     try:
@@ -677,6 +677,20 @@ def get_library_series_detail(series_tmdb_id: str):
                         "order": link.order
                     }
                     series_cast_map[person.id] = person_data
+
+        # Check and download missing season posters
+        for s_info in series_data["seasons"].values():
+            s_poster = s_info.get("poster_path")
+            if s_poster:
+                filename = s_poster.lstrip("/")
+                local_file = Path("data/media/images/posters") / filename
+                if not local_file.exists() or local_file.stat().st_size < 100:
+                    def download_missing_poster(poster_path):
+                        from app.services.asset_service import AssetService
+                        asset_service = AssetService()
+                        asset_service.download_image(poster_path, "posters", size="w500")
+                    
+                    background_tasks.add_task(download_missing_poster, s_poster)
 
         # Sort seasons and episodes
         series_data["seasons"] = [series_data["seasons"][k] for k in sorted(series_data["seasons"].keys())]
