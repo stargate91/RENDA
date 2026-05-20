@@ -19,6 +19,7 @@
   flex: 1;
   padding: 60px;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   position: relative;
 }
 
