@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Play, Star, Heart, Clapperboard, Film } from 'lucide-react';
-import CustomTagsList from './CustomTagsList';
+import CustomTagsList from '../Shared/CustomTagsList';
 
 const SeriesDetailHero = ({
   data,

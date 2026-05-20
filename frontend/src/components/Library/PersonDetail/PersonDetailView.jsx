@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, User } from 'lucide-react';
-import { api, API_BASE } from '../../services/api';
-import { useAppContext } from '../../context/AppContext';
+import { api, API_BASE } from '../../../services/api';
+import { useAppContext } from '../../../context/AppContext';
 import PersonDetailHero from './PersonDetailHero';
 import PersonMoviesSection from './PersonMoviesSection';
 import PersonSeriesSection from './PersonSeriesSection';
@@ -223,3 +223,4 @@ const PersonDetailView = ({ personId, onBack, onMovieClick, onSeriesClick }) => 
 };
 
 export default PersonDetailView;
+

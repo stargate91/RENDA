@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Users, User, X } from 'lucide-react';
-import { api, API_BASE } from '../../services/api';
-import { useAppContext } from '../../context/AppContext';
+import { api, API_BASE } from '../../../services/api';
+import { useAppContext } from '../../../context/AppContext';
 import SeriesDetailHero from './SeriesDetailHero';
 import SeriesSeasonSelector from './SeriesSeasonSelector';
 import SeriesEpisodeList from './SeriesEpisodeList';
@@ -399,3 +399,4 @@ const SeriesDetailView = ({ seriesTmdbId, onBack, onPersonClick }) => {
 };
 
 export default SeriesDetailView;
+

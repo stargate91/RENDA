@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Play, ChevronDown, ChevronUp, FolderOpen, RefreshCcw, Check } from 'lucide-react';
-import { api } from '../../services/api';
+import { api } from '../../../services/api';
 
 const SeriesEpisodeList = ({ activeSeason, activeSeasonNum, inLibrary, onPlayMedia, openResolver, T, API_BASE }) => {
   const [expandedEpisodeId, setExpandedEpisodeId] = useState(null);
@@ -211,3 +211,4 @@ const SeriesEpisodeList = ({ activeSeason, activeSeasonNum, inLibrary, onPlayMed
 };
 
 export default SeriesEpisodeList;
+

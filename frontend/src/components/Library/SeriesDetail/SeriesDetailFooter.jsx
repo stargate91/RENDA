@@ -1,6 +1,6 @@
 import React from 'react';
 import { FolderOpen, RefreshCcw, Star } from 'lucide-react';
-import { api } from '../../services/api';
+import { api } from '../../../services/api';
 
 const SeriesDetailFooter = ({ data, openResolver, T }) => {
   return (
@@ -100,3 +100,4 @@ const SeriesDetailFooter = ({ data, openResolver, T }) => {
 };
 
 export default SeriesDetailFooter;
+

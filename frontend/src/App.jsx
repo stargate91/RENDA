@@ -8,7 +8,7 @@ import DiscoveryConsole from './components/Discovery/DiscoveryConsole';
 import InspectorPanel from './components/Discovery/InspectorPanel';
 import SettingsView from './components/Settings/SettingsView';
 import DashboardView from './components/Dashboard/DashboardView';
-import LibraryView from './components/Library/LibraryView';
+import LibraryView from './components/Library/Core/LibraryView';
 import ListsView from './components/Lists/ListsView';
 import Layout from './components/Layout/Layout';
 import { useGlobalDragDrop } from './hooks/useGlobalDragDrop';

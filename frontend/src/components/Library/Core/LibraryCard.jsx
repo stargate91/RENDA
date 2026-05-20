@@ -1,6 +1,6 @@
 import React from 'react';
 import { User, Film, Check, Heart, Star } from 'lucide-react';
-import { api } from '../../services/api';
+import { api } from '../../../services/api';
 
 const LibraryCard = ({
   item,
@@ -326,3 +326,4 @@ const LibraryCard = ({
 };
 
 export default LibraryCard;
+

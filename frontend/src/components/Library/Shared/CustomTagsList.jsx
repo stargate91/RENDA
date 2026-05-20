@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Tag, Plus, X, Check } from 'lucide-react';
-import { api } from '../../services/api';
-import { useAppContext } from '../../context/AppContext';
+import { api } from '../../../services/api';
+import { useAppContext } from '../../../context/AppContext';
 
 const CustomTagsList = ({ tags, onAddTag, onRemoveTag }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -248,3 +248,4 @@ const CustomTagsList = ({ tags, onAddTag, onRemoveTag }) => {
 };
 
 export default CustomTagsList;
+

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, Loader2, User, Check, Plus, Minus, Heart, X } from 'lucide-react';
-import { api } from '../../services/api';
+import { api } from '../../../services/api';
 
 const PeopleManagerModal = ({
   activeTab, // 'actors' | 'directors'
@@ -600,3 +600,4 @@ const PeopleManagerModal = ({
 };
 
 export default PeopleManagerModal;
+

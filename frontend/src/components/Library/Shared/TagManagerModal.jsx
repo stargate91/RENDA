@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Tag, X, Plus, Check } from 'lucide-react';
-import { api } from '../../services/api';
-import { useAppContext } from '../../context/AppContext';
+import { api } from '../../../services/api';
+import { useAppContext } from '../../../context/AppContext';
 
 export const TagsManagerView = ({ tags = [], searchQuery = '', navigateTo, onTagsChanged }) => {
   const { T, confirmAction } = useAppContext();
@@ -552,3 +552,4 @@ export const BulkTagModal = ({ T, selectedItemIds = [], currentItems = [], onClo
 };
 
 export default TagsManagerView;
+

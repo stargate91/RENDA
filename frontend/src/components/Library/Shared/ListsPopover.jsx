@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Check, Plus } from 'lucide-react';
-import { api } from '../../services/api';
+import { api } from '../../../services/api';
 
 const ListsPopover = ({ itemId, movieTitle, moviePoster, onClose, T }) => {
   const [lists, setLists] = useState([]);
@@ -285,3 +285,4 @@ const ListsPopover = ({ itemId, movieTitle, moviePoster, onClose, T }) => {
 };
 
 export default ListsPopover;
+

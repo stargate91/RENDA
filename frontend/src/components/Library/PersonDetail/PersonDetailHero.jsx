@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Star, Heart, Plus, Minus, Calendar, MapPin, User, Sparkles } from 'lucide-react';
-import CustomTagsList from './CustomTagsList';
+import CustomTagsList from '../Shared/CustomTagsList';
 
 const PersonDetailHero = ({
   data,

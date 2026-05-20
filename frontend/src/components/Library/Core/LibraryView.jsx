@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, Film, Tv, ShieldAlert, User, Clapperboard, Settings, Plus, X, Tag, Check } from 'lucide-react';
-import { api } from '../../services/api';
-import MovieDetailView from './MovieDetailView';
-import SeriesDetailView from './SeriesDetailView';
-import PersonDetailView from './PersonDetailView';
+import { api } from '../../../services/api';
+import MovieDetailView from '../MovieDetail/MovieDetailView';
+import SeriesDetailView from '../SeriesDetail/SeriesDetailView';
+import PersonDetailView from '../PersonDetail/PersonDetailView';
 import LibraryFilterBar from './LibraryFilterBar';
 import LibraryGrid from './LibraryGrid';
-import TagsManagerView, { BulkTagModal } from './TagManagerModal';
-import PeopleManagerModal from './PeopleManagerModal';
-import { useAppContext } from '../../context/AppContext';
-import '../../styles/components/library.css';
+import TagsManagerView, { BulkTagModal } from '../Shared/TagManagerModal';
+import PeopleManagerModal from '../Shared/PeopleManagerModal';
+import { useAppContext } from '../../../context/AppContext';
+import '../../../styles/components/library.css';
 
 const LibraryView = ({ T }) => {
   const [data, setData] = useState({ movies: [], series: [], adult: [], counts: { movies: 0, series: 0, adult: 0 } });
@@ -647,3 +647,4 @@ const LibraryView = ({ T }) => {
 };
 
 export default LibraryView;
+

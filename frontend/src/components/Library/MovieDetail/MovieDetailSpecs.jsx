@@ -1,6 +1,6 @@
 import React from 'react';
 import { Monitor, HardDrive, FolderOpen, RefreshCcw, ExternalLink, Star } from 'lucide-react';
-import { api } from '../../services/api';
+import { api } from '../../../services/api';
 
 const MovieDetailSpecs = ({ data, openResolver, T }) => {
   const tech = data.technical || {};
@@ -226,3 +226,4 @@ const MovieDetailSpecs = ({ data, openResolver, T }) => {
 };
 
 export default MovieDetailSpecs;
+

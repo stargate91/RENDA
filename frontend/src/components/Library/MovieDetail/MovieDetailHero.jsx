@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Clock, Calendar, Star, Heart, ListVideo, Film, Monitor } from 'lucide-react';
-import CustomTagsList from './CustomTagsList';
-import ListsPopover from './ListsPopover';
+import CustomTagsList from '../Shared/CustomTagsList';
+import ListsPopover from '../Shared/ListsPopover';
 
 const MovieDetailHero = ({
   data,

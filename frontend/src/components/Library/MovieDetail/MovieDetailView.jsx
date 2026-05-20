@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Film, X } from 'lucide-react';
-import { api, API_BASE } from '../../services/api';
-import { useAppContext } from '../../context/AppContext';
+import { api, API_BASE } from '../../../services/api';
+import { useAppContext } from '../../../context/AppContext';
 import MovieDetailHero from './MovieDetailHero';
 import MovieDetailCast from './MovieDetailCast';
 import MovieDetailSpecs from './MovieDetailSpecs';
@@ -259,3 +259,4 @@ const MovieDetailView = ({ itemId, onBack, onPersonClick }) => {
 };
 
 export default MovieDetailView;
+
