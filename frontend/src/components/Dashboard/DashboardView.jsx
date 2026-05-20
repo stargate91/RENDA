@@ -97,10 +97,11 @@ const TimeTravelTimeline = ({ decades, T }) => {
   );
 };
 
-const SpotlightBanner = ({ item, onWatchlist, T }) => {
+const SpotlightBanner = ({ item, watchlistIds = [], onWatchlist, T }) => {
   if (!item) return null;
   const imageUrl = `https://image.tmdb.org/t/p/original${item.backdrop_path}`;
   const title = item.title || item.name;
+  const isWatchlisted = watchlistIds.includes(item.id);
   
   return (
     <div style={{
@@ -129,21 +130,38 @@ const SpotlightBanner = ({ item, onWatchlist, T }) => {
         <button 
           onClick={() => onWatchlist(item.id, item.title ? 'movie' : 'tv')}
           style={{
-            background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: '12px',
+            background: isWatchlisted ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #3b82f6, #8b5cf6)', 
+            color: '#fff', border: 'none', padding: '12px 24px', borderRadius: '12px',
             fontSize: '16px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
-            boxShadow: '0 0 20px rgba(59, 130, 246, 0.5)', transition: 'all 0.3s'
+            boxShadow: isWatchlisted ? '0 0 20px rgba(16, 185, 129, 0.4)' : '0 0 20px rgba(59, 130, 246, 0.5)', transition: 'all 0.3s'
           }}
-          onMouseOver={e => { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.boxShadow = '0 0 30px rgba(59, 130, 246, 0.8)'; }}
-          onMouseOut={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 0 20px rgba(59, 130, 246, 0.5)'; }}
+          onMouseOver={e => { 
+            e.currentTarget.style.transform = 'scale(1.05)'; 
+            e.currentTarget.style.boxShadow = isWatchlisted ? '0 0 30px rgba(16, 185, 129, 0.7)' : '0 0 30px rgba(59, 130, 246, 0.8)'; 
+          }}
+          onMouseOut={e => { 
+            e.currentTarget.style.transform = 'scale(1)'; 
+            e.currentTarget.style.boxShadow = isWatchlisted ? '0 0 20px rgba(16, 185, 129, 0.4)' : '0 0 20px rgba(59, 130, 246, 0.5)'; 
+          }}
         >
-          <span>+</span> {T('dashboard.watchlist.add') || 'Watchlist'}
+          {isWatchlisted ? (
+            <>
+              <span>✓</span> {T('dashboard.watchlist.added') || 'Watchlisted'}
+            </>
+          ) : (
+            <>
+              <span>+</span> {T('dashboard.watchlist.add') || 'Watchlist'}
+            </>
+          )}
         </button>
       </div>
     </div>
   );
 };
 
-const RecommendationCarousel = ({ title, items, onWatchlist, onCardClick, T }) => {
+
+
+const RecommendationCarousel = ({ title, items, watchlistIds = [], onWatchlist, onCardClick, T }) => {
   const scrollRef = useRef(null);
   const [showLeft, setShowLeft] = useState(false);
   const [showRight, setShowRight] = useState(true);
@@ -223,42 +241,47 @@ const RecommendationCarousel = ({ title, items, onWatchlist, onCardClick, T }) =
           <style>{`
             .rec-card:hover .rec-overlay { opacity: 1 !important; }
           `}</style>
-          {items.map(item => (
-            <div key={item.id} style={{
-              minWidth: '200px', width: '200px', position: 'relative', borderRadius: '16px', overflow: 'hidden',
-              scrollSnapAlign: 'start', transition: 'transform 0.3s', cursor: 'pointer', background: '#111', flexShrink: 0
-            }}
-            className="rec-card"
-            onClick={() => onCardClick && onCardClick(item)}
-            onMouseOver={e => e.currentTarget.style.transform = 'scale(1.05) translateY(-10px)'}
-            onMouseOut={e => e.currentTarget.style.transform = 'scale(1) translateY(0)'}
-            >
-              <div style={{ paddingBottom: '150%' }}>
-                <img src={`https://image.tmdb.org/t/p/w500${item.poster_path}`} alt={item.title || item.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-              </div>
-              
-              <div className="rec-overlay" style={{
-                position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.4))',
-                display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '15px', opacity: 0, transition: 'opacity 0.3s'
-              }}>
-                <div style={{ fontWeight: 'bold', color: '#fff', fontSize: '14px', marginBottom: '5px' }}>{item.title || item.name}</div>
-                <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px', marginBottom: '15px' }}>⭐ {item.vote_average?.toFixed(1)}</div>
+          {items.map(item => {
+            const isWatchlisted = watchlistIds.includes(item.id);
+            return (
+              <div key={item.id} style={{
+                minWidth: '200px', width: '200px', position: 'relative', borderRadius: '16px', overflow: 'hidden',
+                scrollSnapAlign: 'start', transition: 'transform 0.3s', cursor: 'pointer', background: '#111', flexShrink: 0
+              }}
+              className="rec-card"
+              onClick={() => onCardClick && onCardClick(item)}
+              onMouseOver={e => e.currentTarget.style.transform = 'scale(1.05) translateY(-10px)'}
+              onMouseOut={e => e.currentTarget.style.transform = 'scale(1) translateY(0)'}
+              >
+                <div style={{ paddingBottom: '150%' }}>
+                  <img src={`https://image.tmdb.org/t/p/w500${item.poster_path}`} alt={item.title || item.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
                 
-                <button
-                  onClick={(e) => { e.stopPropagation(); onWatchlist(item.id, item.title ? 'movie' : 'tv'); }}
-                  style={{
-                    background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.4)', color: '#fff',
-                    padding: '8px', borderRadius: '8px', backdropFilter: 'blur(4px)', cursor: 'pointer', fontWeight: 'bold',
-                    transition: 'background 0.2s'
-                  }}
-                  onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
-                  onMouseOut={e => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
-                >
-                  + {T('dashboard.watchlist.add_short') || 'Watchlist'}
-                </button>
+                <div className="rec-overlay" style={{
+                  position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.4))',
+                  display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '15px', opacity: 0, transition: 'opacity 0.3s'
+                }}>
+                  <div style={{ fontWeight: 'bold', color: '#fff', fontSize: '14px', marginBottom: '5px' }}>{item.title || item.name}</div>
+                  <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px', marginBottom: '15px' }}>⭐ {item.vote_average?.toFixed(1)}</div>
+                  
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onWatchlist(item.id, item.title ? 'movie' : 'tv'); }}
+                    style={{
+                      background: isWatchlisted ? 'rgba(16, 185, 129, 0.4)' : 'rgba(255,255,255,0.2)', 
+                      border: isWatchlisted ? '1px solid rgba(16, 185, 129, 0.6)' : '1px solid rgba(255,255,255,0.4)', 
+                      color: '#fff',
+                      padding: '8px', borderRadius: '8px', backdropFilter: 'blur(4px)', cursor: 'pointer', fontWeight: 'bold',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseOver={e => e.currentTarget.style.background = isWatchlisted ? 'rgba(16, 185, 129, 0.6)' : 'rgba(255,255,255,0.3)'}
+                    onMouseOut={e => e.currentTarget.style.background = isWatchlisted ? 'rgba(16, 185, 129, 0.4)' : 'rgba(255,255,255,0.2)'}
+                  >
+                    {isWatchlisted ? '✓ Watchlisted' : `+ ${T('dashboard.watchlist.add_short') || 'Watchlist'}`}
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
@@ -269,6 +292,7 @@ const DashboardView = ({ settings, stats, T }) => {
   const { imageStatus, setView, setPendingDetailId } = useAppContext();
   const [cwItems, setCwItems] = useState([]);
   const [recommendations, setRecommendations] = useState(null);
+  const [watchlistIds, setWatchlistIds] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -284,7 +308,10 @@ const DashboardView = ({ settings, stats, T }) => {
         cw.sort((a, b) => new Date(b.last_watched_at || 0) - new Date(a.last_watched_at || 0));
         setCwItems(cw);
         
-        if (recsData) setRecommendations(recsData);
+        if (recsData) {
+          setRecommendations(recsData);
+          setWatchlistIds(recsData.watchlist_item_ids || []);
+        }
       } catch (e) {
         console.error("Failed to fetch dashboard data:", e);
       } finally {
@@ -295,14 +322,18 @@ const DashboardView = ({ settings, stats, T }) => {
   }, []);
 
   const handleWatchlist = async (tmdbId, type) => {
+    const isWatchlisted = watchlistIds.includes(tmdbId);
     try {
-      const result = await api.addToWatchlist(tmdbId, type);
-      alert(T('dashboard.watchlist.success') || "Added to your Watchlist!");
-      return result?.id;
+      if (isWatchlisted) {
+        await api.removeFromWatchlist(tmdbId);
+        setWatchlistIds(prev => prev.filter(id => id !== tmdbId));
+      } else {
+        await api.addToWatchlist(tmdbId, type);
+        setWatchlistIds(prev => [...prev, tmdbId]);
+      }
     } catch (e) {
       console.error(e);
-      alert("Failed to add to watchlist.");
-      return null;
+      alert(isWatchlisted ? "Failed to remove from watchlist." : "Failed to add to watchlist.");
     }
   };
 
@@ -314,7 +345,12 @@ const DashboardView = ({ settings, stats, T }) => {
   return (
     <>
       {recommendations?.trending?.length > 0 && (
-        <SpotlightBanner item={recommendations.trending[0]} onWatchlist={handleWatchlist} T={T} />
+        <SpotlightBanner 
+          item={recommendations.trending[0]} 
+          watchlistIds={watchlistIds} 
+          onWatchlist={handleWatchlist} 
+          T={T} 
+        />
       )}
 
       <div className="header">
@@ -326,6 +362,7 @@ const DashboardView = ({ settings, stats, T }) => {
         <RecommendationCarousel 
           title={T('dashboard.recommendations.genre', { genre: recommendations.top_genre || 'Your favorites' }) || `Because you like ${recommendations.top_genre || 'these'}...`}
           items={recommendations.discover} 
+          watchlistIds={watchlistIds} 
           onWatchlist={handleWatchlist} 
           onCardClick={handleCardClick}
           T={T} 

@@ -24,9 +24,21 @@ def get_recommendations(background_tasks: BackgroundTasks):
     from app.services.media_library_service import MediaLibraryService
     from app.api.tmdb_client import TMDBClient
     from app.db.models.metadata import TMDBCache
+    from app.db.models.media import CustomList, CustomListItem
     
     db = Session()
     try:
+        # Get watchlist items to return their TMDB IDs
+        watchlist = db.query(CustomList).filter(CustomList.name == "Watchlist").first()
+        watchlist_tmdb_ids = []
+        if watchlist:
+            watchlist_tmdb_ids = [
+                item[0] for item in db.query(CustomListItem.tmdb_id).filter(
+                    CustomListItem.list_id == watchlist.id,
+                    CustomListItem.tmdb_id != None
+                ).all()
+            ]
+
         # Get top genre
         stats = MediaLibraryService(db).get_stats()
         genres = stats.genre_distribution if hasattr(stats, "genre_distribution") else stats.get("genre_distribution", {})
@@ -109,7 +121,8 @@ def get_recommendations(background_tasks: BackgroundTasks):
             return {
                 "trending": trending_cache.raw_data.get("results", []) if isinstance(trending_cache.raw_data, dict) else trending_cache.raw_data,
                 "discover": discover_cache.raw_data.get("results", []) if isinstance(discover_cache.raw_data, dict) else discover_cache.raw_data,
-                "top_genre": top_genre
+                "top_genre": top_genre,
+                "watchlist_item_ids": watchlist_tmdb_ids
             }
 
         # Otherwise (first run or one of the caches is missing), fetch synchronously
@@ -118,7 +131,8 @@ def get_recommendations(background_tasks: BackgroundTasks):
         return {
             "trending": trending,
             "discover": discover,
-            "top_genre": top_genre
+            "top_genre": top_genre,
+            "watchlist_item_ids": watchlist_tmdb_ids
         }
     finally:
         db.close()
@@ -188,6 +202,7 @@ def add_to_watchlist(payload: dict):
         # 3. Fetch details from TMDB to get the title and poster path
         tmdb = TMDBClient(db)
         details = tmdb.get_details(tmdb_id, item_type)
+
         if not details:
             return JSONResponse(status_code=404, content={"error": "TMDB details not found"})
 
@@ -211,6 +226,34 @@ def add_to_watchlist(payload: dict):
         import traceback
         logger.error(f"Error adding to custom watchlist: {e}")
         logger.error(traceback.format_exc())
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    finally:
+        db.close()
+
+@router.delete("/watchlist/{tmdb_id}")
+def remove_from_watchlist(tmdb_id: int):
+    from app.db.models.media import CustomList, CustomListItem
+    
+    db = Session()
+    try:
+        watchlist = db.query(CustomList).filter(CustomList.name == "Watchlist").first()
+        if not watchlist:
+            return JSONResponse(status_code=404, content={"error": "Watchlist not found"})
+
+        item = db.query(CustomListItem).filter(
+            CustomListItem.list_id == watchlist.id,
+            CustomListItem.tmdb_id == tmdb_id
+        ).first()
+        
+        if not item:
+            return JSONResponse(status_code=404, content={"error": "Item not found in Watchlist"})
+
+        db.delete(item)
+        db.commit()
+        return {"status": "success"}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error removing from custom watchlist: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
     finally:
         db.close()

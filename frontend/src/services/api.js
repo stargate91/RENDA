@@ -33,6 +33,10 @@ export const api = {
     body: JSON.stringify({ tmdb_id: tmdbId, type }),
   }),
 
+  removeFromWatchlist: (tmdbId) => fetchJson(`/api/watchlist/${tmdbId}`, {
+    method: 'DELETE',
+  }),
+
   getDiscoveryItems: () => fetchJson('/api/discovery'),
 
   getLibrary: () => fetchJson('/api/library'),
