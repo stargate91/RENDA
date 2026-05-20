@@ -318,13 +318,18 @@ class MetadataEnricher:
         # 1. Rendezők / Készítők
         creators = []
         if match.item_type == ItemType.MOVIE:
-            creators = [p for p in crew if p["job"] == "Director"][:2]
+            creators = [p for p in crew if p.get("job") == "Director"][:2]
         else:
             # Sorozatoknál 'created_by'
             creators = details.get("created_by", [])
-            # Ha nincs created_by, akkor a crew-ból a Producerek
+            # Ha nincs created_by, akkor a crew-ból a Producerek vagy Rendezők
             if not creators:
-                creators = [p for p in crew if p["job"] in ["Executive Producer", "Director"]]
+                for p in crew:
+                    if "jobs" in p:
+                        if any(j.get("job") in ["Executive Producer", "Director"] for j in p["jobs"] if isinstance(j, dict)):
+                            creators.append(p)
+                    elif p.get("job") in ["Executive Producer", "Director"]:
+                        creators.append(p)
             creators = creators[:2]
 
         # Mentés és Linkelés
@@ -334,8 +339,8 @@ class MetadataEnricher:
         for i, p in enumerate(creators[:2]):
             person = self._get_or_create_person(p)
             self._link_person(match, person, job="Director" if match.item_type == ItemType.MOVIE else "Creator")
-            processed_people.append(p["id"])
-            if i == 0: match.director = p["name"]
+            processed_people.append(p.get("id"))
+            if i == 0: match.director = p.get("name")
 
         # B. Színészek feldolgozása
         for i, p in enumerate(cast):
