@@ -32,10 +32,14 @@ class TMDBClient:
         """Retrieves non-expired cache from the database."""
         from datetime import datetime, timedelta
         
-        # Check cache (expire after 30 days)
+        # Check cache
         cache_item = self.db.query(TMDBCache).filter(TMDBCache.cache_key == cache_key).first()
         if cache_item:
-            if datetime.utcnow() - cache_item.updated_at < timedelta(days=30):
+            # Dynamic cache expiration based on request endpoint
+            is_dynamic = "trending" in cache_key or "discover" in cache_key
+            expire_days = 1 if is_dynamic else 30
+            
+            if datetime.utcnow() - cache_item.updated_at < timedelta(days=expire_days):
                 return cache_item.raw_data
         return None
 

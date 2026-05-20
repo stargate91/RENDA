@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import JSONResponse, FileResponse
 from sqlalchemy.orm import joinedload
 from sqlalchemy import or_, func
@@ -9,6 +9,7 @@ import subprocess
 import platform
 from pathlib import Path
 from typing import Optional
+from datetime import datetime, timedelta
 
 from app.db.deletion import delete_extra_files_by_ids, delete_media_items_by_ids
 from app.db.base import Session
@@ -19,9 +20,11 @@ router = APIRouter()
 
 
 @router.get("/recommendations")
-def get_recommendations():
+def get_recommendations(background_tasks: BackgroundTasks):
     from app.services.media_library_service import MediaLibraryService
     from app.api.tmdb_client import TMDBClient
+    from app.db.models.metadata import TMDBCache
+    
     db = Session()
     try:
         # Get top genre
@@ -31,8 +34,6 @@ def get_recommendations():
         if genres:
             top_genre = sorted(genres.items(), key=lambda x: x[1], reverse=True)[0][0]
 
-        # In a real app we'd map "Sci-Fi & Fantasy" to TMDB genre IDs (e.g. 878)
-        # For simplicity, we just ask TMDB for discover without genres or try to map a few common ones
         genre_map = {
             "Action": "28", "Adventure": "12", "Animation": "16", "Comedy": "35",
             "Crime": "80", "Documentary": "99", "Drama": "18", "Family": "10751",
@@ -42,12 +43,78 @@ def get_recommendations():
             "Sci-Fi & Fantasy": "878,14", "Action & Adventure": "28,12"
         }
         
-        tmdb = TMDBClient(db)
-        trending = tmdb.get_trending("all", "day")
-        
         genre_id = genre_map.get(top_genre) if top_genre else None
-        discover = tmdb.discover("movie", with_genres=genre_id) if genre_id else tmdb.get_trending("movie", "week")
+        tmdb = TMDBClient(db)
+
+        # Generate the exact cache keys used by get_trending and discover methods
+        trending_key = tmdb._generate_cache_key("/trending/all/day", {
+            "api_key": tmdb._api_key,
+            "language": "en-US"
+        })
         
+        if genre_id:
+            discover_endpoint = "/discover/movie"
+            discover_params = {
+                "api_key": tmdb._api_key,
+                "language": "en-US",
+                "page": 1,
+                "sort_by": "popularity.desc",
+                "with_genres": genre_id
+            }
+        else:
+            discover_endpoint = "/trending/movie/week"
+            discover_params = {
+                "api_key": tmdb._api_key,
+                "language": "en-US"
+            }
+        discover_key = tmdb._generate_cache_key(discover_endpoint, discover_params)
+
+        # Retrieve cache items from DB (regardless of expiration)
+        trending_cache = db.query(TMDBCache).filter(TMDBCache.cache_key == trending_key).first()
+        discover_cache = db.query(TMDBCache).filter(TMDBCache.cache_key == discover_key).first()
+
+        now = datetime.utcnow()
+        needs_update = False
+        
+        # Check if cache is missing or older than 24 hours
+        if not trending_cache or (now - trending_cache.updated_at > timedelta(hours=24)):
+            needs_update = True
+        if not discover_cache or (now - discover_cache.updated_at > timedelta(hours=24)):
+            needs_update = True
+
+        if needs_update:
+            # Define background update function
+            def update_recommendations_cache():
+                bg_db = Session()
+                try:
+                    # Delete expired cache rows first to force fresh fetch in client
+                    bg_db.query(TMDBCache).filter(TMDBCache.cache_key.in_([trending_key, discover_key])).delete()
+                    bg_db.commit()
+                    
+                    bg_tmdb = TMDBClient(bg_db)
+                    bg_tmdb.get_trending("all", "day")
+                    if genre_id:
+                        bg_tmdb.discover("movie", with_genres=genre_id)
+                    else:
+                        bg_tmdb.get_trending("movie", "week")
+                except Exception as e:
+                    logger.error(f"Error updating recommendations in background: {e}")
+                finally:
+                    bg_db.close()
+            
+            background_tasks.add_task(update_recommendations_cache)
+
+        # If cache exists, return it immediately for instant page load
+        if trending_cache and discover_cache:
+            return {
+                "trending": trending_cache.raw_data.get("results", []) if isinstance(trending_cache.raw_data, dict) else trending_cache.raw_data,
+                "discover": discover_cache.raw_data.get("results", []) if isinstance(discover_cache.raw_data, dict) else discover_cache.raw_data,
+                "top_genre": top_genre
+            }
+
+        # Otherwise (first run or one of the caches is missing), fetch synchronously
+        trending = tmdb.get_trending("all", "day")
+        discover = tmdb.discover("movie", with_genres=genre_id) if genre_id else tmdb.get_trending("movie", "week")
         return {
             "trending": trending,
             "discover": discover,
@@ -69,7 +136,6 @@ def get_discovery_items():
 
 @router.post("/discovery/delete")
 def delete_discovery_items(payload: dict):
-    """Deletes specified media items and extras from the database."""
     item_ids = payload.get("item_ids", [])
     extra_ids = payload.get("extra_ids", [])
     db = Session()
