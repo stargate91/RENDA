@@ -8,6 +8,8 @@ from app.db.models import *
 # Import routers
 from app.api.routes import scanner, settings, library, recommendations, people, playback, overrides, metadata, renamer, tags, lists
 
+import os
+
 # Automatically create tables if they don't exist
 Base.metadata.create_all(bind=engine)
 CacheBase.metadata.create_all(bind=cache_engine)
@@ -34,6 +36,9 @@ async def lifespan(app: FastAPI):
     stop_background_workers()
 
 app = FastAPI(title="RENDA API", lifespan=lifespan)
+
+# Ensure media directory exists
+os.makedirs("data/media", exist_ok=True)
 
 # Mount media folder
 app.mount("/media", StaticFiles(directory="data/media"), name="media")
